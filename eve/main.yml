@@ -1,0 +1,31 @@
+---
+version: 0.2
+
+branches:
+  default:
+    stage: pre-merge
+
+stages:
+  pre-merge:
+    worker: &master-worker
+      type: docker
+      path: eve/workers/master
+      volumes:
+        - '/home/eve/workspace'
+    steps:
+      - Git:
+          name: fetch source
+          repourl: '%(prop:git_reference)s'
+          shallow: True
+          retryFetch: True
+          haltOnFailure: True
+      - ShellCommand:
+          name: install dependencies
+          command: yarn 
+      - ShellCommand:
+          name: run lint
+          command: yarn --silent lint -- --max-warnings 0
+      - ShellCommand:
+          name: run test
+          command: yarn --silent test
+
