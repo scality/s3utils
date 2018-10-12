@@ -1,0 +1,40 @@
+{
+  "name": "s3utils",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=8"
+  },
+  "description": "Awesome scripts to use when working with S3 at scale",
+  "scripts": {
+    "lint": "eslint $(git ls-files '*.js')",
+    "test": "jest test/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scality/s3utils.git"
+  },
+  "keywords": [
+    "s3",
+    "s3",
+    "utilities"
+  ],
+  "author": "Scality",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/scality/s3utils/issues"
+  },
+  "homepage": "https://github.com/scality/s3utils#readme",
+  "dependencies": {
+    "arsenal": "scality/arsenal#0a85eeb",
+    "async": "^2.6.1",
+    "aws-sdk": "^2.333.0",
+    "werelogs": "scality/werelogs"
+  },
+  "devDependencies": {
+    "eslint": "^2.13.1",
+    "eslint-config-airbnb": "^6.2.0",
+    "eslint-config-scality": "github:scality/Guidelines",
+    "eslint-plugin-react": "^4.3.0",
+    "jest": "^23.6.0"
+  }
+}
