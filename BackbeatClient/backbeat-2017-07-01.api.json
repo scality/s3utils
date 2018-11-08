@@ -1,0 +1,1203 @@
+{
+    "version": "1.0",
+    "metadata": {
+        "apiVersion": "2017-07-01",
+        "checksumFormat": "md5",
+        "endpointPrefix": "s3",
+        "globalEndpoint": "127.0.0.1",
+        "protocol": "rest-json",
+        "serviceAbbreviation": "Backbeat",
+        "serviceFullName": "Backbeat Internal Routes",
+        "signatureVersion": "s3",
+        "timestampFormat": "rfc822",
+        "uid": "backbeat-2017-07-01"
+    },
+    "operations": {
+        "PutData": {
+            "http": {
+                "method": "PUT",
+                "requestUri": "/_/backbeat/data/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "ContentMD5": {
+                        "location": "header",
+                        "locationName": "Content-MD5"
+                    },
+                    "CanonicalID": {
+                        "location": "header",
+                        "locationName": "X-Scal-Canonical-Id"
+                    },
+                    "Body": {
+                        "streaming": true,
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "Location": {
+                        "type": "list",
+                        "member": {
+                            "type": "structure",
+                            "members": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "dataStoreName": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "payload": "Location"
+            }
+        },
+        "MultipleBackendPutObject": {
+            "http": {
+                "method": "PUT",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=putobject"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "ContentMD5": {
+                        "location": "header",
+                        "locationName": "Content-MD5"
+                    },
+                    "ContentType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Type"
+                    },
+                    "UserMetaData": {
+                        "location": "header",
+                        "locationName": "X-Scal-User-Metadata"
+                    },
+                    "CacheControl": {
+                        "location": "header",
+                        "locationName": "X-Scal-Cache-Control"
+                    },
+                    "ContentDisposition": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Disposition"
+                    },
+                    "ContentEncoding": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Encoding"
+                    },
+                    "CanonicalID": {
+                        "location": "header",
+                        "locationName": "X-Scal-Canonical-Id"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "VersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Version-Id"
+                    },
+                    "Body": {
+                        "streaming": true,
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendDeleteObject": {
+            "http": {
+                "method": "DELETE",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=deleteobject"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendPutMPUPart": {
+            "http": {
+                "method": "PUT",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=putpart"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "PartNumber": {
+                        "location": "header",
+                        "locationName": "X-Scal-Part-Number",
+                        "type": "long"
+                    },
+                    "UploadId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Upload-Id"
+                    },
+                    "Body": {
+                        "streaming": true,
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "partNumber": {
+                        "type": "long"
+                    },
+                    "ETag": {
+                        "type": "string"
+                    },
+                    "numberSubParts": {
+                        "type": "long"
+                    }
+                }
+            }
+        },
+        "MultipleBackendInitiateMPU": {
+            "http": {
+                "method": "POST",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=initiatempu"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "VersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Version-Id"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "ContentType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Type"
+                    },
+                    "UserMetaData": {
+                        "location": "header",
+                        "locationName": "X-Scal-User-Metadata"
+                    },
+                    "CacheControl": {
+                        "location": "header",
+                        "locationName": "X-Scal-Cache-Control"
+                    },
+                    "ContentDisposition": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Disposition"
+                    },
+                    "ContentEncoding": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Encoding"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "uploadId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendCompleteMPU": {
+            "http": {
+                "method": "POST",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=completempu"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "VersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Version-Id"
+                    },
+                    "ContentType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Type"
+                    },
+                    "UserMetaData": {
+                        "location": "header",
+                        "locationName": "X-Scal-User-Metadata"
+                    },
+                    "CacheControl": {
+                        "location": "header",
+                        "locationName": "X-Scal-Cache-Control"
+                    },
+                    "ContentDisposition": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Disposition"
+                    },
+                    "ContentEncoding": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Encoding"
+                    },
+                    "UploadId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Upload-Id"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendPutObjectTagging": {
+            "http": {
+                "method": "POST",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=puttagging"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "DataStoreVersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Data-Store-Version-Id"
+                    },
+                    "Tags": {
+                        "location": "header",
+                        "locationName": "X-Scal-Tags"
+                    },
+                    "SourceBucket": {
+                        "location": "header",
+                        "locationName": "X-Scal-Source-Bucket"
+                    },
+                    "SourceVersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Source-Version-Id"
+                    },
+                    "ReplicationEndpointSite": {
+                        "location": "header",
+                        "locationName": "X-Scal-Replication-Endpoint-Site"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendDeleteObjectTagging": {
+            "http": {
+                "method": "DELETE",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=deleteobjecttagging"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "DataStoreVersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Data-Store-Version-Id"
+                    },
+                    "SourceBucket": {
+                        "location": "header",
+                        "locationName": "X-Scal-Source-Bucket"
+                    },
+                    "SourceVersionId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Source-Version-Id"
+                    },
+                    "ReplicationEndpointSite": {
+                        "location": "header",
+                        "locationName": "X-Scal-Replication-Endpoint-Site"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "PutMetadata": {
+            "http": {
+                "method": "PUT",
+                "requestUri": "/_/backbeat/metadata/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "ContentMD5": {
+                        "location": "header",
+                        "locationName": "Content-MD5"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    },
+                    "ReplicationContent": {
+                        "location": "header",
+                        "locationName": "x-scal-replication-content",
+                        "type": "string"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "GetMetadata": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/backbeat/metadata/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "VersionId": {
+                        "type": "string",
+                        "documentation": "VersionId used to reference a specific version of the object.",
+                        "location": "querystring",
+                        "locationName": "versionId"
+                    }
+                }
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "Body": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "GetObject": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "IfMatch": {
+                        "location": "header",
+                        "locationName": "If-Match"
+                    },
+                    "IfModifiedSince": {
+                        "location": "header",
+                        "locationName": "If-Modified-Since",
+                        "type": "timestamp"
+                    },
+                    "IfNoneMatch": {
+                        "location": "header",
+                        "locationName": "If-None-Match"
+                    },
+                    "IfUnmodifiedSince": {
+                        "location": "header",
+                        "locationName": "If-Unmodified-Since",
+                        "type": "timestamp"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "Range": {
+                        "location": "header",
+                        "locationName": "Range"
+                    },
+                    "ResponseCacheControl": {
+                        "location": "querystring",
+                        "locationName": "response-cache-control"
+                    },
+                    "ResponseContentDisposition": {
+                        "location": "querystring",
+                        "locationName": "response-content-disposition"
+                    },
+                    "ResponseContentEncoding": {
+                        "location": "querystring",
+                        "locationName": "response-content-encoding"
+                    },
+                    "ResponseContentLanguage": {
+                        "location": "querystring",
+                        "locationName": "response-content-language"
+                    },
+                    "ResponseContentType": {
+                        "location": "querystring",
+                        "locationName": "response-content-type"
+                    },
+                    "ResponseExpires": {
+                        "location": "querystring",
+                        "locationName": "response-expires",
+                        "type": "timestamp"
+                    },
+                    "VersionId": {
+                        "location": "querystring",
+                        "locationName": "versionId"
+                    },
+                    "SSECustomerAlgorithm": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-algorithm"
+                    },
+                    "SSECustomerKey": {
+                        "shape": "S19",
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-key"
+                    },
+                    "SSECustomerKeyMD5": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-key-MD5"
+                    },
+                    "RequestPayer": {
+                        "location": "header",
+                        "locationName": "x-amz-request-payer"
+                    },
+                    "PartNumber": {
+                        "location": "querystring",
+                        "locationName": "partNumber",
+                        "type": "integer"
+                    },
+                    "LocationConstraint": {
+                        "location": "header",
+                        "locationName": "x-amz-location-constraint"
+                    }
+                }
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "Body": {
+                        "streaming": true,
+                        "type": "blob"
+                    },
+                    "DeleteMarker": {
+                        "location": "header",
+                        "locationName": "x-amz-delete-marker",
+                        "type": "boolean"
+                    },
+                    "AcceptRanges": {
+                        "location": "header",
+                        "locationName": "accept-ranges"
+                    },
+                    "Expiration": {
+                        "location": "header",
+                        "locationName": "x-amz-expiration"
+                    },
+                    "Restore": {
+                        "location": "header",
+                        "locationName": "x-amz-restore"
+                    },
+                    "LastModified": {
+                        "location": "header",
+                        "locationName": "Last-Modified",
+                        "type": "timestamp"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "ETag": {
+                        "location": "header",
+                        "locationName": "ETag"
+                    },
+                    "MissingMeta": {
+                        "location": "header",
+                        "locationName": "x-amz-missing-meta",
+                        "type": "integer"
+                    },
+                    "VersionId": {
+                        "location": "header",
+                        "locationName": "x-amz-version-id"
+                    },
+                    "CacheControl": {
+                        "location": "header",
+                        "locationName": "Cache-Control"
+                    },
+                    "ContentDisposition": {
+                        "location": "header",
+                        "locationName": "Content-Disposition"
+                    },
+                    "ContentEncoding": {
+                        "location": "header",
+                        "locationName": "Content-Encoding"
+                    },
+                    "ContentLanguage": {
+                        "location": "header",
+                        "locationName": "Content-Language"
+                    },
+                    "ContentRange": {
+                        "location": "header",
+                        "locationName": "Content-Range"
+                    },
+                    "ContentType": {
+                        "location": "header",
+                        "locationName": "Content-Type"
+                    },
+                    "Expires": {
+                        "location": "header",
+                        "locationName": "Expires",
+                        "type": "timestamp"
+                    },
+                    "WebsiteRedirectLocation": {
+                        "location": "header",
+                        "locationName": "x-amz-website-redirect-location"
+                    },
+                    "ServerSideEncryption": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption"
+                    },
+                    "Metadata": {
+                        "shape": "S11",
+                        "location": "headers",
+                        "locationName": "x-amz-meta-"
+                    },
+                    "SSECustomerAlgorithm": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-algorithm"
+                    },
+                    "SSECustomerKeyMD5": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-key-MD5"
+                    },
+                    "SSEKMSKeyId": {
+                        "shape": "Sj",
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-aws-kms-key-id"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "x-amz-storage-class"
+                    },
+                    "RequestCharged": {
+                        "location": "header",
+                        "locationName": "x-amz-request-charged"
+                    },
+                    "ReplicationStatus": {
+                        "location": "header",
+                        "locationName": "x-amz-replication-status"
+                    },
+                    "PartsCount": {
+                        "location": "header",
+                        "locationName": "x-amz-mp-parts-count",
+                        "type": "integer"
+                    },
+                    "TagCount": {
+                        "location": "header",
+                        "locationName": "x-amz-tagging-count",
+                        "type": "integer"
+                    }
+                },
+                "payload": "Body"
+            }
+        },
+        "BatchDelete": {
+            "http": {
+                "method": "POST",
+                "requestUri": "/_/backbeat/batchdelete"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                ],
+                "members": {
+                    "ContentType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Content-Type"
+                    },
+                    "Locations": {
+                        "type": "list",
+                        "member": {
+                            "type": "structure",
+                            "required": [
+                                "key",
+                                "dataStoreName"
+                            ],
+                            "members": {
+                                "dataStoreName": {
+                                    "type": "string"
+                                },
+                                "key": {
+                                    "type": "string"
+                                },
+                                "size": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                }
+            }
+        },
+        "GetRaftBuckets": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/listbuckets/{LogId}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "LogId"
+                ],
+                "members": {
+                    "LogId": {
+                        "location": "uri",
+                        "locationName": "LogId"
+                    }
+                }
+            },
+            "output": {
+                "type": "list",
+                "member": {
+                    "type": "string"
+                }
+            }
+        },
+        "GetBucketMetadata": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/getbucket/{Bucket}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    }
+                }
+            },
+            "output": {
+                "shape": "BucketMD"
+            }
+        },
+        "GetObjectList": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/listobjects/{Bucket}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    }
+                }
+            },
+            "output": {
+                "shape": "ObjectMDListResponse"
+            }
+        },
+        "GetObjectMetadata": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/getobject/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    }
+                }
+            },
+            "output": {
+                "type": "map",
+                "key": {},
+                "value": {}
+            }
+        }
+    },
+    "shapes": {
+        "Sj": {
+            "type": "string",
+            "sensitive": true
+        },
+        "S11": {
+            "type": "map",
+            "key": {},
+            "value": {}
+        },
+        "S19": {
+            "type": "blob",
+            "sensitive": true
+        },
+        "ObjectMDListResponse": {
+            "type": "structure",
+            "members": {
+                "Contents": {
+                    "shape": "ObjectMDList"
+                }
+            }
+        },
+        "ObjectMDList": {
+            "type": "list",
+            "member": {
+                "shape": "ObjectMD"
+            }
+        },
+        "ObjectMD": {
+            "type": "structure",
+            "members": {
+                "key": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "BucketMD": {
+            "type": "structure",
+            "members": {
+                "acl": {
+                    "shape": "AclObj"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "ownerDisplayName": {
+                    "type": "string"
+                },
+                "creationDate": {
+                    "type": "string"
+                },
+                "mdBucketModelVersion": {
+                    "type": "integer"
+                },
+                "transient": {
+                    "type": "boolean"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "serverSideEncryption": {
+                    "shape": "ServerSideEncryption"
+                },
+                "versioningConfiguration": {
+                    "shape": "VersioningConfigurationObj"
+                },
+                "locationConstraint": {
+                    "type": "string"
+                },
+                "readLocationConstraint": {
+                    "type": "string"
+                },
+                "cors": {
+                    "shape": "CorsListObj"
+                },
+                "replicationConfiguration": {
+                    "shape": "ReplicationConfigurationObj"
+                },
+                "lifecycleConfiguration": {
+                    "shape": "LifecycleConfigurationObj"
+                },
+                "uid": {
+                    "type": "string"
+                }
+            }
+        },
+        "ServerSideEncryption": {
+            "type": "map",
+            "key": {},
+            "value": {}
+        },
+        "CorsListObj": {
+            "type": "list",
+            "member": {
+                "shape": "CorsObj"
+            }
+        },
+        "CorsObj": {
+            "type": "map",
+            "key": {},
+            "value": {}
+        },
+        "VersioningConfigurationObj": {
+            "type": "map",
+            "key": {},
+            "value": {}
+        },
+        "ReplicationConfigurationObj": {
+            "type": "map",
+            "key": {},
+            "value": {}
+        },
+        "RepRuleObj": {
+            "type": "structure",
+            "members": {
+                "Destination": {
+                    "type": "structure",
+                    "members": {
+                        "Bucket": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "Prefix": {
+                    "type": "string"
+                },
+                "Status": {
+                    "type": "string",
+                    "enum": [
+                        "Enabled",
+                        "Disabled"
+                    ]
+                },
+                "ID": {
+                    "type": "string"
+                }
+            }
+        },
+        "LifecycleConfigurationObj": {
+            "type": "structure",
+            "members": {
+                "Rules": {
+                    "type": "list",
+                    "member": {
+                        "shape": "LCRuleObj"
+                    }
+                }
+            }
+        },
+        "LCRuleObj": {
+            "type": "structure",
+            "members": {
+                "ID": {
+                    "type": "string"
+                },
+                "Status": {
+                    "type": "string",
+                    "enum": [
+                        "Enabled",
+                        "Disabled"
+                    ]
+                },
+                "Prefix": {
+                    "type": "string"
+                },
+                "Expiration": {
+                    "type": "structure",
+                    "members": {
+                        "Days": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        },
+        "AclObj": {
+            "type": "structure",
+            "members": {
+                "Canned": {
+                    "type": "string"
+                },
+                "FULL_CONTROL": {
+                    "type": "list",
+                    "member": {
+                        "type": "string"
+                    }
+                },
+                "WRITE": {
+                    "type": "list",
+                    "member": {
+                        "type": "string"
+                    }
+                },
+                "WRITE_ACP": {
+                    "type": "list",
+                    "member": {
+                        "type": "string"
+                    }
+                },
+                "READ": {
+                    "type": "list",
+                    "member": {
+                        "type": "string"
+                    }
+                },
+                "READ_ACP": {
+                    "type": "list",
+                    "member": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
