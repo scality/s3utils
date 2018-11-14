@@ -14,4 +14,3 @@ COPY ./ ./
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
 
-ENTRYPOINT ["/usr/src/app/docker-entrypoint.sh"]
