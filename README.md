@@ -23,3 +23,12 @@ and aborts any ongoing multipart uploads to prepare the bucket for deletion.
 ```
 node cleanupBuckets.js testbucket1,testbucket2
 ```
+
+# List objects that failed replication
+
+This script can print the list of objects that failed replication to stdout by
+taking a comma-separated list of buckets. Run the command as
+
+````
+node listFailedObjects testbucket1,testbucket2
+```
