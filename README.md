@@ -3,7 +3,7 @@ S3 Connector and Zenko Utilities
 
 Run the docker container as
 ```
-docker run -d -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretkey' -e 'ENDPOINT=http://127.0.0.1:8000' zenko/s3utils
+docker run -d -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretkey' -e 'ENDPOINT=http://127.0.0.1:8000' -e 'SITE_NAME=crrSiteName' zenko/s3utils
 ```
 
 ## Trigger CRR on objects that were put before replication was enabled on the bucket

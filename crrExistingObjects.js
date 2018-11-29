@@ -7,11 +7,12 @@ const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
 
-const log = new Logger('s3utils::emptyBucket');
+const log = new Logger('s3utils::crrExistingObjects');
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
+const SITE_NAME = process.env.SITE_NAME;
 const LISTING_LIMIT = 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
@@ -48,11 +49,10 @@ const options = {
     },
 };
 const s3 = new AWS.S3(options);
-
-
 const bb = new BackbeatClient(options);
 
-function _markObjectPending(bucket, key, versionId, repConfig, cb) {
+function _markObjectPending(bucket, key, versionId, storageClass,
+                            repConfig, cb) {
     return waterfall([
         // get object blob
         next => bb.getMetadata({
@@ -69,7 +69,6 @@ function _markObjectPending(bucket, key, versionId, repConfig, cb) {
             }
             const { Rules, Role } = repConfig;
             const destination = Rules[0].Destination.Bucket;
-            const storageClass = Rules[0].Destination.StorageClass;
             // set replication properties
             const ops = objMD['content-length'] === 0 ? ['METADATA'] :
                 ['METADATA', 'DATA'];
@@ -119,10 +118,22 @@ function _markPending(bucket, versions, cb) {
             }
             return next(null, res.ReplicationConfiguration);
         }),
-        (repConfig, next) => mapLimit(versions, 10, (i, apply) => {
-            const { Key, VersionId } = i;
-            _markObjectPending(bucket, Key, VersionId, repConfig, apply);
-        }, next),
+        (repConfig, next) => {
+            const { Rules } = repConfig;
+            const storageClass = Rules[0].Destination.StorageClass || SITE_NAME;
+            if (!storageClass) {
+                const errMsg =
+                      'missing SITE_NAME environment variable, must be set to' +
+                      ' the value of "site" property in the CRR configuration';
+                log.error(errMsg);
+                return next(new Error(errMsg));
+            }
+            return mapLimit(versions, 10, (i, apply) => {
+                const { Key, VersionId } = i;
+                _markObjectPending(bucket, Key, VersionId, storageClass,
+                                   repConfig, apply);
+            }, next);
+        },
     ], cb);
 }
 
