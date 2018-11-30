@@ -7,11 +7,12 @@ const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
 
-const log = new Logger('s3utils::emptyBucket');
+const log = new Logger('s3utils::crrExistingObjects');
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
+const SITE_NAME = process.env.SITE_NAME;
 const LISTING_LIMIT = 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
@@ -48,11 +49,11 @@ const options = {
     },
 };
 const s3 = new AWS.S3(options);
-
-
 const bb = new BackbeatClient(options);
 
-function _markObjectPending(bucket, key, versionId, repConfig, cb) {
+function _markObjectPending(bucket, key, versionId, storageClass,
+                            repConfig, cb) {
+    let objMD;
     return waterfall([
         // get object blob
         next => bb.getMetadata({
@@ -62,14 +63,50 @@ function _markObjectPending(bucket, key, versionId, repConfig, cb) {
         }, next),
         // update replication info and put back object blob
         (mdRes, next) => {
-            const objMD = JSON.parse(mdRes.Body);
+            objMD = JSON.parse(mdRes.Body);
+            if (objMD.replicationInfo && objMD.replicationInfo.status !== '') {
+                // skip object since it's already marked for crr
+                return next();
+            }
+            if (objMD.versionId) {
+                // The object already has an *internal* versionId,
+                // which exists when the object has been put on
+                // versioned or versioning-suspended bucket. Even if
+                // the listed version is "null", the object may have
+                // an actual internal versionId, only if the bucket
+                // was versioning-suspended when the object was put.
+                return next();
+            }
+            // The object does not have an *internal* versionId, as it
+            // was put on a nonversioned bucket: do a first metadata
+            // update to let cloudserver generate one, just passing on
+            // the existing metadata blob. Note that the resulting key
+            // will still be nonversioned, but the following update
+            // will be able to create a versioned key for this object,
+            // so that replication can happen. The externally visible
+            // version will stay "null".
+            return bb.putMetadata({
+                Bucket: bucket,
+                Key: key,
+                ContentLength: Buffer.byteLength(mdRes.Body),
+                Body: mdRes.Body,
+            }, (err, putRes) => {
+                if (err) {
+                    return next(err);
+                }
+                // No need to fetch the whole metadata again, simply
+                // update the one we have with the generated versionId.
+                objMD.versionId = putRes.versionId;
+                return next();
+            });
+        },
+        next => {
             if (objMD.replicationInfo && objMD.replicationInfo.status !== '') {
                 // skip object since it's already marked for crr
                 return next();
             }
             const { Rules, Role } = repConfig;
             const destination = Rules[0].Destination.Bucket;
-            const storageClass = Rules[0].Destination.StorageClass;
             // set replication properties
             const ops = objMD['content-length'] === 0 ? ['METADATA'] :
                 ['METADATA', 'DATA'];
@@ -119,10 +156,22 @@ function _markPending(bucket, versions, cb) {
             }
             return next(null, res.ReplicationConfiguration);
         }),
-        (repConfig, next) => mapLimit(versions, 10, (i, apply) => {
-            const { Key, VersionId } = i;
-            _markObjectPending(bucket, Key, VersionId, repConfig, apply);
-        }, next),
+        (repConfig, next) => {
+            const { Rules } = repConfig;
+            const storageClass = Rules[0].Destination.StorageClass || SITE_NAME;
+            if (!storageClass) {
+                const errMsg =
+                      'missing SITE_NAME environment variable, must be set to' +
+                      ' the value of "site" property in the CRR configuration';
+                log.error(errMsg);
+                return next(new Error(errMsg));
+            }
+            return mapLimit(versions, 10, (i, apply) => {
+                const { Key, VersionId } = i;
+                _markObjectPending(bucket, Key, VersionId, storageClass,
+                                   repConfig, apply);
+            }, next);
+        },
     ], cb);
 }
 
