@@ -53,6 +53,7 @@ const bb = new BackbeatClient(options);
 
 function _markObjectPending(bucket, key, versionId, storageClass,
                             repConfig, cb) {
+    let objMD;
     return waterfall([
         // get object blob
         next => bb.getMetadata({
@@ -62,7 +63,44 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         }, next),
         // update replication info and put back object blob
         (mdRes, next) => {
-            const objMD = JSON.parse(mdRes.Body);
+            objMD = JSON.parse(mdRes.Body);
+            if (objMD.replicationInfo && objMD.replicationInfo.status !== '') {
+                // skip object since it's already marked for crr
+                return next();
+            }
+            if (objMD.versionId) {
+                // The object already has an *internal* versionId,
+                // which exists when the object has been put on
+                // versioned or versioning-suspended bucket. Even if
+                // the listed version is "null", the object may have
+                // an actual internal versionId, only if the bucket
+                // was versioning-suspended when the object was put.
+                return next();
+            }
+            // The object does not have an *internal* versionId, as it
+            // was put on a nonversioned bucket: do a first metadata
+            // update to let cloudserver generate one, just passing on
+            // the existing metadata blob. Note that the resulting key
+            // will still be nonversioned, but the following update
+            // will be able to create a versioned key for this object,
+            // so that replication can happen. The externally visible
+            // version will stay "null".
+            return bb.putMetadata({
+                Bucket: bucket,
+                Key: key,
+                ContentLength: Buffer.byteLength(mdRes.Body),
+                Body: mdRes.Body,
+            }, (err, putRes) => {
+                if (err) {
+                    return next(err);
+                }
+                // No need to fetch the whole metadata again, simply
+                // update the one we have with the generated versionId.
+                objMD.versionId = putRes.versionId;
+                return next();
+            });
+        },
+        next => {
             if (objMD.replicationInfo && objMD.replicationInfo.status !== '') {
                 // skip object since it's already marked for crr
                 return next();
