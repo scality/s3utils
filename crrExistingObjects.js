@@ -1,7 +1,7 @@
 const http = require('http');
 
 const AWS = require('aws-sdk');
-const { doWhilst, mapLimit, waterfall } = require('async');
+const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
 
 const { Logger } = require('werelogs');
 
@@ -14,6 +14,7 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const SITE_NAME = process.env.SITE_NAME;
 const LISTING_LIMIT = 1000;
+const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
@@ -50,6 +51,17 @@ const options = {
 };
 const s3 = new AWS.S3(options);
 const bb = new BackbeatClient(options);
+
+let nProcessed = 0;
+let nErrors = 0;
+let bucketInProgress = null;
+
+function _logProgress() {
+    log.info(`progress update: ${nProcessed} processed, ${nErrors} errors, ` +
+             `bucket in progress: ${bucketInProgress || '(none)'}`);
+}
+
+const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
 
 function _markObjectPending(bucket, key, versionId, storageClass,
                             repConfig, cb) {
@@ -166,19 +178,27 @@ function _markPending(bucket, versions, cb) {
                 log.error(errMsg);
                 return next(new Error(errMsg));
             }
-            return mapLimit(versions, 10, (i, apply) => {
+            return eachLimit(versions, 10, (i, apply) => {
                 const { Key, VersionId } = i;
-                _markObjectPending(bucket, Key, VersionId, storageClass,
-                                   repConfig, apply);
+                _markObjectPending(
+                    bucket, Key, VersionId, storageClass, repConfig, err => {
+                        ++nProcessed;
+                        if (err) {
+                            ++nErrors;
+                            return apply(err);
+                        }
+                        return apply();
+                    });
             }, next);
         },
     ], cb);
 }
 
-function triggerCRR(bucketName, cb) {
+function triggerCRROnBucket(bucketName, cb) {
     const bucket = bucketName.trim();
     let VersionIdMarker = null;
     let KeyMarker = null;
+    bucketInProgress = bucket;
     doWhilst(
         done => _listObjectVersions(bucket, VersionIdMarker, KeyMarker,
             (err, data) => {
@@ -197,17 +217,20 @@ function triggerCRR(bucketName, cb) {
             return false;
         },
         err => {
+            bucketInProgress = null;
             if (err) {
                 log.error('error marking objects for crr', { bucket });
                 return cb(err);
             }
+            _logProgress();
             log.info(`completed task for bucket: ${bucket}`);
             return cb();
         });
 }
 
 // trigger the calls to list objects and mark them for crr
-mapLimit(BUCKETS, 1, triggerCRR, err => {
+eachSeries(BUCKETS, triggerCRROnBucket, err => {
+    clearInterval(logProgressInterval);
     if (err) {
         return log.error('error during task execution', { error: err });
     }
