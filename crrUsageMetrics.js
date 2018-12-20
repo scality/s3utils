@@ -3,7 +3,7 @@ const AWS = require('aws-sdk');
 const http = require('http');
 
 const { Logger } = require('./logging');
-const log = new Logger('s3utils:listFailedObjects');
+const log = new Logger('s3utils:crrUsageMetrics');
 /* eslint-disable no-console */
 
 // configurable params
@@ -11,7 +11,10 @@ const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
+const WORKERS = (process.env.WORKERS &&
+                 Number.parseInt(process.env.WORKERS, 10)) || 10;
 const LISTING_LIMIT = 1000;
+const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.error('No buckets given as input! Please provide ' +
@@ -31,6 +34,12 @@ if (!SECRET_KEY) {
     process.exit(1);
 }
 
+// mapping "bucketName:CanonicalID" => { completedCount,
+// completedBytes }, aggregated for all objects with replication
+// status COMPLETED, that will be dumped at the end in JSON format to
+// stdout.
+const metrics = {};
+
 const s3 = new AWS.S3({
     accessKeyId: ACCESS_KEY,
     secretAccessKey: SECRET_KEY,
@@ -48,6 +57,17 @@ const s3 = new AWS.S3({
     },
 });
 
+let nScanned = 0;
+let nErrors = 0;
+let bucketInProgress = null;
+
+function _logProgress() {
+    log.info(`progress update: ${nScanned} scanned, ${nErrors} errors, ` +
+             `bucket in progress: ${bucketInProgress || '(none)'}`);
+}
+
+const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
+
 // list object versions
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     s3.listObjectVersions({
@@ -58,37 +78,41 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     }, cb);
 }
 
-// return object with key and version_id
-function _getKeys(list) {
-    return list.map(v => ({
-        Key: v.Key,
-        VersionId: v.VersionId,
-    }));
-}
-
 function listBucket(bucket, cb) {
     const bucketName = bucket.trim();
     let VersionIdMarker = null;
     let KeyMarker = null;
-    log.info('listing failed objects from bucket', { bucket });
+    bucketInProgress = bucket;
+    log.info('aggregating CRR usage metrics from bucket', { bucket });
     async.doWhilst(
         done => _listObjectVersions(bucketName, VersionIdMarker, KeyMarker,
             (err, data) => {
                 if (err) {
-                    log.error('error occured while listing', {
+                    log.error('error listing object versions', {
                         error: err, bucketName });
                     return done(err);
                 }
-                const keys = _getKeys(data.Versions);
-                return async.mapLimit(keys, 10, (k, next) => {
-                    const { Key, VersionId } = k;
+                return async.eachLimit(data.Versions, WORKERS, (k, next) => {
+                    const { Key, VersionId, Owner } = k;
                     s3.headObject({ Bucket: bucketName, Key, VersionId },
                         (err, res) => {
+                            ++nScanned;
                             if (err) {
+                                ++nErrors;
                                 return next(err);
                             }
-                            if (res.ReplicationStatus === 'FAILED') {
-                                console.log(Object.assign({ Key }, res));
+                            if (res.ReplicationStatus === 'COMPLETED') {
+                                const metricsKey = `${bucketName}:${Owner.ID}`;
+                                if (!metrics[metricsKey]) {
+                                    metrics[metricsKey] = {
+                                        completedCount: 0,
+                                        completedBytes: 0,
+                                    };
+                                }
+                                const metricsValue = metrics[metricsKey];
+                                metricsValue.completedCount += 1;
+                                metricsValue.completedBytes +=
+                                    res.ContentLength;
                             }
                             return next();
                         });
@@ -103,8 +127,10 @@ function listBucket(bucket, cb) {
             }),
         () => {
             if (!VersionIdMarker || !KeyMarker) {
-                log.debug('completed listing failed objects for bucket',
+                bucketInProgress = null;
+                log.debug('completed aggregating CRR usage metrics for bucket',
                     { bucket });
+                _logProgress();
                 return false;
             }
             return true;
@@ -113,13 +139,27 @@ function listBucket(bucket, cb) {
     );
 }
 
-async.mapSeries(BUCKETS, (bucket, done) => listBucket(bucket, done),
+async.eachSeries(BUCKETS, (bucket, done) => listBucket(bucket, done),
     err => {
+        clearInterval(logProgressInterval);
         if (err) {
-            log.error('error occured while listing failed objects', {
+            log.error('error occurred while aggregating CRR usage metrics', {
                 error: err,
             });
         }
+        console.log(JSON.stringify(metrics));
     }
 );
+
+function stop() {
+    log.warn('stopping execution');
+    _logProgress();
+    process.exit(1);
+}
+
+process.on('SIGINT', stop);
+process.on('SIGHUP', stop);
+process.on('SIGQUIT', stop);
+process.on('SIGTERM', stop);
+
 /* eslint-enable no-console */

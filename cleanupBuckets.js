@@ -1,7 +1,7 @@
 const http = require('http');
 const async = require('async');
 const AWS = require('aws-sdk');
-const { Logger } = require('werelogs');
+const { Logger } = require('./logging');
 
 const log = new Logger('s3utils::emptyBucket');
 // configurable params
