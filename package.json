@@ -27,8 +27,7 @@
   "dependencies": {
     "arsenal": "scality/arsenal#0a85eeb",
     "async": "^2.6.1",
-    "aws-sdk": "^2.333.0",
-    "werelogs": "scality/werelogs"
+    "aws-sdk": "^2.333.0"
   },
   "devDependencies": {
     "eslint": "^2.13.1",
