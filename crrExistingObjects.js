@@ -3,7 +3,7 @@ const http = require('http');
 const AWS = require('aws-sdk');
 const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
 
-const { Logger } = require('werelogs');
+const { Logger } = require('./logging');
 
 const BackbeatClient = require('./BackbeatClient');
 

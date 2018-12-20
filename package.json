@@ -28,7 +28,6 @@
     "arsenal": "scality/arsenal#0a85eeb",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
-    "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
   },
   "devDependencies": {
