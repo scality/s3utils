@@ -7,6 +7,7 @@ COPY ./package.json .
 
 RUN apt-get update \
     && apt-get install -y jq python git build-essential vim --no-install-recommends \
+    && apt-get install mongodb \
     && npm install
 
 COPY ./ ./
