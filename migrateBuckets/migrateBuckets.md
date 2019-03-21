@@ -1,6 +1,6 @@
 # How to Use migrateBuckets.js
 
-The moveBucketAccounts script is for transferring buckets and their
+The migrateBuckets script is for transferring buckets and their
 contents from one IAM account to another.
 
 To launch the script, use the command:

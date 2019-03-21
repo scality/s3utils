@@ -14,8 +14,6 @@ werelogs.configure({ level: 'info', dump: 'error' });
 const logger = new werelogs.Logger('s3utils:migrateBuckets')
     .newRequestLogger();
 
-const skipError = new Error('skip');
-
 /* expected input JSON structure:
 * {
 *   bucketd: {
@@ -43,7 +41,7 @@ commander
     'Canonical id of destination account')
 .option('-o, --dest-owner-name <destOwnerName>',
     'Owner display name of destination account')
-.option('-c, --config-path <configPath>', "Path to metadata config")
+.option('-c, --config-path <configPath>', 'Path to metadata config')
 .parse(process.argv);
 
 const {
@@ -107,11 +105,6 @@ try {
 
 const splitter = '..|..';
 
-function _parseUsersBucketKey(key) {
-    const splitStr = key.split(splitter);
-    return { canonicalId: splitStr[0], bucketName: splitStr[1] };
-}
-
 function _createUsersBucketKey(bucketName, id) {
     return `${id}${splitter}${bucketName}`;
 }
@@ -163,7 +156,7 @@ function _changeUsersBucket(bucket, log, cb) {
         const searchKey = _createUsersBucketKey(bucketName, srcCanonicalId);
         const matchingBucket = objectList.Contents.find(object =>
             object.key === searchKey);
-        
+
         if (!matchingBucket) {
             log.debug(`users..bucket object ${bucketName} does not need ` +
             'to be updated');
@@ -184,7 +177,7 @@ function _changeUsersBucket(bucket, log, cb) {
             metaBucket, newObjectName, objectMD, serUids, err => {
                 if (err) {
                     log.error('Error updating users..bucket object ' +
-                        `${objectName}: ${err}`);
+                        `${matchingBucket.key}: ${err}`);
                     return next(err);
                 }
                 log.debug(`users..bucket object ${matchingBucket.key} ` +
@@ -204,7 +197,7 @@ function _changeUsersBucket(bucket, log, cb) {
             }),
         ], err => {
             if (err) {
-                return done(err);
+                return cb(err);
             }
             log.debug('Successfully updated users..bucket entry');
             return cb();
@@ -312,10 +305,6 @@ function migrateBuckets(bucket, cb) {
             _changeObjectsAccount(bucket, logger, next);
         },
     ], err => {
-        if (err === skipError) {
-            // move on to next bucket
-            return done();
-        }
         if (err) {
             logger.error(`Bucket ${bucketName} failed to process: ${err}`);
             return cb(err);
