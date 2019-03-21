@@ -29,6 +29,7 @@
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
     "bucketclient": "scality/bucketclient#b74165ac",
+    "commander": "^2.9.0",
     "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
   },

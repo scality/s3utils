@@ -39,11 +39,9 @@ commander
 .option('-b, --bucket-name <bucketName>', 'Name of the bucket')
 .option('-s, --src-canonical-id <srcCanonicalId',
     'Canonical id of source account')
-.option('-o, --src-owner-name <srcOwnerName>',
-    'Owner display name of source account')
 .option('-d, --dest-canonical-id <destCanonicalId',
     'Canonical id of destination account')
-.option('-e, --dest-owner-name <destOwnerName>',
+.option('-o, --dest-owner-name <destOwnerName>',
     'Owner display name of destination account')
 .option('-c, --config-path <configPath>', "Path to metadata config")
 .parse(process.argv);
@@ -51,13 +49,12 @@ commander
 const {
     bucketName,
     srcCanonicalId,
-    srcOwnerName,
     destCanonicalId,
     destOwnerName,
     configPath,
 } = commander;
 
-if (!bucketName || !srcCanonicalId || !srcOwnerName ||
+if (!bucketName || !srcCanonicalId ||
 !destCanonicalId || !destOwnerName || !configPath) {
     logger.error('Missing command line parameter');
     commander.outputHelp();
@@ -218,8 +215,6 @@ function _changeUsersBucket(bucket, log, cb) {
 function _changeOneObjectAccount(bucket, object, log, cb) {
     const {
         bucketName,
-        srcCanonicalId,
-        srcOwnerName,
         destCanonicalId,
         destOwnerName,
     } = bucket;
@@ -240,10 +235,6 @@ function _changeOneObjectAccount(bucket, object, log, cb) {
         if (objectId === destCanonicalId && objectOwner === destOwnerName) {
             log.debug(`Object ${Key} id already updated`);
             return cb();
-        } else if (objectId !== srcCanonicalId
-        && objectOwner !== srcOwnerName) {
-            log.info(`Object ${Key} id does not match provided id ` +
-                'so object is not being updated');
         }
         objectMD['owner-id'] = destCanonicalId;
         objectMD['owner-display-name'] = destOwnerName;

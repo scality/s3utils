@@ -10,9 +10,8 @@ To launch the script, use the command:
 
 The `-b` option specifies the name of the bucket to migrate.
 The `-s` option specifies the canonical id of the current bucket owner account.
-The `-o` option specifies the display name of the current bucket owner account.
 The `-d` option specifies the canonical id of the target bucket owner account.
-The `-e` option specifies the display name of the target bucket owner account.
+The `-o` option specifies the display name of the target bucket owner account.
 The `-c` option specifies the absolute path to a json file.
 
 All options are required.
