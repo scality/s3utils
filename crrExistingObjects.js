@@ -13,9 +13,14 @@ const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const SITE_NAME = process.env.SITE_NAME;
-const PROCESS_ALL = process.env.PROCESS_ALL === 'true';
+let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
 const WORKERS = (process.env.WORKERS &&
                  Number.parseInt(process.env.WORKERS, 10)) || 10;
+const MAX_UPDATES = (process.env.MAX_UPDATES &&
+                     Number.parseInt(process.env.MAX_UPDATES, 10));
+let KEY_MARKER = process.env.KEY_MARKER;
+let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
+
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
@@ -36,10 +41,22 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
-if (PROCESS_ALL) {
-    log.warn('PROCESS_ALL environment option is active: ' +
-             'ALL objects in the bucket(s) will be reprocessed for CRR!');
+if (!TARGET_REPLICATION_STATUS) {
+    TARGET_REPLICATION_STATUS = 'NEW';
 }
+
+const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
+replicationStatusToProcess.forEach(state => {
+    if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
+        log.fatal('invalid TARGET_REPLICATION_STATUS environment: must be a ' +
+                  'comma-separated list of replication statuses to requeue, ' +
+                  'as NEW, PENDING, COMPLETED, FAILED or REPLICA.');
+        process.exit(1);
+    }
+});
+log.info('Objects with replication status ' +
+         `${replicationStatusToProcess.join(' or ')} ` +
+         'will be reset to PENDING to trigger CRR');
 
 const options = {
     accessKeyId: ACCESS_KEY,
@@ -66,12 +83,23 @@ let nErrors = 0;
 let bucketInProgress = null;
 
 function _logProgress() {
-    log.info(`progress update: ${nProcessed - nSkipped} touched, ` +
+    log.info(`progress update: ${nProcessed - nSkipped} updated, ` +
              `${nSkipped} skipped, ${nErrors} errors, ` +
              `bucket in progress: ${bucketInProgress || '(none)'}`);
 }
 
 const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
+
+function _objectShouldBeUpdated(objMD) {
+    return replicationStatusToProcess.some(filter => {
+        if (filter === 'NEW') {
+            return (!objMD.replicationInfo ||
+                    objMD.replicationInfo.status === '');
+        }
+        return (objMD.replicationInfo &&
+                objMD.replicationInfo.status === filter);
+    });
+}
 
 function _markObjectPending(bucket, key, versionId, storageClass,
                             repConfig, cb) {
@@ -84,12 +112,9 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             Key: key,
             VersionId: versionId,
         }, next),
-        // update replication info and put back object blob
         (mdRes, next) => {
             objMD = JSON.parse(mdRes.Body);
-            if (!PROCESS_ALL &&
-                objMD.replicationInfo && objMD.replicationInfo.status !== '') {
-                // skip object since it's already marked for crr
+            if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
             }
@@ -125,6 +150,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 return next();
             });
         },
+        // update replication info and put back object blob
         next => {
             if (skip) {
                 return next();
@@ -215,6 +241,15 @@ function triggerCRROnBucket(bucketName, cb) {
     let KeyMarker = null;
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
+    if (KEY_MARKER || VERSION_ID_MARKER) {
+        // resume from where we left off in previous script launch
+        KeyMarker = KEY_MARKER;
+        VersionIdMarker = VERSION_ID_MARKER;
+        KEY_MARKER = undefined;
+        VERSION_ID_MARKER = undefined;
+        log.info(`resuming at: KeyMarker=${KeyMarker} ` +
+                 `VersionIdMarker=${VersionIdMarker}`);
+    }
     doWhilst(
         done => _listObjectVersions(bucket, VersionIdMarker, KeyMarker,
             (err, data) => {
@@ -227,6 +262,30 @@ function triggerCRROnBucket(bucketName, cb) {
                 return _markPending(bucket, data.Versions, done);
             }),
         () => {
+            if (nProcessed - nSkipped >= MAX_UPDATES) {
+                _logProgress();
+                let remainingBuckets;
+                if (VersionIdMarker || KeyMarker) {
+                    // next bucket to process is still the current one
+                    remainingBuckets = BUCKETS.slice(
+                        BUCKETS.findIndex(bucket => bucket === bucketName));
+                } else {
+                    // next bucket to process is the next in bucket list
+                    remainingBuckets = BUCKETS.slice(
+                        BUCKETS.findIndex(bucket => bucket === bucketName) + 1);
+                }
+                let message =
+                    'reached update count limit, resuming from this ' +
+                    'point can be achieved by re-running the script with ' +
+                    `the bucket list "${remainingBuckets.join(',')}"`;
+                if (VersionIdMarker || KeyMarker) {
+                    message += ' and the following environment variables set: '
+                        + `KEY_MARKER=${KeyMarker} ` +
+                        `VERSION_ID_MARKER=${VersionIdMarker}`;
+                }
+                log.info(message);
+                process.exit(0);
+            }
             if (VersionIdMarker || KeyMarker) {
                 return true;
             }
