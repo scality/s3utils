@@ -62,6 +62,10 @@ objects to re-sync a backup bucket to the primary site.
 Specify how many parallel workers should run to update object
 metadata. The default is 10 parallel workers.
 
+Example:
+
+`WORKERS=50`
+
 #### MAX_UPDATES
 
 Specify a maximum number of metadata updates to execute before
@@ -97,10 +101,19 @@ a maximum of 10,000 objects to replicate before the script stops.
 Set to resume from where an earlier invocation stopped (see
 [MAX_UPDATES](#MAX_UPDATES)).
 
+Example:
+
+`KEY_MARKER="some/key"`
+
 #### VERSION_ID_MARKER
 
 Set to resume from where an earlier invocation stopped (see
 [MAX_UPDATES](#MAX_UPDATES)).
+
+Example:
+
+`VERSION_ID_MARKER="123456789"`
+
 
 ### Example use cases
 
@@ -127,9 +140,11 @@ export TARGET_REPLICATION_STATUS=PENDING
 export MAX_UPDATES=10000
 ```
 
-**Warning**: This may cause replication of objects already in the 
-Kafka queue to repeat. To avoid this, purge the "backbeat-replication"
-Kafka queue before launching the script.
+**Warning**: This may cause replication of objects already in the
+Kafka queue to repeat. To avoid this, set the backbeat consumer
+offsets of "backbeat-replication" Kafka topic to the latest topic
+offsets before launching the script, to skip over the existing
+consumer log.
 
 #### Replicate entries that failed a previous replication
 
