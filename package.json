@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
-    "arsenal": "scality/arsenal#0a85eeb",
+    "arsenal": "scality/arsenal#8f71d4f",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
     "werelogs": "scality/werelogs",
