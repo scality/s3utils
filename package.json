@@ -7,7 +7,9 @@
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
-    "test": "jest test/ | exit 0"
+    "test": "jest test/ | exit 0",
+    "snyk-protect": "snyk protect",
+    "prepublish": "npm run snyk-protect"
   },
   "repository": {
     "type": "git",
@@ -29,7 +31,8 @@
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
     "werelogs": "scality/werelogs",
-    "zenkoclient": "scality/zenkoclient#5c7f655"
+    "zenkoclient": "scality/zenkoclient#5c7f655",
+    "snyk": "^1.189.0"
   },
   "devDependencies": {
     "eslint": "^2.13.1",
@@ -37,5 +40,6 @@
     "eslint-config-scality": "github:scality/Guidelines",
     "eslint-plugin-react": "^4.3.0",
     "jest": "^23.6.0"
-  }
+  },
+  "snyk": true
 }
