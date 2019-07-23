@@ -259,7 +259,8 @@ function triggerCRROnBucket(bucketName, cb) {
                 }
                 VersionIdMarker = data.NextVersionIdMarker;
                 KeyMarker = data.NextKeyMarker;
-                return _markPending(bucket, data.Versions, done);
+                return _markPending(
+                    bucket, data.Versions.concat(data.DeleteMarkers), done);
             }),
         () => {
             if (nProcessed - nSkipped >= MAX_UPDATES) {
