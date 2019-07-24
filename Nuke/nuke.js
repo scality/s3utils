@@ -124,7 +124,7 @@ function nukeObjects(cb) {
         cb,
     );
 }
-nukeObjects((err, res) => {
+nukeObjects((err) => {
     if (err) {
         return console.log('error occured deleting objects', err);
     }
