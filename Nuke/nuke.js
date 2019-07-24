@@ -92,6 +92,7 @@ function _deleteVersions(objectsToDelete, cb) {
 function nukeObjects(cb) {
     let VersionIdMarker = null;
     let KeyMarker = null;
+    const keysToDelete;
     const nonCurrent = [];
     async.doWhilst(
         done => _listObjectVersions(VersionIdMarker, KeyMarker, (err, data) => {
@@ -101,14 +102,14 @@ function nukeObjects(cb) {
             // const filteredData
             //= data.Versions.filter(item => item.IsLatest !== true);
             if (argv.deleteLatest === 'true') {
-                const keysToDelete = _getKeys(data.Versions);
+                keysToDelete = _getKeys(data.Versions);
             } else {
                 Object.keys(data.Versions).forEach(function eachKey(key) {
                     if (!data.Versions[key].IsLatest) {
                         nonCurrent.push(data.Versions[key]);
                     }
                 });
-                const keysToDelete = _getKeys(nonCurrent);
+                keysToDelete = _getKeys(nonCurrent);
             }
             VersionIdMarker = data.NextVersionIdMarker;
             KeyMarker = data.NextKeyMarker;
