@@ -1,1 +1,2 @@
-{ "extends": "scality" }
+{ "extends": "scality", "parser": "babel-eslint" }
+
