@@ -22,8 +22,8 @@ const { argv } = require('yargs')
     .option('delete-latest', {
         describe: 'Deletes all versions',
     })
-    .demandOption(['bucket', 'accessKey', 'secretKey',
-        'endpoint'], 'Please provide all required arguments to work with this tool')
+    .demandOption(['bucket', 'accessKey', 'secretKey', 'endpoint'],
+        'Please provide all required arguments to work with this tool')
     .help()
     .argv;
 
@@ -55,7 +55,8 @@ const s3 = new AWS.S3({
 });
 // list object versions
 function _listObjectVersions(VersionIdMarker, KeyMarker, cb) {
-    s3.listObjectVersions({ Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker }, cb);
+    s3.listObjectVersions({ Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker },
+        cb);
 }
 // return object with key and version_id
 function _getKeys(keys) {
@@ -68,7 +69,8 @@ function _getKeys(keys) {
 function _deleteVersions(objectsToDelete, cb) {
     // multi object delete can delete max 1000 objects
     function _batchDelete(Objects, done) {
-        s3.deleteObjects({ Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } }, (err, res) => {
+        s3.deleteObjects({ Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } },
+        (err, res) => {
             if (err) {
                 console.log('batch delete err', err);
                 return done(err);
@@ -96,7 +98,7 @@ function nukeObjects(cb) {
             }
             // const filteredData = data.Versions.filter(item => item.IsLatest !== true);
             if (argv.deleteLatest === 'true') {
-                keysToDelete = _getKeys(data.Versions);
+                let keysToDelete = _getKeys(data.Versions);
             } else {
                 Object.keys(data.Versions).forEach(function eachKey(key) {
                     if (!data.Versions[key].IsLatest) {
