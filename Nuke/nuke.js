@@ -55,8 +55,9 @@ const s3 = new AWS.S3({
 });
 // list object versions
 function _listObjectVersions(VersionIdMarker, KeyMarker, cb) {
-    s3.listObjectVersions({ 
-        Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker }, cb);
+    s3.listObjectVersions({
+        Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker },
+        cb);
 }
 // return object with key and version_id
 function _getKeys(keys) {
@@ -99,14 +100,14 @@ function nukeObjects(cb) {
             }
             // const filteredData = data.Versions.filter(item => item.IsLatest !== true);
             if (argv.deleteLatest === 'true') {
-                let keysToDelete = _getKeys(data.Versions);
+                const keysToDelete = _getKeys(data.Versions);
             } else {
                 Object.keys(data.Versions).forEach(function eachKey(key) {
                     if (!data.Versions[key].IsLatest) {
                         nonCurrent.push(data.Versions[key]);
                     }
                 });
-                keysToDelete = _getKeys(nonCurrent);
+                const keysToDelete = _getKeys(nonCurrent);
             }
             VersionIdMarker = data.NextVersionIdMarker;
             KeyMarker = data.NextKeyMarker;
