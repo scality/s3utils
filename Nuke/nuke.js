@@ -72,7 +72,7 @@ function _deleteVersions(objectsToDelete, cb) {
     function _batchDelete(Objects, done) {
         s3.deleteObjects({
             Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } },
-        (err) => {
+        err => {
             if (err) {
                 console.log('batch delete err', err);
                 return done(err);
