@@ -79,9 +79,9 @@ const options = {
 const s3 = new AWS.S3(options);
 const bb = new BackbeatClient(options);
 
-const nProcessed = 0;
-const nSkipped = 0;
-const nErrors = 0;
+let nProcessed = 0;
+let nSkipped = 0;
+let nErrors = 0;
 let bucketInProgress = null;
 
 function _logProgress() {
