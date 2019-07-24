@@ -1,7 +1,9 @@
 const http = require('http');
 
 const AWS = require('aws-sdk');
-const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
+const {
+    doWhilst, eachSeries, eachLimit, waterfall,
+} = require('async');
 
 const { Logger } = require('werelogs');
 
@@ -9,24 +11,24 @@ const BackbeatClient = require('./BackbeatClient');
 
 const log = new Logger('s3utils::crrExistingObjects');
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
-const SITE_NAME = process.env.SITE_NAME;
-let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
-const WORKERS = (process.env.WORKERS &&
-                 Number.parseInt(process.env.WORKERS, 10)) || 10;
-const MAX_UPDATES = (process.env.MAX_UPDATES &&
-                     Number.parseInt(process.env.MAX_UPDATES, 10));
-let KEY_MARKER = process.env.KEY_MARKER;
-let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
+const { SITE_NAME } = process.env;
+let { TARGET_REPLICATION_STATUS } = process.env;
+const WORKERS = (process.env.WORKERS
+    && Number.parseInt(process.env.WORKERS, 10)) || 10;
+const MAX_UPDATES = (process.env.MAX_UPDATES
+    && Number.parseInt(process.env.MAX_UPDATES, 10));
+let { KEY_MARKER } = process.env;
+let { VERSION_ID_MARKER } = process.env;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' +
-        'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide '
+        + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -48,15 +50,15 @@ if (!TARGET_REPLICATION_STATUS) {
 const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
 replicationStatusToProcess.forEach(state => {
     if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
-        log.fatal('invalid TARGET_REPLICATION_STATUS environment: must be a ' +
-                  'comma-separated list of replication statuses to requeue, ' +
-                  'as NEW, PENDING, COMPLETED, FAILED or REPLICA.');
+        log.fatal('invalid TARGET_REPLICATION_STATUS environment: must be a '
+            + 'comma-separated list of replication statuses to requeue, '
+                + 'as NEW, PENDING, COMPLETED, FAILED or REPLICA.');
         process.exit(1);
     }
 });
-log.info('Objects with replication status ' +
-         `${replicationStatusToProcess.join(' or ')} ` +
-         'will be reset to PENDING to trigger CRR');
+log.info('Objects with replication status '
+        + `${replicationStatusToProcess.join(' or ')} `
+        + 'will be reset to PENDING to trigger CRR');
 
 const options = {
     accessKeyId: ACCESS_KEY,
@@ -77,15 +79,15 @@ const options = {
 const s3 = new AWS.S3(options);
 const bb = new BackbeatClient(options);
 
-let nProcessed = 0;
-let nSkipped = 0;
-let nErrors = 0;
+const nProcessed = 0;
+const nSkipped = 0;
+const nErrors = 0;
 let bucketInProgress = null;
 
 function _logProgress() {
-    log.info(`progress update: ${nProcessed - nSkipped} updated, ` +
-             `${nSkipped} skipped, ${nErrors} errors, ` +
-             `bucket in progress: ${bucketInProgress || '(none)'}`);
+    log.info(`progress update: ${nProcessed - nSkipped} updated, `
+            + `${nSkipped} skipped, ${nErrors} errors, `
+            + `bucket in progress: ${bucketInProgress || '(none)'}`);
 }
 
 const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
@@ -93,16 +95,16 @@ const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
 function _objectShouldBeUpdated(objMD) {
     return replicationStatusToProcess.some(filter => {
         if (filter === 'NEW') {
-            return (!objMD.replicationInfo ||
-                    objMD.replicationInfo.status === '');
+            return (!objMD.replicationInfo
+                    || objMD.replicationInfo.status === '');
         }
-        return (objMD.replicationInfo &&
-                objMD.replicationInfo.status === filter);
+        return (objMD.replicationInfo
+                && objMD.replicationInfo.status === filter);
     });
 }
 
 function _markObjectPending(bucket, key, versionId, storageClass,
-                            repConfig, cb) {
+    repConfig, cb) {
     let objMD;
     let skip = false;
     return waterfall([
@@ -158,8 +160,8 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             const { Rules, Role } = repConfig;
             const destination = Rules[0].Destination.Bucket;
             // set replication properties
-            const ops = objMD['content-length'] === 0 ? ['METADATA'] :
-                ['METADATA', 'DATA'];
+            const ops = objMD['content-length'] === 0 ? ['METADATA']
+                : ['METADATA', 'DATA'];
             const backends = [{
                 site: storageClass,
                 status: 'PENDING',
@@ -184,13 +186,13 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             }, next);
         },
     ], err => {
-        ++nProcessed;
+        nProcessed + 1;
         if (err) {
-            ++nErrors;
+            nErrors + 1;
             return cb(err);
         }
         if (skip) {
-            ++nSkipped;
+            nSkipped + 1;
         }
         return cb();
     });
@@ -220,16 +222,16 @@ function _markPending(bucket, versions, cb) {
             const { Rules } = repConfig;
             const storageClass = Rules[0].Destination.StorageClass || SITE_NAME;
             if (!storageClass) {
-                const errMsg =
-                      'missing SITE_NAME environment variable, must be set to' +
-                      ' the value of "site" property in the CRR configuration';
+                const errMsg = 'missing SITE_NAME environment variable, must be set to'
+                    + ' the value of "site" property in the CRR configuration';
                 log.error(errMsg);
                 return next(new Error(errMsg));
             }
             return eachLimit(versions, WORKERS, (i, apply) => {
                 const { Key, VersionId } = i;
                 _markObjectPending(
-                    bucket, Key, VersionId, storageClass, repConfig, apply);
+                    bucket, Key, VersionId, storageClass, repConfig, apply,
+                );
             }, next);
         },
     ], cb);
@@ -247,8 +249,8 @@ function triggerCRROnBucket(bucketName, cb) {
         VersionIdMarker = VERSION_ID_MARKER;
         KEY_MARKER = undefined;
         VERSION_ID_MARKER = undefined;
-        log.info(`resuming at: KeyMarker=${KeyMarker} ` +
-                 `VersionIdMarker=${VersionIdMarker}`);
+        log.info(`resuming at: KeyMarker=${KeyMarker} `
+                + `VersionIdMarker=${VersionIdMarker}`);
     }
     doWhilst(
         done => _listObjectVersions(bucket, VersionIdMarker, KeyMarker,
@@ -260,7 +262,8 @@ function triggerCRROnBucket(bucketName, cb) {
                 VersionIdMarker = data.NextVersionIdMarker;
                 KeyMarker = data.NextKeyMarker;
                 return _markPending(
-                    bucket, data.Versions.concat(data.DeleteMarkers), done);
+                    bucket, data.Versions.concat(data.DeleteMarkers), done,
+                );
             }),
         () => {
             if (nProcessed - nSkipped >= MAX_UPDATES) {
@@ -269,20 +272,21 @@ function triggerCRROnBucket(bucketName, cb) {
                 if (VersionIdMarker || KeyMarker) {
                     // next bucket to process is still the current one
                     remainingBuckets = BUCKETS.slice(
-                        BUCKETS.findIndex(bucket => bucket === bucketName));
+                        BUCKETS.findIndex(bucket => bucket === bucketName),
+                    );
                 } else {
                     // next bucket to process is the next in bucket list
                     remainingBuckets = BUCKETS.slice(
-                        BUCKETS.findIndex(bucket => bucket === bucketName) + 1);
+                        BUCKETS.findIndex(bucket => bucket === bucketName) + 1,
+                    );
                 }
-                let message =
-                    'reached update count limit, resuming from this ' +
-                    'point can be achieved by re-running the script with ' +
-                    `the bucket list "${remainingBuckets.join(',')}"`;
+                let message = 'reached update count limit, resuming from this '
+                    + 'point can be achieved by re-running the script with '
+                    + `the bucket list "${remainingBuckets.join(',')}"`;
                 if (VersionIdMarker || KeyMarker) {
                     message += ' and the following environment variables set: '
-                        + `KEY_MARKER=${KeyMarker} ` +
-                        `VERSION_ID_MARKER=${VersionIdMarker}`;
+                        + `KEY_MARKER=${KeyMarker} `
+                        + `VERSION_ID_MARKER=${VersionIdMarker}`;
                 }
                 log.info(message);
                 process.exit(0);
@@ -301,7 +305,8 @@ function triggerCRROnBucket(bucketName, cb) {
             _logProgress();
             log.info(`completed task for bucket: ${bucket}`);
             return cb();
-        });
+        },
+    );
 }
 
 // trigger the calls to list objects and mark them for crr

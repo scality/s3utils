@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk');
-const Service = require('aws-sdk').Service;
+const { Service } = require('aws-sdk');
 
 // for more info, see how S3 client is configured in aws-sdk
 // (clients/s3.js and lib/services/s3.js)

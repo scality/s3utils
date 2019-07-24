@@ -7,7 +7,8 @@
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
-    "test": "jest test/ | exit 0"
+    "test": "jest test/ | exit 0",
+    "eslint": "node_modules/.bin/eslint"
   },
   "repository": {
     "type": "git",
@@ -28,13 +29,16 @@
     "arsenal": "scality/arsenal#8f71d4f",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
+    "eslint-config-airbnb-base": "^13.2.0",
     "werelogs": "scality/werelogs",
+    "yargs": "^13.3.0",
     "zenkoclient": "scality/zenkoclient#5c7f655"
   },
   "devDependencies": {
     "eslint": "^2.13.1",
     "eslint-config-airbnb": "^6.2.0",
     "eslint-config-scality": "github:scality/Guidelines",
+    "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-react": "^4.3.0",
     "jest": "^23.6.0"
   }

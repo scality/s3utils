@@ -6,12 +6,12 @@ const { Logger } = require('werelogs');
 const log = new Logger('s3utils::emptyBucket');
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' +
-        'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide '
+    + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -105,7 +105,7 @@ function cleanupVersions(bucket, cb) {
             }
             return false;
         },
-        cb
+        cb,
     );
 }
 

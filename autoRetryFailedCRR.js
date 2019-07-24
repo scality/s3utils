@@ -3,9 +3,9 @@ const { Logger } = require('werelogs');
 const ZenkoClient = require('zenkoclient');
 
 const log = new Logger('s3utils::autoRetryFailedCRR');
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 if (!ENDPOINT) {
     throw new Error('ENDPOINT not defined!');
 }

@@ -1,21 +1,21 @@
 const async = require('async');
 const AWS = require('aws-sdk');
 const http = require('http');
-
 const { Logger } = require('werelogs');
+
 const log = new Logger('s3utils:listFailedObjects');
 /* eslint-disable no-console */
 
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 const LISTING_LIMIT = 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.error('No buckets given as input! Please provide ' +
-        'a comma-separated list of buckets');
+    log.error('No buckets given as input! Please provide '
+        + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -75,8 +75,7 @@ function listBucket(bucket, cb) {
         done => _listObjectVersions(bucketName, VersionIdMarker, KeyMarker,
             (err, data) => {
                 if (err) {
-                    log.error('error occured while listing', {
-                        error: err, bucketName });
+                    log.error('error occured while listing', { error: err, bucketName });
                     return done(err);
                 }
                 const keys = _getKeys(data.Versions);
@@ -109,17 +108,16 @@ function listBucket(bucket, cb) {
             }
             return true;
         },
-        cb
+        cb,
     );
 }
 
-async.mapSeries(BUCKETS, (bucket, done) => listBucket(bucket, done),
-    err => {
-        if (err) {
-            log.error('error occured while listing failed objects', {
-                error: err,
-            });
-        }
+async.mapSeries(BUCKETS, (bucket, done) => listBucket(bucket, done), err => {
+    if (err) {
+        log.error('error occured while listing failed objects', {
+            error: err,
+        });
     }
+},
 );
 /* eslint-enable no-console */

@@ -5,10 +5,10 @@ const ZenkoClient = require('zenkoclient');
 
 const { MongoClientInterface } = storage.metadata.mongoclient;
 const { encode } = versioning.VersionID;
-const ENDPOINT = process.env.ENDPOINT;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const { ENDPOINT } = process.env;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { MONGODB_REPLICASET } = process.env;
 const DRY_RUN = !!process.env.DRY_RUN;
 
 if (!ENDPOINT) {
@@ -75,12 +75,13 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                 return cb(err);
             }
             const stalledObjects = res.map(data => {
-                if (!data || typeof data !== 'object' ||
-                    !data.value || typeof data.value !== 'object') {
+                if (!data || typeof data !== 'object'
+                    || !data.value || typeof data.value !== 'object') {
                     return false;
                 }
-                const time = data.value['last-modified'] || null;
-                if (isNaN(Date.parse(time))) {
+                const time = data.value['last-modified']
+                    || null;
+                if (Number.isNaN(Date.parse(time))) {
                     return false;
                 }
                 const testDate = new Date(time);
@@ -101,11 +102,13 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                 return false;
             })
             // filter nulls
-            .filter(i => !!i);
+                .filter(i => !!i);
             // flatten array of arrays
             if (stalledObjects.length > 0) {
                 return cb(null, stalledObjects.reduce(
-                    (accumulator, currVal) => accumulator.concat(currVal)));
+                    (accumulator, currVal) => accumulator.concat(currVal),
+                ),
+                );
             }
             return cb(null, stalledObjects);
         });
@@ -117,11 +120,11 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                 return cb(err);
             }
             return async.eachLimit(collections, 1, (value, next) => {
-                const skipBucket = value.name === METASTORE ||
-                    value.name === INFOSTORE ||
-                    value.name === USERSBUCKET ||
-                    value.name === PENSIEVE ||
-                    value.name.startsWith(MPU_BUCKET_PREFIX);
+                const skipBucket = value.name === METASTORE
+                    || value.name === INFOSTORE
+                    || value.name === USERSBUCKET
+                    || value.name === PENSIEVE
+                    || value.name.startsWith(MPU_BUCKET_PREFIX);
                 if (skipBucket) {
                     // skip
                     return next();

@@ -2,29 +2,30 @@ const async = require('async');
 const AWS = require('aws-sdk');
 const http = require('http');
 
-var argv = require('yargs')
+const { argv } = require('yargs')
     .option('bucket', {
         alias: 'b',
-        describe: 'Name of the bucket'
+        describe: 'Name of the bucket',
     })
     .option('accessKey', {
         alias: 'a',
-        describe: 'Access Key'
+        describe: 'Access Key',
     })
     .option('secretKey', {
         alias: 's',
-        describe: 'Secret Key'
+        describe: 'Secret Key',
     })
     .option('endpoint', {
         alias: 'e',
-        describe: 'S3 endpoint'
+        describe: 'S3 endpoint',
     })
     .option('delete-latest', {
-        describe: 'Deletes all versions'
+        describe: 'Deletes all versions',
     })
-    .demandOption(['bucket', 'accessKey', 'secretKey', 'endpoint'], 'Please provide all required arguments to work with this tool')
+    .demandOption(['bucket', 'accessKey', 'secretKey',
+        'endpoint'], 'Please provide all required arguments to work with this tool')
     .help()
-    .argv
+    .argv;
 
 const BUCKET = argv.bucket;
 const LISTING_LIMIT = 30000000;
@@ -37,7 +38,7 @@ const QUIET_MODE = true;
 AWS.config.update({
     accessKeyId: ACCESSKEY,
     secretAccessKey: SECRETKEY,
-    region: "us-west-1",
+    region: 'us-west-1',
     sslEnabled: false,
     endpoint: ENDPOINT,
     s3ForcePathStyle: true,
@@ -58,7 +59,7 @@ function _listObjectVersions(VersionIdMarker, KeyMarker, cb) {
 }
 // return object with key and version_id
 function _getKeys(keys) {
-    return keys.map((v) => ({
+    return keys.map(v => ({
         Key: v.Key,
         VersionId: v.VersionId,
     }));
@@ -87,6 +88,7 @@ function _deleteVersions(objectsToDelete, cb) {
 function nukeObjects(cb) {
     let VersionIdMarker = null;
     let KeyMarker = null;
+    const nonCurrent = [];
     async.doWhilst(
         done => _listObjectVersions(VersionIdMarker, KeyMarker, (err, data) => {
             if (err) {
@@ -96,10 +98,9 @@ function nukeObjects(cb) {
             if (argv.deleteLatest === 'true') {
                 keysToDelete = _getKeys(data.Versions);
             } else {
-                var nonCurrent = [];
                 Object.keys(data.Versions).forEach(function eachKey(key) {
                     if (!data.Versions[key].IsLatest) {
-                        nonCurrent.push(data.Versions[key])
+                        nonCurrent.push(data.Versions[key]);
                     }
                 });
                 keysToDelete = _getKeys(nonCurrent);
@@ -110,12 +111,12 @@ function nukeObjects(cb) {
             _deleteVersions(keysToDelete.concat(markersToDelete), done);
         }),
         () => {
-            if (VersionIdMarker ||  KeyMarker) {
+            if (VersionIdMarker || KeyMarker) {
                 return true;
             }
             return false;
         },
-        cb
+        cb,
     );
 }
 nukeObjects((err, res) => {

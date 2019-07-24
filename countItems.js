@@ -1,5 +1,4 @@
-const { MongoClientInterface } =
-    require('arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 const { Logger } = require('werelogs');
 
 const log = new Logger('S3Utils::ScanItemCount');
