@@ -35,6 +35,7 @@
     "zenkoclient": "scality/zenkoclient#5c7f655"
   },
   "devDependencies": {
+    "babel-eslint": "^10.0.2",
     "eslint": "^2.13.1",
     "eslint-config-airbnb": "^6.2.0",
     "eslint-config-scality": "github:scality/Guidelines",
