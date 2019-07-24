@@ -186,13 +186,13 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             }, next);
         },
     ], err => {
-        nProcessed + 1;
+        nProcessed = nProcessed + 1;
         if (err) {
-            nErrors + 1;
+            nErrors = nErrors + 1;
             return cb(err);
         }
         if (skip) {
-            nSkipped + 1;
+            nSkipped = nSkipped + 1;
         }
         return cb();
     });
