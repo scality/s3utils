@@ -2,7 +2,7 @@ const async = require('async');
 const AWS = require('aws-sdk');
 const http = require('http');
 
-const { argv } = require('yargs')
+const argv = require('yargs')
     .option('bucket', {
         alias: 'b',
         describe: 'Name of the bucket',
@@ -26,7 +26,7 @@ const { argv } = require('yargs')
         'Please provide all required arguments to work with this tool')
     .help()
     .argv;
-
+console.log(argv);
 const BUCKET = argv.bucket;
 const LISTING_LIMIT = 30000000;
 const ACCESSKEY = argv.accessKey;
@@ -77,7 +77,7 @@ function _deleteVersions(objectsToDelete, cb) {
                 console.log('batch delete err', err);
                 return done(err);
             }
-            Objects.forEach(v => console.log('deleted key: ${v.Key}'));
+            Objects.forEach(v => console.log(`deleted key: ${v.Key}`));
             return done();
         });
     }
