@@ -74,10 +74,10 @@ function _deleteVersions(objectsToDelete, cb) {
             Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } },
         err => {
             if (err) {
-                console.log('batch delete err', err);
+                Console.log('batch delete err', err);
                 return done(err);
             }
-            Objects.forEach(v => console.log('deleted key: ' + v.Key));
+            Objects.forEach(v => Console.log('deleted key: ${v.Key}'));
             return done();
         });
     }
@@ -115,6 +115,7 @@ function nukeObjects(cb) {
             KeyMarker = data.NextKeyMarker;
             const markersToDelete = _getKeys(data.DeleteMarkers);
             _deleteVersions(keysToDelete.concat(markersToDelete), done);
+            return;
         }),
         () => {
             if (VersionIdMarker || KeyMarker) {
@@ -127,7 +128,7 @@ function nukeObjects(cb) {
 }
 nukeObjects((err) => {
     if (err) {
-        return console.log('error occured deleting objects', err);
+        return Console.log('error occured deleting objects', err);
     }
-    return console.log('completed deletion');
+    return Console.log('completed deletion');
 });
