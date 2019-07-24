@@ -55,8 +55,8 @@ const s3 = new AWS.S3({
 });
 // list object versions
 function _listObjectVersions(VersionIdMarker, KeyMarker, cb) {
-    s3.listObjectVersions({ Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker },
-        cb);
+    s3.listObjectVersions({ 
+        Bucket: BUCKET, MaxKeys: LISTING_LIMIT, VersionIdMarker, KeyMarker }, cb);
 }
 // return object with key and version_id
 function _getKeys(keys) {
@@ -69,7 +69,8 @@ function _getKeys(keys) {
 function _deleteVersions(objectsToDelete, cb) {
     // multi object delete can delete max 1000 objects
     function _batchDelete(Objects, done) {
-        s3.deleteObjects({ Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } },
+        s3.deleteObjects({
+            Bucket: BUCKET, Delete: { Objects, Quiet: QUIET_MODE } },
         (err, res) => {
             if (err) {
                 console.log('batch delete err', err);
