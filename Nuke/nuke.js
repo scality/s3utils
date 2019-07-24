@@ -92,7 +92,7 @@ function _deleteVersions(objectsToDelete, cb) {
 function nukeObjects(cb) {
     let VersionIdMarker = null;
     let KeyMarker = null;
-    const keysToDelete;
+    const keysToDelete = null;
     const nonCurrent = [];
     async.doWhilst(
         done => _listObjectVersions(VersionIdMarker, KeyMarker, (err, data) => {
