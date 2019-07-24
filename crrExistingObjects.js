@@ -222,7 +222,8 @@ function _markPending(bucket, versions, cb) {
             const { Rules } = repConfig;
             const storageClass = Rules[0].Destination.StorageClass || SITE_NAME;
             if (!storageClass) {
-                const errMsg = 'missing SITE_NAME environment variable, must be set to'
+                const errMsg
+                    = 'missing SITE_NAME environment variable, must be set to'
                     + ' the value of "site" property in the CRR configuration';
                 log.error(errMsg);
                 return next(new Error(errMsg));

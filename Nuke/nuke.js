@@ -98,7 +98,8 @@ function nukeObjects(cb) {
             if (err) {
                 return done(err);
             }
-            // const filteredData = data.Versions.filter(item => item.IsLatest !== true);
+            // const filteredData
+            //= data.Versions.filter(item => item.IsLatest !== true);
             if (argv.deleteLatest === 'true') {
                 const keysToDelete = _getKeys(data.Versions);
             } else {

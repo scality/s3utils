@@ -75,7 +75,8 @@ function listBucket(bucket, cb) {
         done => _listObjectVersions(bucketName, VersionIdMarker, KeyMarker,
             (err, data) => {
                 if (err) {
-                    log.error('error occured while listing', { error: err, bucketName });
+                    log.error('error occured while listing',
+                    { error: err, bucketName });
                     return done(err);
                 }
                 const keys = _getKeys(data.Versions);
