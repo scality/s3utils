@@ -69,6 +69,10 @@ function _getKeys(keys) {
 
 // delete all versions of an object
 function _deleteVersions(bucket, objectsToDelete, cb) {
+    if (objectsToDelete.length === 0) {
+        log.info('no archived objects to delete');
+        return cb();
+    }
     // multi object delete can delete max 1000 objects
     const params = {
         Bucket: bucket,
