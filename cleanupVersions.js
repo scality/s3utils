@@ -80,7 +80,11 @@ function _deleteVersions(bucket, objectsToDelete, cb) {
     };
     s3.deleteObjects(params, err => {
         if (err) {
-            log.error('batch delete err', err);
+            log.error('batch delete err', {
+                error: err,
+                bucket,
+                objectsToDelete,
+            });
             return cb(err);
         }
         objectsToDelete.forEach(v =>
