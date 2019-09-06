@@ -83,7 +83,8 @@ function _deleteVersions(bucket, objectsToDelete, cb) {
             log.error('batch delete err', err);
             return cb(err);
         }
-        objectsToDelete.forEach(v => log.info(`deleted key: ${v.Key}`));
+        objectsToDelete.forEach(v =>
+            log.info(`deleted key: ${v.Key} version: ${v.VersionId}`));
         return cb();
     });
 }
