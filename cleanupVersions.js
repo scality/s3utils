@@ -10,6 +10,7 @@ const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const REMOVE_DELETE_MARKERS = process.env.REMOVE_DELETE_MARKERS;
+const LISTING_PREFIX = process.env.LISTING_PREFIX;
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
         'a comma-separated list of buckets');
@@ -53,6 +54,7 @@ const s3 = new AWS.S3({
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     return s3.listObjectVersions({
         Bucket: bucket,
+        Prefix: LISTING_PREFIX || undefined,
         MaxKeys: LISTING_LIMIT,
         VersionIdMarker,
         KeyMarker,
