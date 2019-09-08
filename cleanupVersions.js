@@ -11,7 +11,7 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const REMOVE_DELETE_MARKERS = process.env.REMOVE_DELETE_MARKERS;
 const LISTING_PREFIX = process.env.LISTING_PREFIX;
-let WORKERS = 1;
+let WORKERS = 10;
 if (process.env.WORKERS) {
     if (Number.isNaN(Number.parseInt(process.env.WORKERS, 10))) {
         log.fatal('WORKERS must be >= 1');
@@ -97,15 +97,15 @@ function _deleteVersions(bucket, objectsToDelete, cb) {
             });
             return cb(err);
         }
-        objectsToDelete.forEach(v =>
-            log.info(`deleted key: ${v.Key} version: ${v.VersionId}`));
+        log.debug('deleted keys', { objectsToDelete });
+        // objectsToDelete.forEach(v =>
+        //     log.info(`deleted key: ${v.Key} version: ${v.VersionId}`));
         return cb();
     });
 }
 
 const deleteQueue = async.queue((params, done) => {
-    const { bucket, data } = params;
-    const { Versions, DeleteMarkers } = data;
+    const { bucket, Versions, DeleteMarkers } = params;
     // skip latest versions
     const keysToDelete = _getKeys(Versions.filter(i => i.IsLatest === false));
     // skip latest delete markers
@@ -114,7 +114,7 @@ const deleteQueue = async.queue((params, done) => {
     // remove all delete markers, use this option once all the
     // archived versions are deleted
     if (REMOVE_DELETE_MARKERS) {
-        markersToDelete = _getKeys(data.DeleteMarkers);
+        markersToDelete = _getKeys(DeleteMarkers);
     }
     return _deleteVersions(bucket, keysToDelete.concat(markersToDelete), done);
 }, WORKERS);
@@ -129,7 +129,11 @@ function cleanupVersions(bucket, cb) {
                 if (err) {
                     return done(err);
                 }
-                deleteQueue.push({ bucket, data });
+                const { NextVersionIdMarker, NextKeyMarker, Versions,
+                    DeleteMarkers} = data;
+                VersionIdMarker = NextVersionIdMarker;
+                KeyMarker = NextKeyMarker;
+                deleteQueue.push({ bucket, Versions,  DeleteMarkers});
                 return done();
             }),
         () => {
