@@ -11,6 +11,14 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const REMOVE_DELETE_MARKERS = process.env.REMOVE_DELETE_MARKERS;
 const LISTING_PREFIX = process.env.LISTING_PREFIX;
+let WORKERS = 1;
+if (process.env.WORKERS) {
+    if (Number.isNaN(Number.parseInt(process.env.WORKERS, 10))) {
+        log.fatal('WORKERS must be >= 1');
+        process.exit(1);
+    }
+    WORKERS = Number.parseInt(process.env.WORKERS, 10);
+}
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
         'a comma-separated list of buckets');
@@ -95,6 +103,23 @@ function _deleteVersions(bucket, objectsToDelete, cb) {
     });
 }
 
+const deleteQueue = async.queue((params, done) => {
+    const { bucket, data } = params;
+    const { Versions, DeleteMarkers } = data;
+    // skip latest versions
+    const keysToDelete = _getKeys(Versions.filter(i => i.IsLatest === false));
+    // skip latest delete markers
+    let markersToDelete = _getKeys(DeleteMarkers.filter(
+        i => i.IsLatest === false));
+    // remove all delete markers, use this option once all the
+    // archived versions are deleted
+    if (REMOVE_DELETE_MARKERS) {
+        markersToDelete = _getKeys(data.DeleteMarkers);
+    }
+    return _deleteVersions(bucket, keysToDelete.concat(markersToDelete), done);
+}, WORKERS);
+
+
 function cleanupVersions(bucket, cb) {
     let VersionIdMarker = null;
     let KeyMarker = null;
@@ -104,20 +129,8 @@ function cleanupVersions(bucket, cb) {
                 if (err) {
                     return done(err);
                 }
-                VersionIdMarker = data.NextVersionIdMarker;
-                KeyMarker = data.NextKeyMarker;
-                // skip latest versions
-                const keysToDelete = _getKeys(
-                    data.Versions.filter(i => i.IsLatest === false));
-                // skip latest delete markers
-                let markersToDelete = _getKeys(
-                    data.DeleteMarkers.filter(i => i.IsLatest === false));
-                // remove all delete markers
-                if (REMOVE_DELETE_MARKERS) {
-                    markersToDelete = _getKeys(data.DeleteMarkers);
-                }
-                return _deleteVersions(bucket,
-                    keysToDelete.concat(markersToDelete), done);
+                deleteQueue.push({ bucket, data });
+                return done();
             }),
         () => {
             if (VersionIdMarker || KeyMarker) {
@@ -127,23 +140,6 @@ function cleanupVersions(bucket, cb) {
         },
         cb
     );
-}
-
-function abortAllMultipartUploads(bucket, cb) {
-    s3.listMultipartUploads({ Bucket: bucket }, (err, res) => {
-        if (err) {
-            return cb(err);
-        }
-        if (!res || !res.Uploads) {
-            return cb();
-        }
-        return async.mapLimit(res.Uploads, 10,
-            (item, done) => {
-                const { Key, UploadId } = item;
-                const params = { Bucket: bucket, Key, UploadId };
-                s3.abortMultipartUpload(params, done);
-            }, cb);
-    });
 }
 
 function _cleanupBucket(bucket, cb) {
