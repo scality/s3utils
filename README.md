@@ -54,8 +54,33 @@ Trigger CRR on all original source objects (not replicas) in a bucket.
 
 `TARGET_REPLICATION_STATUS=REPLICA`
 
-For disaster recovery notably, it may be useful to reprocess REPLICA 
+For disaster recovery notably, it may be useful to reprocess REPLICA
 objects to re-sync a backup bucket to the primary site.
+
+#### STORAGE_TYPE
+
+Comma-separated list of the destination storage location types. This is used
+only if a replication destination is a public cloud.
+
+The recognized statuses are:
+
+* **aws_s3**: The destination storage location type is Amazon S3.
+
+* **azure**: The destination storage location type is Microsoft Azure Blob
+   Storage.
+
+* **gcp**: The destination storage location type is Google Cloud Storage.
+
+Examples:
+
+`STORAGE_TYPE=aws_s3`
+
+The destination storage location type is AWS.
+
+`STORAGE_TYPE=aws_s3,azure,gcp`
+
+The destination storage type is a one-to-many configuration replicating to AWS,
+Azure, and GCP destination storage locations.
 
 #### WORKERS
 
@@ -86,7 +111,7 @@ passed on the command line).
  process them quickly enough, Kafka may drop the oldest entries**,
  and the associated objects will stay in the **PENDING** state
  permanently without being replicated. When the number of objects
- is large, it is a good idea to limit the batch size and wait 
+ is large, it is a good idea to limit the batch size and wait
  for CRR to complete between invocations.
 
 Example:
@@ -149,7 +174,7 @@ consumer log.
 #### Replicate entries that failed a previous replication
 
 If entries have permanently failed to replicate with a FAILED
-replication status and were lost in the failed CRR API, it's still 
+replication status and were lost in the failed CRR API, it's still
 possible to re-attempt replication later with the following
 extra environment variables:
 
@@ -161,7 +186,7 @@ export MAX_UPDATES=10000
 #### Re-sync a primary site completely to a new DR site
 
 To re-sync objects to a new DR site (for example, when the original
-DR site is lost) force a new replication of all original objects 
+DR site is lost) force a new replication of all original objects
 with the following environment variables (after setting the proper
 replication configuration to the DR site bucket):
 
