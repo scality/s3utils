@@ -9,7 +9,7 @@ const config = {
     replicaSetHosts,
     writeConcern: 'majority',
     replicaSet: 'rs0',
-    readPreference: 'primary',
+    readPreference: 'secondaryPreferred',
     database: 'metadata',
     replicationGroupId: 'RG001',
     logger: log,
