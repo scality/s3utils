@@ -13,6 +13,7 @@ const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const ENDPOINT = process.env.ENDPOINT;
 const SITE_NAME = process.env.SITE_NAME;
+let STORAGE_TYPE = process.env.STORAGE_TYPE;
 let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
 const WORKERS = (process.env.WORKERS &&
                  Number.parseInt(process.env.WORKERS, 10)) || 10;
@@ -40,6 +41,9 @@ if (!ACCESS_KEY) {
 if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
+}
+if (!STORAGE_TYPE) {
+    STORAGE_TYPE = '';
 }
 if (!TARGET_REPLICATION_STATUS) {
     TARGET_REPLICATION_STATUS = 'NEW';
@@ -172,7 +176,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 destination,
                 storageClass,
                 role: Role,
-                storageType: '',
+                storageType: STORAGE_TYPE,
             };
             objMD.replicationInfo = replicationInfo;
             const mdBlob = JSON.stringify(objMD);
