@@ -1,21 +1,55 @@
 const { MongoClientInterface } =
     require('arsenal').storage.metadata.mongoclient;
 const { Logger } = require('werelogs');
+const fs = require('fs');
 
 const log = new Logger('S3Utils::ScanItemCount');
 const replicaSetHosts = process.env.MONGODB_REPLICASET;
+const database = process.env.MONGODB_DATABASE || 'metadata';
 
-const config = {
+function getIsLocationTransientCb() {
+    const locationConfigFile = 'conf/locationConfig.json';
+    if (!fs.existsSync(locationConfigFile)) {
+        log.info('location conf file missing, falling back to PENSIEVE coll',
+            { filename: locationConfigFile });
+        return null;
+    }
+
+    const buf = fs.readFileSync(locationConfigFile);
+    const locationConfig = JSON.parse(buf.toString());
+
+    return function locationIsTransient(locationName, log, cb) {
+        if (!locationConfig[locationName]) {
+            log.error('unknown location', { locationName });
+            process.nextTick(cb, null, false);
+            return;
+        }
+        const isTransient = Boolean(locationConfig[locationName].isTransient);
+        process.nextTick(cb, null, isTransient);
+    };
+}
+
+const params = {
     replicaSetHosts,
+    database,
+    isLocationTransient: getIsLocationTransientCb(),
     writeConcern: 'majority',
     replicaSet: 'rs0',
     readPreference: 'secondaryPreferred',
-    database: 'metadata',
     replicationGroupId: 'RG001',
     logger: log,
 };
 
-const mongoclient = new MongoClientInterface(config);
+if (process.env.MONGODB_AUTH_USERNAME &&
+    process.env.MONGODB_AUTH_PASSWORD) {
+    params.authCredentials = {
+        username: process.env.MONGODB_AUTH_USERNAME,
+        password: process.env.MONGODB_AUTH_PASSWORD,
+    };
+}
+
+const mongoclient = new MongoClientInterface(params);
+
 mongoclient.setup(err => {
     if (err) {
         log.error('error connecting to mongodb', {
