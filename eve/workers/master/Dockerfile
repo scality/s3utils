@@ -13,7 +13,7 @@ RUN apt-get update -q && apt-get -qy install curl apt-transport-https \
     && cat /tmp/s3utils_packages.list | xargs apt-get install -qy \
     && git clone https://github.com/tj/n.git \
     && make -C ./n \
-    && n 8 latest \
+    && n 10 latest \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && apt-get update \

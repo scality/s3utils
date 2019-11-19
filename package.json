@@ -2,7 +2,7 @@
   "name": "s3utils",
   "version": "1.0.0",
   "engines": {
-    "node": ">=6"
+    "node": ">= 10"
   },
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
