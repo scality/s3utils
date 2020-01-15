@@ -17,7 +17,7 @@ models:
   - SetProperty: &registry_url
       name: registry
       property: registry_url
-      value: registry.scality.com/zenko-dev/backbeat
+      value: registry.scality.com/zenko-dev/s3utils
   - SetProperty: &docker_tag_revision
       name: Set docker tag revision property
       property: docker_tag_revision
