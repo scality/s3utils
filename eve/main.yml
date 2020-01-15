@@ -51,11 +51,11 @@ stages:
     worker:
       type: local
     steps:
-    - TriggerStages:
-      name: run stages
-      stage_names:
-      - run-tests
-      - docker-build
+      - TriggerStages:
+          name: run stages
+          stage_names:
+            - run-tests
+            - docker-build
 
   run-tests:
     worker: &master-worker
