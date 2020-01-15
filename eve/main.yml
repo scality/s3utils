@@ -2,23 +2,69 @@
 version: 0.2
 
 branches:
-  default:
+  feature/*, improvement/*, bugfix/*, w/*, q/*, hotfix/*:
     stage: pre-merge
+  development/*:
+    stage: post-merge
+
+models:
+  - Git: &git
+      name: fetch source
+      repourl: '%(prop:git_reference)s'
+      shallow: True
+      retryFetch: True
+      haltOnFailure: True
+  - SetProperty: &registry_url
+      name: registry
+      property: registry_url
+      value: registry.scality.com/zenko-dev/backbeat
+  - SetProperty: &docker_tag_revision
+      name: Set docker tag revision property
+      property: docker_tag_revision
+      value: "%(prop:registry_url)s:%(prop:commit_short_revision)s"
+  - SetProperty: &docker_tag_latest
+      name: Set docker tag latest property
+      property: docker_tag_latest
+      value: "%(prop:registry_url)s:latest-%(prop:product_version)s"
+  - ShellCommand: &docker_build
+      name: Build docker image
+      command: >-
+        docker build
+        -t %(prop:docker_tag_revision)s
+        -t %(prop:docker_tag_latest)s
+        .
+  - ShellCommand: &wait_docker_daemon
+      name: Wait for Docker daemon to be ready
+      command: |
+        bash -c '
+        for i in {1..150}
+        do
+          docker info &> /dev/null && exit
+          sleep 2
+        done
+        echo "Could not reach Docker daemon from buildbot worker" >&2
+        exit 1'
+      haltOnFailure: true
 
 stages:
   pre-merge:
+    worker:
+      type: local
+    steps:
+    - TriggerStages:
+      name: run stages
+      stage_names:
+      - run-tests
+      - docker-build
+
+  run-tests:
     worker: &master-worker
       type: docker
       path: eve/workers/master
       volumes:
         - '/home/eve/workspace'
     steps:
-      - Git:
-          name: fetch source
-          repourl: '%(prop:git_reference)s'
-          shallow: True
-          retryFetch: True
-          haltOnFailure: True
+      - Git: *git
       - ShellCommand:
           name: install dependencies
           command: yarn 
@@ -29,3 +75,38 @@ stages:
           name: run test
           command: yarn --silent test
 
+  docker-build:
+    worker: &image_builder
+      type: kube_pod
+      path: eve/workers/release/pod.yaml
+      images:
+        release: eve/workers/release
+    steps:
+      - Git: *git
+      - ShellCommand: *wait_docker_daemon
+      - SetProperty: *registry_url
+      - SetProperty: *docker_tag_revision
+      - SetProperty: *docker_tag_latest
+      - ShellCommand: *docker_build
+
+  post-merge:
+    worker: *image_builder
+    steps:
+      - Git: *git
+      - ShellCommand: *wait_docker_daemon
+      - ShellCommand: &docker_login
+          name: Private Registry Login
+          command: >
+            docker login
+            -u '%(secret:harbor_login)s'
+            -p '%(secret:harbor_password)s'
+            registry.scality.com
+      - SetProperty: *registry_url
+      - SetProperty: *docker_tag_revision
+      - SetProperty: *docker_tag_latest
+      - ShellCommand: *docker_build
+      - ShellCommand: &docker_push
+          name: Push images
+          command: |
+            docker push %(prop:docker_tag_revision)s
+            docker push %(prop:docker_tag_latest)s
