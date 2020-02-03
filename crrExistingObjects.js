@@ -83,11 +83,12 @@ const bb = new BackbeatClient(options);
 
 let nProcessed = 0;
 let nSkipped = 0;
+let nUpdated = 0;
 let nErrors = 0;
 let bucketInProgress = null;
 
 function _logProgress() {
-    log.info(`progress update: ${nProcessed - nSkipped} updated, ` +
+    log.info(`progress update: ${nUpdated} updated, ` +
              `${nSkipped} skipped, ${nErrors} errors, ` +
              `bucket in progress: ${bucketInProgress || '(none)'}`);
 }
@@ -198,6 +199,8 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         }
         if (skip) {
             ++nSkipped;
+        } else {
+            ++nUpdated;
         }
         return cb();
     });
@@ -270,7 +273,7 @@ function triggerCRROnBucket(bucketName, cb) {
                     bucket, data.Versions.concat(data.DeleteMarkers), done);
             }),
         () => {
-            if (nProcessed - nSkipped >= MAX_UPDATES) {
+            if (nUpdated >= MAX_UPDATES) {
                 _logProgress();
                 let remainingBuckets;
                 if (VersionIdMarker || KeyMarker) {
