@@ -191,7 +191,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         ++nProcessed;
         if (err) {
             ++nErrors;
-            return cb(err);
+            return cb();
         }
         if (skip) {
             ++nSkipped;
