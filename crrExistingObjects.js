@@ -73,7 +73,6 @@ const options = {
     signatureVersion: 'v4',
     signatureCache: false,
     httpOptions: {
-        maxRetries: 0,
         timeout: 0,
         agent: new http.Agent({ keepAlive: true }),
     },
