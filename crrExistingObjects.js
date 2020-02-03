@@ -85,11 +85,18 @@ let nSkipped = 0;
 let nUpdated = 0;
 let nErrors = 0;
 let bucketInProgress = null;
+let VersionIdMarker = null;
+let KeyMarker = null;
 
 function _logProgress() {
-    log.info(`progress update: ${nUpdated} updated, ` +
-             `${nSkipped} skipped, ${nErrors} errors, ` +
-             `bucket in progress: ${bucketInProgress || '(none)'}`);
+    log.info('progress update', {
+        updated: nUpdated,
+        skipped: nSkipped,
+        errors: nErrors,
+        bucket: bucketInProgress || null,
+        keyMarker: KeyMarker || null,
+        versionIdMarker: VersionIdMarker || null,
+    });
 }
 
 const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
@@ -246,8 +253,6 @@ function _markPending(bucket, versions, cb) {
 
 function triggerCRROnBucket(bucketName, cb) {
     const bucket = bucketName.trim();
-    let VersionIdMarker = null;
-    let KeyMarker = null;
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
     if (KEY_MARKER || VERSION_ID_MARKER) {
@@ -266,10 +271,15 @@ function triggerCRROnBucket(bucketName, cb) {
                     log.error('error listing object versions', { error: err });
                     return done(err);
                 }
-                VersionIdMarker = data.NextVersionIdMarker;
-                KeyMarker = data.NextKeyMarker;
                 return _markPending(
-                    bucket, data.Versions.concat(data.DeleteMarkers), done);
+                    bucket, data.Versions.concat(data.DeleteMarkers), err => {
+                        if (err) {
+                            return done(err);
+                        }
+                        VersionIdMarker = data.NextVersionIdMarker;
+                        KeyMarker = data.NextKeyMarker;
+                        return done();
+                    });
             }),
         () => {
             if (nUpdated >= MAX_UPDATES) {
