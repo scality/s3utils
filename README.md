@@ -91,10 +91,10 @@ Example:
 
 `WORKERS=50`
 
-#### MAX_UPDATES
+#### MAX_UPDATES, MAX_SCANNED
 
-Specify a maximum number of metadata updates to execute before
-stopping the script.
+Specify a maximum number of metadata updates (MAX_UPDATES) or scanned
+entries (MAX_SCANNED) to execute before stopping the script.
 
 If the script reaches this limit, it outputs a log line containing
 the KeyMarker and VersionIdMarker to pass to the next invocation (as
@@ -114,17 +114,22 @@ passed on the command line).
  is large, it is a good idea to limit the batch size and wait
  for CRR to complete between invocations.
 
-Example:
+Examples:
 
 `MAX_UPDATES=10000`
 
 This limits the number of updates to 10,000 objects, which requeues
 a maximum of 10,000 objects to replicate before the script stops.
 
+`MAX_SCANNED=10000`
+
+This limits the number of scanned objects to 10,000 objects before
+the script stops.
+
 #### KEY_MARKER
 
 Set to resume from where an earlier invocation stopped (see
-[MAX_UPDATES](#MAX_UPDATES)).
+[MAX_UPDATES, MAX_SCANNED](#MAX_UPDATES)).
 
 Example:
 

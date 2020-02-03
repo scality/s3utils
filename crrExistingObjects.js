@@ -19,6 +19,8 @@ const WORKERS = (process.env.WORKERS &&
                  Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
                      Number.parseInt(process.env.MAX_UPDATES, 10));
+const MAX_SCANNED = (process.env.MAX_SCANNED &&
+                     Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
 
@@ -282,7 +284,7 @@ function triggerCRROnBucket(bucketName, cb) {
                     });
             }),
         () => {
-            if (nUpdated >= MAX_UPDATES) {
+            if (nUpdated >= MAX_UPDATES || nProcessed >= MAX_SCANNED) {
                 _logProgress();
                 let remainingBuckets;
                 if (VersionIdMarker || KeyMarker) {
@@ -295,7 +297,9 @@ function triggerCRROnBucket(bucketName, cb) {
                         BUCKETS.findIndex(bucket => bucket === bucketName) + 1);
                 }
                 let message =
-                    'reached update count limit, resuming from this ' +
+                    'reached ' +
+                    `${nUpdated >= MAX_UPDATES ? 'update' : 'scanned'} ` +
+                    'count limit, resuming from this ' +
                     'point can be achieved by re-running the script with ' +
                     `the bucket list "${remainingBuckets.join(',')}"`;
                 if (VersionIdMarker || KeyMarker) {
