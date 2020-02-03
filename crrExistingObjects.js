@@ -191,6 +191,9 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         ++nProcessed;
         if (err) {
             ++nErrors;
+            log.error('error updating object', {
+                bucket, key, versionId, error: err.message,
+            });
             return cb();
         }
         if (skip) {
