@@ -15,6 +15,7 @@ const ENDPOINT = process.env.ENDPOINT;
 const SITE_NAME = process.env.SITE_NAME;
 let STORAGE_TYPE = process.env.STORAGE_TYPE;
 let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
+const TARGET_PREFIX = process.env.TARGET_PREFIX;
 const WORKERS = (process.env.WORKERS &&
                  Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
@@ -219,6 +220,7 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     return s3.listObjectVersions({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
+        Prefix: TARGET_PREFIX,
         VersionIdMarker,
         KeyMarker,
     }, cb);

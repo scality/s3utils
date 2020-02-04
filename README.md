@@ -57,6 +57,17 @@ Trigger CRR on all original source objects (not replicas) in a bucket.
 For disaster recovery notably, it may be useful to reprocess REPLICA
 objects to re-sync a backup bucket to the primary site.
 
+#### TARGET_PREFIX
+
+Optional prefix of keys to scan
+
+Example:
+
+`TARGET_PREFIX=foo/`
+
+Only scan keys beginning with "foo/"
+
+
 #### STORAGE_TYPE
 
 Comma-separated list of the destination storage location types. This is used
