@@ -1,0 +1,21 @@
+{
+    "primary-location": {
+        "type": "file",
+        "objectId": "primary-location",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "secondary-location-1": {
+        "type": "file",
+        "objectId": "secondary-location-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "secondary-location-2": {
+        "type": "file",
+        "objectId": "secondary-location-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    }
+}
+

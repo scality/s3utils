@@ -1,6 +1,10 @@
 # Logs
 *.log
 
+# Artifacts
+coverage/
+*/coverage/
+
 # Dependency directory
 node_modules/
 */node_modules/

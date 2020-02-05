@@ -27,5 +27,8 @@ stages:
           command: yarn --silent lint -- --max-warnings 0
       - ShellCommand:
           name: run test
-          command: yarn --silent test
+          command: yarn --silent test:unit
+      - ShellCommand:
+          name: run test
+          command: yarn --silent test:functional 
 

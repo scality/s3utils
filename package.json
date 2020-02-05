@@ -7,7 +7,8 @@
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
-    "test": "jest test/ | exit 0"
+    "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
+    "test:functional": "MONGODB_REPLICASET=localhost:27017 LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose  --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
   },
   "repository": {
     "type": "git",
@@ -25,9 +26,10 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
-    "arsenal": "scality/arsenal#d994e2a",
+    "arsenal": "github:scality/arsenal#development/8.1",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
+    "node-uuid": "^1.4.8",
     "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
   },
@@ -35,7 +37,9 @@
     "eslint": "^2.13.1",
     "eslint-config-airbnb": "^6.2.0",
     "eslint-config-scality": "github:scality/Guidelines",
+    "eslint-plugin-jest": "^23.6.0",
     "eslint-plugin-react": "^4.3.0",
-    "jest": "^23.6.0"
+    "jest": "^23.6.0",
+    "mongodb-memory-server": "^6.2.4"
   }
 }
