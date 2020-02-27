@@ -17,11 +17,13 @@ let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
 const WORKERS = (process.env.WORKERS &&
                  Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
-                     Number.parseInt(process.env.MAX_UPDATES, 10));
+                     Number.parseInt(process.env.MAX_UPDATES, 10)) || 10;
 let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
 
-const LISTING_LIMIT = 1000;
+const LISTING_LIMIT = (process.env.LISTING_LIMIT &&
+                       Number.parseInt(process.env.LISTING_LIMIT, 10)) || 10;
+
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
