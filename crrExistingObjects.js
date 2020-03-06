@@ -17,16 +17,18 @@ let STORAGE_TYPE = process.env.STORAGE_TYPE;
 let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
 const TARGET_PREFIX = process.env.TARGET_PREFIX;
 const WORKERS = (process.env.WORKERS &&
-                 Number.parseInt(process.env.WORKERS, 10)) || 10;
+    Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
-                     Number.parseInt(process.env.MAX_UPDATES, 10));
+    Number.parseInt(process.env.MAX_UPDATES, 10));
 const MAX_SCANNED = (process.env.MAX_SCANNED &&
-                     Number.parseInt(process.env.MAX_SCANNED, 10));
+    Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
+const AWS_SDK_REQUEST_RETRIES = 100;
+const AWS_SDK_REQUEST_DELAY_MS = 30;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
@@ -56,14 +58,14 @@ const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
 replicationStatusToProcess.forEach(state => {
     if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
         log.fatal('invalid TARGET_REPLICATION_STATUS environment: must be a ' +
-                  'comma-separated list of replication statuses to requeue, ' +
-                  'as NEW, PENDING, COMPLETED, FAILED or REPLICA.');
+            'comma-separated list of replication statuses to requeue, ' +
+            'as NEW, PENDING, COMPLETED, FAILED or REPLICA.');
         process.exit(1);
     }
 });
 log.info('Objects with replication status ' +
-         `${replicationStatusToProcess.join(' or ')} ` +
-         'will be reset to PENDING to trigger CRR');
+    `${replicationStatusToProcess.join(' or ')} ` +
+    'will be reset to PENDING to trigger CRR');
 
 const options = {
     accessKeyId: ACCESS_KEY,
@@ -80,7 +82,21 @@ const options = {
         agent: new http.Agent({ keepAlive: true }),
     },
 };
-const s3 = new AWS.S3(options);
+/**
+ *  Options specific to s3 requests
+ *  `maxRetries` & `customBackoff` are set only to s3 requests
+ *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
+ */
+const s3Options = {
+    maxRetries: AWS_SDK_REQUEST_RETRIES,
+    customBackoff: (retryCount, error) => {
+        log.error('aws sdk request error', { error, retryCount });
+        // computed delay is not truly exponential, it is reset to minimum after
+        // every 10 calls, with max delay of 15 seconds!
+        return AWS_SDK_REQUEST_DELAY_MS * Math.pow(2, retryCount % 10);
+    },
+};
+const s3 = new AWS.S3(Object.assign(options, s3Options));
 const bb = new BackbeatClient(options);
 
 let nProcessed = 0;
@@ -108,15 +124,15 @@ function _objectShouldBeUpdated(objMD) {
     return replicationStatusToProcess.some(filter => {
         if (filter === 'NEW') {
             return (!objMD.replicationInfo ||
-                    objMD.replicationInfo.status === '');
+                objMD.replicationInfo.status === '');
         }
         return (objMD.replicationInfo &&
-                objMD.replicationInfo.status === filter);
+            objMD.replicationInfo.status === filter);
     });
 }
 
 function _markObjectPending(bucket, key, versionId, storageClass,
-                            repConfig, cb) {
+    repConfig, cb) {
     let objMD;
     let skip = false;
     return waterfall([
@@ -241,8 +257,8 @@ function _markPending(bucket, versions, cb) {
             const storageClass = Rules[0].Destination.StorageClass || SITE_NAME;
             if (!storageClass) {
                 const errMsg =
-                      'missing SITE_NAME environment variable, must be set to' +
-                      ' the value of "site" property in the CRR configuration';
+                    'missing SITE_NAME environment variable, must be set to' +
+                    ' the value of "site" property in the CRR configuration';
                 log.error(errMsg);
                 return next(new Error(errMsg));
             }
@@ -266,7 +282,7 @@ function triggerCRROnBucket(bucketName, cb) {
         KEY_MARKER = undefined;
         VERSION_ID_MARKER = undefined;
         log.info(`resuming at: KeyMarker=${KeyMarker} ` +
-                 `VersionIdMarker=${VersionIdMarker}`);
+            `VersionIdMarker=${VersionIdMarker}`);
     }
     doWhilst(
         done => _listObjectVersions(bucket, VersionIdMarker, KeyMarker,
