@@ -242,3 +242,43 @@ following a comma-separated list of buckets. Run the command as
 ````
 node listFailedObjects testbucket1,testbucket2
 ```
+
+#### Verify existence of sproxyd keys for all objects in a set of buckets or raft sessions
+
+This script verifies that all sproxyd keys referenced by objects in S3
+buckets exist on the RING. It can help to identify objects affected by
+the S3C-1959 bug.
+
+## Usage
+
+```
+node verifyBucketSproxydKeys.js
+```
+
+## Mandatory environment variables:
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+
+* Either:
+
+** **BUCKETS**: comma-separated list of buckets to scan
+
+* or:
+
+** **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
+
+## Optional environment variables:
+
+* **WORKERS**: concurrency value for sproxyd requests (default 100)
+
+* **FROM_URL**: URL from which to resume scanning ("s3://bucket[/key]")
+
+* **VERBOSE**: set to 1 for more verbose output (shows one line for every sproxyd key)
+
+* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+
+* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+
+* **MPU_ONLY**: only scan MPU objects, i.e. objects with at least two sproxyd locations
