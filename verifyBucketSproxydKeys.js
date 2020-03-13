@@ -350,7 +350,9 @@ function listBucketIter(bucket, cb) {
                 return checkSproxydKeys(objectUrl, locations, itemDone);
             });
         }, () => {
-            status.KeyMarker = Contents[Contents.length - 1].key;
+            if (IsTruncated) {
+                status.KeyMarker = Contents[Contents.length - 1].key;
+            }
             cb(null, IsTruncated);
         });
     });
