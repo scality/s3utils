@@ -239,11 +239,11 @@ node cleanupBuckets.js testbucket1,testbucket2
 This script prints the list of objects that failed replication to stdout,
 following a comma-separated list of buckets. Run the command as
 
-````
+```
 node listFailedObjects testbucket1,testbucket2
 ```
 
-#### Verify existence of sproxyd keys for all objects in a set of buckets or raft sessions
+# Verify existence of sproxyd keys
 
 This script verifies that all sproxyd keys referenced by objects in S3
 buckets exist on the RING. It can help to identify objects affected by
