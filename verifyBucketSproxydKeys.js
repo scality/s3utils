@@ -100,7 +100,7 @@ const status = {
     KeyMarker: '',
 };
 
-let remainingBuckets = BUCKETS && BUCKETS.split(',');
+let remainingBuckets = (BUCKETS && BUCKETS.split(',')) || [];
 let sproxydAlias;
 
 // used to skip versions that have already been processed as master key
@@ -218,10 +218,10 @@ function raftSessionsToBuckets(cb) {
                 return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
             }
             const resp = JSON.parse(res.body);
-            remainingBuckets = resp.filter(
+            remainingBuckets = remainingBuckets.concat(resp.filter(
                 bucket => !bucket.startsWith('mpuShadowBucket')
                     && bucket !== 'users..bucket'
-            );
+            ));
             return done();
         });
     }, cb);
