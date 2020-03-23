@@ -1,17 +1,9 @@
-const http = require('http');
-
-const AWS = require('aws-sdk');
-const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
-
+const { doWhilst, eachSeries, eachLimit, waterfall, series } = require('async');
 const { Logger } = require('werelogs');
-
-const BackbeatClient = require('./BackbeatClient');
+const metadataUtil = require('./CrrExistingObjects/metadataUtils');
 
 const log = new Logger('s3utils::crrExistingObjects');
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
 const SITE_NAME = process.env.SITE_NAME;
 let STORAGE_TYPE = process.env.STORAGE_TYPE;
 let TARGET_REPLICATION_STATUS = process.env.TARGET_REPLICATION_STATUS;
@@ -24,27 +16,18 @@ const MAX_SCANNED = (process.env.MAX_SCANNED &&
     Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
+const REPLICATION_GROUP_ID = process.env.REPLICATION_GROUP_ID;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
-const AWS_SDK_REQUEST_RETRIES = 100;
-const AWS_SDK_REQUEST_DELAY_MS = 30;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
         'a comma-separated list of buckets');
     process.exit(1);
 }
-if (!ENDPOINT) {
-    log.fatal('ENDPOINT not defined!');
-    process.exit(1);
-}
-if (!ACCESS_KEY) {
-    log.fatal('ACCESS_KEY not defined');
-    process.exit(1);
-}
-if (!SECRET_KEY) {
-    log.fatal('SECRET_KEY not defined');
+if (!REPLICATION_GROUP_ID) {
+    log.fatal('REPLICATION_GROUP_ID not defined!');
     process.exit(1);
 }
 if (!STORAGE_TYPE) {
@@ -66,38 +49,6 @@ replicationStatusToProcess.forEach(state => {
 log.info('Objects with replication status ' +
     `${replicationStatusToProcess.join(' or ')} ` +
     'will be reset to PENDING to trigger CRR');
-
-const options = {
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
-    endpoint: ENDPOINT,
-    region: 'us-east-1',
-    sslEnabled: false,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
-    httpOptions: {
-        timeout: 0,
-        agent: new http.Agent({ keepAlive: true }),
-    },
-};
-/**
- *  Options specific to s3 requests
- *  `maxRetries` & `customBackoff` are set only to s3 requests
- *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
- */
-const s3Options = {
-    maxRetries: AWS_SDK_REQUEST_RETRIES,
-    customBackoff: (retryCount, error) => {
-        log.error('aws sdk request error', { error, retryCount });
-        // computed delay is not truly exponential, it is reset to minimum after
-        // every 10 calls, with max delay of 15 seconds!
-        return AWS_SDK_REQUEST_DELAY_MS * Math.pow(2, retryCount % 10);
-    },
-};
-const s3 = new AWS.S3(Object.assign(options, s3Options));
-const bb = new BackbeatClient(options);
 
 let nProcessed = 0;
 let nSkipped = 0;
@@ -137,13 +88,13 @@ function _markObjectPending(bucket, key, versionId, storageClass,
     let skip = false;
     return waterfall([
         // get object blob
-        next => bb.getMetadata({
+        next => metadataUtil.getMetadata({
             Bucket: bucket,
             Key: key,
             VersionId: versionId,
-        }, next),
+        }, log, next),
         (mdRes, next) => {
-            objMD = JSON.parse(mdRes.Body);
+            objMD = mdRes;
             if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
@@ -165,12 +116,12 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             // will be able to create a versioned key for this object,
             // so that replication can happen. The externally visible
             // version will stay "null".
-            return bb.putMetadata({
+            return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
                 ContentLength: Buffer.byteLength(mdRes.Body),
                 Body: mdRes.Body,
-            }, (err, putRes) => {
+            }, log, (err, putRes) => {
                 if (err) {
                     return next(err);
                 }
@@ -206,12 +157,12 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             };
             objMD.replicationInfo = replicationInfo;
             const mdBlob = JSON.stringify(objMD);
-            return bb.putMetadata({
+            return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
                 ContentLength: Buffer.byteLength(mdBlob),
                 Body: mdBlob,
-            }, next);
+            }, log, next);
         },
     ], err => {
         ++nProcessed;
@@ -233,19 +184,19 @@ function _markObjectPending(bucket, key, versionId, storageClass,
 
 // list object versions
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    return s3.listObjectVersions({
+    return metadataUtil.listObjectVersions({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
         VersionIdMarker,
         KeyMarker,
-    }, cb);
+    }, log, cb);
 }
 
 function _markPending(bucket, versions, cb) {
     const options = { Bucket: bucket };
     waterfall([
-        next => s3.getBucketReplication(options, (err, res) => {
+        next => metadataUtil.getBucketReplication(options, log, (err, res) => {
             if (err) {
                 log.error('error getting bucket replication', { error: err });
                 return next(err);
@@ -291,8 +242,10 @@ function triggerCRROnBucket(bucketName, cb) {
                     log.error('error listing object versions', { error: err });
                     return done(err);
                 }
+                const versions = data.DeleteMarkers
+                    ? data.Versions.concat(data.DeleteMarkers) : data.Versions;
                 return _markPending(
-                    bucket, data.Versions.concat(data.DeleteMarkers), err => {
+                    bucket, versions, err => {
                         if (err) {
                             return done(err);
                         }
@@ -346,7 +299,10 @@ function triggerCRROnBucket(bucketName, cb) {
 }
 
 // trigger the calls to list objects and mark them for crr
-eachSeries(BUCKETS, triggerCRROnBucket, err => {
+series([
+    next => metadataUtil.metadataClient.setup(next),
+    next => eachSeries(BUCKETS, triggerCRROnBucket, next),
+], err => {
     clearInterval(logProgressInterval);
     if (err) {
         return log.error('error during task execution', { error: err });

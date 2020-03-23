@@ -3,7 +3,8 @@ S3 Connector and Zenko Utilities
 
 Run the Docker container as
 ```
-docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' zenko/s3utils node scriptName bucket1[,bucket2...]
+docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' -e 'REPLICATION_GROUP_ID=RG001'
+zenko/s3utils node scriptName bucket1[,bucket2...]
 ```
 
 ## Trigger CRR on existing objects
@@ -13,6 +14,10 @@ docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'EN
 ```
 node crrExistingObjects.js testbucket1,testbucket2
 ```
+
+### Mandatory environment variables,
+
+1. **REPLICATION_GROUP_ID**
 
 ### Extra environment variables
 
