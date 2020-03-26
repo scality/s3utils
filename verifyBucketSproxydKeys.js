@@ -59,7 +59,7 @@ Optional environment variables:
     VERBOSE: set to 1 for more verbose output (shows one line for every sproxyd key)
     LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
-    MPU_ONLY: only scan MPU objects, i.e. objects with at least two sproxyd locations
+    MPU_ONLY: only scan objects uploaded with multipart upload method
 `;
 
 if (!BUCKETS && !RAFT_SESSIONS) {
@@ -245,10 +245,6 @@ function checkSproxydKeys(objectUrl, locations, cb) {
     let keyError = false;
     let keyMissing = false;
 
-    if (MPU_ONLY && locations.length < 2) {
-        status.objectsSkipped += 1;
-        return cb();
-    }
     return async.eachSeries(locations, (loc, locDone) => {
         const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${loc.key}`;
         httpRequest('HEAD', sproxydUrl, (err, res) => {
@@ -322,13 +318,14 @@ function listBucketIter(bucket, cb) {
                 }
             }
 
+            if (MPU_ONLY && md['content-md5'].indexOf('-') === -1) {
+                // not an MPU object
+                status.objectsSkipped += 1;
+                return itemDone();
+            }
             if (md['content-length'] === 0) {
                 // empty object
-                if (MPU_ONLY) {
-                    status.objectsSkipped += 1;
-                } else {
-                    status.objectsScanned += 1;
-                }
+                status.objectsScanned += 1;
                 return itemDone();
             }
             // big MPUs may not have their location in the listing
