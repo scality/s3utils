@@ -9,6 +9,9 @@ const { URL } = require('url');
 const { jsutil } = require('arsenal');
 const { Logger } = require('werelogs');
 
+const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
+const FindDuplicateSproxydKeys = require('./VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
+
 const DEFAULT_WORKERS = 100;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
 const DEFAULT_LISTING_LIMIT = 1000;
@@ -34,20 +37,32 @@ const LOG_PROGRESS_INTERVAL = (
       || DEFAULT_LOG_PROGRESS_INTERVAL;
 
 const MPU_ONLY = process.env.MPU_ONLY === '1';
+const NO_MISSING_KEY_CHECK = process.env.NO_MISSING_KEY_CHECK === '1';
+
+// To check duplicate sproxyd keys while coping with out-of-order
+// checks due to concurrency as well as duplicate keys straddling
+// across multiple versions, we need to maintain duplicate info for a
+// window of versions that is not too small to be confident we can
+// catch all cases.
+const DUPLICATE_KEYS_WINDOW_SIZE = 10000;
+
 
 const USAGE = `
 verifyBucketSproxydKeys.js
 
-This script verifies that all sproxyd keys referenced by objects
-in S3 buckets exist on the RING. It can help to identify objects
-affected by the S3C-1959 bug.
+This script verifies that :
+
+1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
+2. sproxyd keys are unique across versions of the same object
+
+It can help to identify objects affected by the S3C-1959 bug (1) or S3C-2731 (2).
 
 Usage:
     node verifyBucketSproxydKeys.js
 
 Mandatory environment variables:
     BUCKETD_HOSTPORT: ip:port of bucketd endpoint
-    SPROXYD_HOSTPORT: ip:port of sproxyd endpoint
+    SPROXYD_HOSTPORT: ip:port of sproxyd endpoint (optional if NO_MISSING_KEY_CHECK=1)
     Either:
         BUCKETS: comma-separated list of buckets to scan
     or:
@@ -60,6 +75,9 @@ Optional environment variables:
     LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     MPU_ONLY: only scan objects uploaded with multipart upload method
+    NO_MISSING_KEY_CHECK: do not check for existence of sproxyd keys,
+    for a performance benefit - other checks like duplicate keys are
+    still done
 `;
 
 if (!BUCKETS && !RAFT_SESSIONS) {
@@ -75,12 +93,12 @@ if (BUCKETS && RAFT_SESSIONS) {
     process.exit(1);
 }
 if (!BUCKETD_HOSTPORT) {
-    console.error('ERROR: BUCKETD_HOSTPORT not defined!');
+    console.error('ERROR: BUCKETD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);
 }
-if (!SPROXYD_HOSTPORT) {
-    console.error('ERROR: SPROXYD_HOSTPORT not defined!');
+if (!SPROXYD_HOSTPORT && !NO_MISSING_KEY_CHECK) {
+    console.error('ERROR: SPROXYD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);
 }
@@ -95,6 +113,7 @@ const status = {
     objectsSkipped: 0,
     objectsScanned: 0,
     objectsWithMissingKeys: 0,
+    objectsWithDupKeys: 0,
     objectsErrors: 0,
     bucketInProgress: null,
     KeyMarker: '',
@@ -107,15 +126,8 @@ let sproxydAlias;
 let lastMasterKey;
 let lastMasterVersionId;
 
-function getObjectURL(bucket, objectKey) {
-    if (!bucket) {
-        return 's3://';
-    }
-    if (!objectKey) {
-        return `s3://${bucket}`;
-    }
-    return `s3://${bucket}/${encodeURI(objectKey)}`;
-}
+// helper to detect duplicate sproxyd keys
+let findDuplicateSproxydKeys;
 
 function setupFromUrl(fromUrl) {
     if (!fromUrl.startsWith('s3://')) {
@@ -143,7 +155,8 @@ function logProgress(message) {
     log.info(message, {
         skipped: status.objectsSkipped,
         scanned: status.objectsScanned,
-        haveMissingKeys: status.objectsWithMissingKeys,
+        haveMissingKeys: NO_MISSING_KEY_CHECK ? undefined : status.objectsWithMissingKeys,
+        haveDupKeys: status.objectsWithDupKeys,
         errors: status.objectErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
@@ -244,8 +257,36 @@ function fetchObjectLocations(bucket, objectKey, cb) {
 function checkSproxydKeys(objectUrl, locations, cb) {
     let keyError = false;
     let keyMissing = false;
+    let dupKey = false;
 
+    const onComplete = () => {
+        status.objectsScanned += 1;
+        if (keyError) {
+            status.objectsErrors += 1;
+        } else if (keyMissing) {
+            status.objectsWithMissingKeys += 1;
+        }
+        if (dupKey) {
+            status.objectsWithDupKeys += 1;
+        }
+        return cb();
+    };
+
+    const dupInfo = findDuplicateSproxydKeys.insertVersion(
+        objectUrl, locations.map(loc => loc.key));
+    if (dupInfo) {
+        log.error('duplicate sproxyd key found', {
+            objectUrl,
+            objectUrl2: dupInfo.objectId,
+            sproxydKey: dupInfo.key,
+        });
+        dupKey = true;
+    }
+    if (NO_MISSING_KEY_CHECK) {
+        return process.nextTick(onComplete);
+    }
     return async.eachSeries(locations, (loc, locDone) => {
+        // existence check
         const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${loc.key}`;
         httpRequest('HEAD', sproxydUrl, (err, res) => {
             if (err) {
@@ -276,15 +317,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
             }
             locDone();
         });
-    }, () => {
-        status.objectsScanned += 1;
-        if (keyError) {
-            status.objectsErrors += 1;
-        } else if (keyMissing) {
-            status.objectsWithMissingKeys += 1;
-        }
-        return cb();
-    });
+    }, onComplete);
 }
 
 function listBucketIter(bucket, cb) {
@@ -314,6 +347,7 @@ function listBucketIter(bucket, cb) {
                     && md.versionId === lastMasterVersionId) {
                     // we have already processed this versioned key as
                     // the master key, so skip it
+                    findDuplicateSproxydKeys.skipVersion();
                     return itemDone();
                 }
             }
@@ -321,11 +355,13 @@ function listBucketIter(bucket, cb) {
             if (MPU_ONLY && md['content-md5'].indexOf('-') === -1) {
                 // not an MPU object
                 status.objectsSkipped += 1;
+                findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
             if (md['content-length'] === 0) {
                 // empty object
                 status.objectsScanned += 1;
+                findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
             // big MPUs may not have their location in the listing
@@ -357,6 +393,10 @@ function listBucketIter(bucket, cb) {
 
 function listBucket(bucket, cb) {
     status.bucketInProgress = bucket;
+
+    findDuplicateSproxydKeys =
+        new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+
     logProgress('start scanning bucket');
     async.doWhilst(
         done => async.retry({ times: 100, interval: 5000 },
@@ -373,7 +413,12 @@ function listBucket(bucket, cb) {
 
 function main() {
     async.series([
-        done => getSproxydAlias(done),
+        done => {
+            if (NO_MISSING_KEY_CHECK) {
+                return done();
+            }
+            return getSproxydAlias(done);
+        },
         done => raftSessionsToBuckets(done),
         done => {
             if (FROM_URL) {
@@ -393,8 +438,11 @@ function main() {
             if (status.objectsWithMissingKeys) {
                 process.exit(101);
             }
-            if (status.objectsErrors) {
+            if (status.objectsWithDupKeys) {
                 process.exit(102);
+            }
+            if (status.objectsErrors) {
+                process.exit(103);
             }
             process.exit(0);
         }

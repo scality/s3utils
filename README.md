@@ -286,4 +286,88 @@ node verifyBucketSproxydKeys.js
 
 * **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-* **MPU_ONLY**: only scan MPU objects, i.e. objects with at least two sproxyd locations
+* **MPU_ONLY**: only scan objects uploaded with multipart upload method
+
+* **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
+    keys, for a performance benefit - other checks like duplicate keys
+    are still done
+
+## Output
+
+The output of the script consists of JSON log lines. The most
+important ones are described below.
+
+### Info
+
+```
+progress update
+```
+
+This log message is reported at regular intervals, every 10 seconds by
+default unless LOG_PROGRESS_INTERVAL environment variable is
+defined. It shows statistics about the scan in progress.
+
+Logged fields:
+
+* **scanned**: number of objects scanned
+
+* **skipped**: number of objects skipped (in case MPU_ONLY is set)
+
+* **haveMissingKeys**: number of object versions found with at least
+    one missing sproxyd key
+
+* **haveDupKeys**: number of object versions found with at least one
+    sproxyd key shared with another object version
+
+* **url**: current URL `s3://bucket[/object]` for the current listing
+    iteration, can be used to resume a scan from this point passing
+    FROM_URL environment variable.
+
+Example:
+
+```
+{"name":"s3utils:verifyBucketSproxydKeys","time":1585700528238,"skipped":0,"scanned":115833,
+"haveMissingKeys":2,"haveDupKeys":0,"url":"s3://some-bucket/object1234","level":"info",
+"message":"progress update","hostname":"e923ec732b42","pid":67}
+```
+
+### Issue reports
+
+```
+sproxyd check reported missing key
+```
+
+This log message is reported when a missing sproxyd key has been found
+in an object. The message may appear more than once for the same
+object in case multiple sproxyd keys are missing.
+
+Logged fields:
+
+* **objectUrl**: URL of the affected object version:
+    `s3://bucket/object[%00UrlEncodedVersionId]`
+
+* **sproxydKey**: sproxyd key that is missing
+
+```
+duplicate sproxyd key found
+```
+
+This message is reported when two versions (possibly the same) are
+sharing an identical, duplicated sproxyd key.
+
+It represents a data loss risk, since data loss would occur when
+deleting one of the versions with a duplicate key, causing the other
+version to refer to deleted data in its location array.
+
+Logged fields:
+
+* **objectUrl**: URL of the first affected object version with an
+    sproxyd key shared with the second affected object:
+    `s3://bucket/object[%00UrlEncodedVersionId]`
+
+* **objectUrl2**: URL of the second affected object version with an
+    sproxyd key shared with the first affected object:
+    `s3://bucket/object[%00UrlEncodedVersionId]`
+
+* **sproxydKey**: sproxyd key that is duplicated between the two
+    object versions
