@@ -2,18 +2,28 @@
 version: 0.2
 
 branches:
+  development/*:
+    stage: release
   default:
     stage: pre-merge
 
 stages:
   pre-merge:
+    worker:
+      type: local
+    steps:
+    - TriggerStages:
+        stage_names:
+        - tests
+        - build
+  tests:
     worker: &master-worker
       type: docker
       path: eve/workers/master
       volumes:
         - '/home/eve/workspace'
     steps:
-      - Git:
+      - Git: &git_clone
           name: fetch source
           repourl: '%(prop:git_reference)s'
           shallow: True
@@ -32,3 +42,48 @@ stages:
           name: run test
           command: yarn --silent test:functional 
 
+  build:
+    worker: &builder_worker
+      type: kube_pod
+      path: eve/workers/builder/pod.yaml
+      images:
+        builder: eve/workers/builder
+    steps:
+      - Git: *git_clone
+      - ShellCommand: &wait_docker_daemon
+          name: Wait for Docker daemon to be ready
+          command: |
+            bash -c '
+            for i in {1..150}
+            do
+              docker info &> /dev/null && exit
+              sleep 2
+            done
+            echo "Could not reach Docker daemon from buildbot worker" >&2
+            exit 1'
+          haltOnFailure: true
+      - ShellCommand: &docker_login
+          name: Login to docker registry
+          command: docker login -u "${HARBOR_LOGIN}" -p "${HARBOR_PASSWORD}" registry.scality.com
+          usePTY: true
+          env:
+            HARBOR_LOGIN: '%(secret:harbor_login)s'
+            HARBOR_PASSWORD: '%(secret:harbor_password)s'
+      - ShellCommand: &build_s3utils
+          name: Build s3utils image
+          command: sh eve/scripts/pull-or-build.sh .
+          env: &build_s3utils_env
+            DOCKER_IMAGE: s3utils
+            DOCKER_TAG: '%(prop:commit_short_revision)s'
+          haltOnFailure: true
+  release:
+    worker: *builder_worker
+    steps:
+      - Git: *git_clone
+      - ShellCommand: *wait_docker_daemon
+      - ShellCommand: *docker_login
+      - ShellCommand:
+          <<: *build_s3utils
+          env:
+            <<: *build_s3utils_env
+            DOCKER_TAG: "%(prop:product_version)s"
