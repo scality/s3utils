@@ -371,3 +371,55 @@ Logged fields:
 
 * **sproxydKey**: sproxyd key that is duplicated between the two
     object versions
+
+
+# Remove delete markers
+
+The removeDeleteMarkers.js script removes delete markers from one or
+more versioning-suspended bucket(s).
+
+## Usage
+
+```
+    node removeDeleteMarkers.js bucket1[,bucket2...]
+```
+
+## Mandatory environment variables
+
+* **ENDPOINT**: S3 endpoint
+
+* **ACCESS_KEY**: S3 account access key
+
+* **SECRET_KEY**: S3 account secret key
+
+## Optional environment variables:
+
+* **TARGET_PREFIX**: only process a specific prefix in the bucket(s)
+
+* **WORKERS**: concurrency value for listing / batch delete requests (default 10)
+
+* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+
+* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+
+* **KEY_MARKER**: resume processing from a specific key
+
+* **VERSION_ID_MARKER**: resume processing from a specific version ID
+
+## Output
+
+The output of the script consists of JSON log lines.
+
+### Info
+
+One log line is output for each delete marker deleted, e.g.:
+
+```
+{"name":"s3utils::removeDeleteMarkers","time":1586304708269,"bucket":"some-bucket","objectKey":"some-key","versionId":"3938343133363935343035383633393939393936524730303120203533342e3432363436322e393035353030","level":"info","message":"delete marker deleted","hostname":"c3f84aa473a2","pid":88}
+```
+
+The script also logs a progress update, every 10 seconds by default:
+
+```
+{"name":"s3utils::removeDeleteMarkers","time":1586304694304,"objectsListed":257000,"deleteMarkersDeleted":0,"deleteMarkersErrors":0,"bucketInProgress":"some-bucket","keyMarker":"some-key-marker","versionIdMarker":"3938343133373030373134393734393939393938524730303120203533342e3430323230362e373139333039","level":"info","message":"progress update","hostname":"c3f84aa473a2","pid":88}
+```
