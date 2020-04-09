@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
-    "arsenal": "github:scality/arsenal#development/8.1",
+    "arsenal": "github:scality/arsenal#81d05b6",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
     "node-uuid": "^1.4.8",

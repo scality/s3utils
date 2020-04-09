@@ -1,5 +1,6 @@
 const { doWhilst, eachSeries, eachLimit, waterfall, series } = require('async');
 const { Logger } = require('werelogs');
+const { ObjectMD } = require('arsenal').models;
 const metadataUtil = require('./CrrExistingObjects/metadataUtils');
 
 const log = new Logger('s3utils::crrExistingObjects');
@@ -74,11 +75,11 @@ const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
 function _objectShouldBeUpdated(objMD) {
     return replicationStatusToProcess.some(filter => {
         if (filter === 'NEW') {
-            return (!objMD.replicationInfo ||
-                objMD.replicationInfo.status === '');
+            return (!objMD.getReplicationInfo() ||
+                    objMD.getReplicationInfo().status === '');
         }
-        return (objMD.replicationInfo &&
-            objMD.replicationInfo.status === filter);
+        return (objMD.getReplicationInfo() &&
+                objMD.getReplicationInfo().status === filter);
     });
 }
 
@@ -94,12 +95,12 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             VersionId: versionId,
         }, log, next),
         (mdRes, next) => {
-            objMD = mdRes;
+            objMD = new ObjectMD(mdRes);
             if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
             }
-            if (objMD.versionId) {
+            if (objMD.getVersionId()) {
                 // The object already has an *internal* versionId,
                 // which exists when the object has been put on
                 // versioned or versioning-suspended bucket. Even if
@@ -127,7 +128,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 }
                 // No need to fetch the whole metadata again, simply
                 // update the one we have with the generated versionId.
-                objMD.versionId = putRes.versionId;
+                objMD.setVersionId(putRes.versionId);
                 return next();
             });
         },
@@ -139,7 +140,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             const { Rules, Role } = repConfig;
             const destination = Rules[0].Destination.Bucket;
             // set replication properties
-            const ops = objMD['content-length'] === 0 ? ['METADATA'] :
+            const ops = objMD.getContentLength() === 0 ? ['METADATA'] :
                 ['METADATA', 'DATA'];
             const backends = [{
                 site: storageClass,
@@ -155,8 +156,9 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 role: Role,
                 storageType: STORAGE_TYPE,
             };
-            objMD.replicationInfo = replicationInfo;
-            const mdBlob = JSON.stringify(objMD);
+            objMD.setReplicationInfo(replicationInfo);
+            objMD.updateMicroVersionId();
+            const mdBlob = objMD.getSerialized();
             return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
@@ -302,6 +304,7 @@ function triggerCRROnBucket(bucketName, cb) {
 series([
     next => metadataUtil.metadataClient.setup(next),
     next => eachSeries(BUCKETS, triggerCRROnBucket, next),
+    next => metadataUtil.metadataClient.close(next),
 ], err => {
     clearInterval(logProgressInterval);
     if (err) {
