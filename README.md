@@ -17,7 +17,11 @@ node crrExistingObjects.js testbucket1,testbucket2
 
 ### Mandatory environment variables,
 
-1. **REPLICATION_GROUP_ID**
+* **REPLICATION_GROUP_ID**
+
+### Optional environment variables,
+
+* **DEBUG**: set to 1 to output debug level information.
 
 ### Extra environment variables
 

@@ -25,7 +25,10 @@ function listObjectVersions(params, log, cb) {
         keyMarker: params.KeyMarker,
         versionIdMarker: params.VersionIdMarker,
     };
-
+    log.debug('listing object versions', {
+        method: 'metadataUtils.listObjectVersions',
+        listingParams,
+    });
     return metadataClient.listObject(bucketName, listingParams, log,
         (err, list) => {
             if (err) {
@@ -49,7 +52,6 @@ function _formatConfig(config) {
             },
         };
     });
-
     return {
         ReplicationConfiguration: {
             Role: role,
@@ -60,6 +62,10 @@ function _formatConfig(config) {
 
 function getBucketReplication(options, log, cb) {
     const bucketName = options.Bucket;
+    log.debug('getting bucket replication', {
+        method: 'metadataUtils.getBucketReplication',
+        bucket: bucketName,
+    });
     return metadataClient.getBucket(bucketName, log, (err, data) => {
         if (err) {
             return cb(err);
@@ -85,26 +91,33 @@ function _getNullVersion(objMD, bucketName, objectKey, log, cb) {
 }
 
 function getMetadata(params, log, cb) {
+    const { Bucket, Key } = params;
     let versionId = params.VersionId;
+    log.debug('getting object metadata', {
+        method: 'metadataUtils.getMetadata',
+        bucket: Bucket,
+        objectKey: Key,
+        versionId,
+    });
     if (versionId && versionId !== 'null') {
         versionId = versionIdUtils.decode(versionId);
     }
-
     if (versionId instanceof Error) {
         const errMsg = 'Invalid version id specified';
         return cb(errors.InvalidArgument.customizeDescription(errMsg));
     }
-
     const mdParams = {
         versionId,
     };
-    const { Bucket, Key } = params;
     return metadataClient.getBucketAndObjectMD(Bucket, Key, mdParams, log,
         (err, data) => {
             if (err) {
                 return cb(err);
             }
             const objMD = data.obj ? JSON.parse(data.obj) : undefined;
+            if (objMD === undefined) {
+                return cb(new Error('could not get metadata'));
+            }
             if (objMD && versionId === 'null') {
                 return _getNullVersion(objMD, Bucket, Key, log,
                     (err, nullVer) => {
@@ -121,14 +134,18 @@ function getMetadata(params, log, cb) {
 function putMetadata(params, log, cb) {
     const { Bucket, Key, Body } = params;
     const objMD = JSON.parse(Body);
-
     // specify both 'versioning' and 'versionId' to create a "new"
     // version (updating master as well) but with specified versionId
     const options = {
         versioning: true,
         versionId: objMD.versionId,
     };
-
+    log.debug('updating object metadata', {
+        method: 'metadataUtils.putMetadata',
+        bucket: Bucket,
+        objectKey: Key,
+        versionId: objMD.versionId,
+    });
     // If the object is from a source bucket without versioning (i.e. NFS),
     // then we want to create a version for the replica object even though
     // none was provided in the object metadata value.

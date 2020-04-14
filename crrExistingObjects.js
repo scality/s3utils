@@ -1,9 +1,17 @@
 const { doWhilst, eachSeries, eachLimit, waterfall, series } = require('async');
-const { Logger } = require('werelogs');
+const werelogs = require('werelogs');
 const { ObjectMD } = require('arsenal').models;
 const metadataUtil = require('./CrrExistingObjects/metadataUtils');
 
-const log = new Logger('s3utils::crrExistingObjects');
+const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
+    ? 'debug' : 'info';
+const loggerConfig = {
+    level: logLevel,
+    dump: 'error',
+};
+werelogs.configure(loggerConfig);
+const log = new werelogs.Logger('s3utils::crrExistingObjects');
+
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const SITE_NAME = process.env.SITE_NAME;
 let STORAGE_TYPE = process.env.STORAGE_TYPE;
@@ -76,10 +84,10 @@ function _objectShouldBeUpdated(objMD) {
     return replicationStatusToProcess.some(filter => {
         if (filter === 'NEW') {
             return (!objMD.getReplicationInfo() ||
-                    objMD.getReplicationInfo().status === '');
+                objMD.getReplicationInfo().status === '');
         }
         return (objMD.getReplicationInfo() &&
-                objMD.getReplicationInfo().status === filter);
+            objMD.getReplicationInfo().status === filter);
     });
 }
 
@@ -96,6 +104,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         }, log, next),
         (mdRes, next) => {
             objMD = new ObjectMD(mdRes);
+            const mdBlob = objMD.getSerialized();
             if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
@@ -111,17 +120,16 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             }
             // The object does not have an *internal* versionId, as it
             // was put on a nonversioned bucket: do a first metadata
-            // update to let cloudserver generate one, just passing on
-            // the existing metadata blob. Note that the resulting key
-            // will still be nonversioned, but the following update
-            // will be able to create a versioned key for this object,
-            // so that replication can happen. The externally visible
-            // version will stay "null".
+            // update to generate one, just passing on the existing metadata
+            // blob. Note that the resulting key will still be nonversioned,
+            // but the following update will be able to create a versioned key
+            // for this object, so that replication can happen. The externally
+            // visible version will stay "null".
             return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
-                ContentLength: Buffer.byteLength(mdRes.Body),
-                Body: mdRes.Body,
+                ContentLength: Buffer.byteLength(mdBlob),
+                Body: mdBlob,
             }, log, (err, putRes) => {
                 if (err) {
                     return next(err);
