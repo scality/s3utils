@@ -293,7 +293,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
                 log.error('sproxyd check error', {
                     objectUrl,
                     sproxydKey: loc.key,
-                    error: err.message,
+                    error: { message: err.message },
                 });
                 keyError = true;
             } else if (res.statusCode === 404) {
@@ -374,7 +374,7 @@ function listBucketIter(bucket, cb) {
                 if (err) {
                     log.error('error fetching object locations array', {
                         objectUrl,
-                        error: err.message,
+                        error: { message: err.message },
                     });
                     status.objectsScanned += 1;
                     status.objectsErrors += 1;
@@ -429,7 +429,7 @@ function main() {
     ], err => {
         if (err) {
             log.error('an error occurred during scan', {
-                error: err.message,
+                error: { message: err.message },
             });
             logProgress('last status');
             process.exit(1);
