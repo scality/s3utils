@@ -427,3 +427,57 @@ The script also logs a progress update, every 10 seconds by default:
 ```
 {"name":"s3utils::removeDeleteMarkers","time":1586304694304,"objectsListed":257000,"deleteMarkersDeleted":0,"deleteMarkersErrors":0,"bucketInProgress":"some-bucket","keyMarker":"some-key-marker","versionIdMarker":"3938343133373030373134393734393939393938524730303120203533342e3430323230362e373139333039","level":"info","message":"progress update","hostname":"c3f84aa473a2","pid":88}
 ```
+
+# Repair duplicate sproxyd keys
+
+This script repairs object versions that share sproxyd keys with
+another version, particularly due to bug S3C-2731.
+
+The repair action consists of copying the data location that is
+duplicated to a new sproxyd key (or set of keys for MPU), and updating
+the metadata to reflect the new location, resulting in two valid
+versions with distinct data, though identical in content.
+
+The script does not remove any version even if the duplicate was due
+to an internal retry in the metadata layer, because either version
+might be referenced by S3 clients in some cases.
+
+## Usage
+
+```
+node repairDuplicateVersions.js
+```
+
+## Standard Input
+
+The standard input must be fed with the JSON logs output by the
+verifyBucketSproxydKeys.js s3utils script. This script only processes
+the log entries containing the message "duplicate sproxyd key found"
+and ignores other entries.
+
+## Mandatory environment variables
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+
+## Example
+
+```
+cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'BUCKETD_HOSTPORT=127.0.0.1:9000 SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
+```
+
+## Caveat
+
+While the script is running, there is a possibility, although slim,
+that it updates metadata for an object that is being updated at the
+exact same time by a client application, either through "PutObjectAcl"
+or "PutObjectTagging" operations which can modify existing
+versions. In such case, there is a risk that either:
+* the application update will be lost
+* or the script will not repair the item properly
+
+If this looks like a potential risk to a customer running the script,
+we suggest to disable those operations on the clients during the time
+the script is running (or alternatively, disable all writes), to avoid
+any such risk.
