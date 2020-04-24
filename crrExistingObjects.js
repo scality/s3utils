@@ -104,7 +104,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
         }, log, next),
         (mdRes, next) => {
             objMD = new ObjectMD(mdRes);
-            const mdBlob = objMD.getSerialized();
+            const md = objMD.getValue();
             if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
@@ -128,8 +128,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
-                ContentLength: Buffer.byteLength(mdBlob),
-                Body: mdBlob,
+                Body: md,
             }, log, (err, putRes) => {
                 if (err) {
                     return next(err);
@@ -166,12 +165,11 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             };
             objMD.setReplicationInfo(replicationInfo);
             objMD.updateMicroVersionId();
-            const mdBlob = objMD.getSerialized();
+            const md = objMD.getValue();
             return metadataUtil.putMetadata({
                 Bucket: bucket,
                 Key: key,
-                ContentLength: Buffer.byteLength(mdBlob),
-                Body: mdBlob,
+                Body: md,
             }, log, next);
         },
     ], err => {

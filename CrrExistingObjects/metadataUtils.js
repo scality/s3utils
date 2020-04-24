@@ -109,17 +109,13 @@ function getMetadata(params, log, cb) {
     const mdParams = {
         versionId,
     };
-    return metadataClient.getBucketAndObjectMD(Bucket, Key, mdParams, log,
+    return metadataClient.getObjectMD(Bucket, Key, mdParams, log,
         (err, data) => {
             if (err) {
                 return cb(err);
             }
-            const objMD = data.obj ? JSON.parse(data.obj) : undefined;
-            if (objMD === undefined) {
-                return cb(new Error('could not get metadata'));
-            }
-            if (objMD && versionId === 'null') {
-                return _getNullVersion(objMD, Bucket, Key, log,
+            if (data && versionId === 'null') {
+                return _getNullVersion(data, Bucket, Key, log,
                     (err, nullVer) => {
                         if (err) {
                             return cb(err);
@@ -127,13 +123,12 @@ function getMetadata(params, log, cb) {
                         return cb(null, nullVer);
                     });
             }
-            return cb(null, objMD);
+            return cb(null, data);
         });
 }
 
 function putMetadata(params, log, cb) {
-    const { Bucket, Key, Body } = params;
-    const objMD = JSON.parse(Body);
+    const { Bucket, Key, Body: objMD } = params;
     // specify both 'versioning' and 'versionId' to create a "new"
     // version (updating master as well) but with specified versionId
     const options = {
