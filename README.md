@@ -270,13 +270,21 @@ node verifyBucketSproxydKeys.js
 
 * **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
-* Either:
+* One of:
 
-** **BUCKETS**: comma-separated list of buckets to scan
+  * **BUCKETS**: comma-separated list of buckets to scan
 
 * or:
 
-** **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
+  * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
+
+* or:
+
+  * **KEYS_FROM_STDIN**: reads objects to scan from stdin if this
+    environment variable is set, where the input is a stream of JSON
+    objects, each of the form:
+    `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
+    **note**: if `\u0000objectversion` is not present, it checks the master key
 
 ## Optional environment variables:
 

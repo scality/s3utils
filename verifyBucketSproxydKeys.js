@@ -5,6 +5,7 @@
 const http = require('http');
 const async = require('async');
 const { URL } = require('url');
+const jsonStream = require('JSONStream');
 
 const { jsutil } = require('arsenal');
 const { Logger } = require('werelogs');
@@ -18,7 +19,7 @@ const DEFAULT_LISTING_LIMIT = 1000;
 
 const {
     BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
-    BUCKETS, RAFT_SESSIONS, FROM_URL,
+    BUCKETS, RAFT_SESSIONS, KEYS_FROM_STDIN, FROM_URL,
 } = process.env;
 
 const WORKERS = (
@@ -63,10 +64,15 @@ Usage:
 Mandatory environment variables:
     BUCKETD_HOSTPORT: ip:port of bucketd endpoint
     SPROXYD_HOSTPORT: ip:port of sproxyd endpoint (optional if NO_MISSING_KEY_CHECK=1)
-    Either:
+    One of:
         BUCKETS: comma-separated list of buckets to scan
     or:
         RAFT_SESSIONS: comma-separated list of raft sessions to scan
+    or:
+        KEYS_FROM_STDIN: reads objects to scan from stdin if this environment variable is
+          set, where the input is a stream of JSON objects, each of the form:
+          {"bucket":"bucketname","key":"objectkey\u0000objectversion"}
+          note: if "\u0000objectversion" is not present, it checks the master key
 
 Optional environment variables:
     WORKERS: concurrency value for sproxyd requests (default ${DEFAULT_WORKERS})
@@ -80,15 +86,15 @@ Optional environment variables:
     still done
 `;
 
-if (!BUCKETS && !RAFT_SESSIONS) {
-    console.error('ERROR: either BUCKETS or RAFT_SESSIONS environment '
+if (!BUCKETS && !RAFT_SESSIONS && !KEYS_FROM_STDIN) {
+    console.error('ERROR: either BUCKETS or RAFT_SESSIONS or KEYS_FROM_STDIN environment '
                   + 'variable must be defined');
     console.error(USAGE);
     process.exit(1);
 }
-if (BUCKETS && RAFT_SESSIONS) {
-    console.error('ERROR: BUCKETS and RAFT_SESSIONS environment variables '
-                  + 'cannot be both defined');
+if ((BUCKETS ? 1 : 0) + (RAFT_SESSIONS ? 1 : 0) + (KEYS_FROM_STDIN ? 1 : 0) > 1) {
+    console.error('ERROR: only one of BUCKETS, RAFT_SESSIONS or KEYS_FROM_STDIN environment '
+                  + 'variables can be defined');
     console.error(USAGE);
     process.exit(1);
 }
@@ -320,6 +326,22 @@ function checkSproxydKeys(objectUrl, locations, cb) {
     }, onComplete);
 }
 
+function fetchAndCheckObject(bucket, itemKey, cb) {
+    const objectUrl = getObjectURL(bucket, itemKey);
+    return fetchObjectLocations(bucket, itemKey, (err, locations) => {
+        if (err) {
+            log.error('error fetching object locations array', {
+                objectUrl,
+                error: { message: err.message },
+            });
+            status.objectsScanned += 1;
+            status.objectsErrors += 1;
+            return cb();
+        }
+        return checkSproxydKeys(objectUrl, locations, cb);
+    });
+}
+
 function listBucketIter(bucket, cb) {
     const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}?maxKeys=`
           + `${LISTING_LIMIT}&marker=${status.KeyMarker ? encodeURI(status.KeyMarker) : ''}`;
@@ -370,18 +392,7 @@ function listBucketIter(bucket, cb) {
             if (md.location) {
                 return checkSproxydKeys(objectUrl, md.location, itemDone);
             }
-            return fetchObjectLocations(bucket, item.key, (err, locations) => {
-                if (err) {
-                    log.error('error fetching object locations array', {
-                        objectUrl,
-                        error: { message: err.message },
-                    });
-                    status.objectsScanned += 1;
-                    status.objectsErrors += 1;
-                    return itemDone();
-                }
-                return checkSproxydKeys(objectUrl, locations, itemDone);
-            });
+            return fetchAndCheckObject(bucket, item.key, itemDone);
         }, () => {
             if (IsTruncated) {
                 status.KeyMarker = Contents[Contents.length - 1].key;
@@ -410,6 +421,51 @@ function listBucket(bucket, cb) {
     );
 }
 
+function consumeStdin(cb) {
+    findDuplicateSproxydKeys =
+        new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+
+    const itemStream = process.stdin.pipe(jsonStream.parse());
+    let nParallel = 0;
+    let streamDone = false;
+    itemStream
+        .on('data', item => {
+            if (!item.bucket) {
+                log.error('missing "bucket" attribute in JSON stream item');
+                return undefined;
+            }
+            if (!item.key) {
+                log.error('missing "key" attribute in JSON stream item');
+                return undefined;
+            }
+            ++nParallel;
+            if (nParallel === WORKERS) {
+                itemStream.pause();
+            }
+            return fetchAndCheckObject(item.bucket, item.key, () => {
+                if (nParallel === WORKERS) {
+                    itemStream.resume();
+                }
+                --nParallel;
+                if (nParallel === 0 && streamDone) {
+                    cb();
+                }
+            });
+        })
+        .on('end', () => {
+            streamDone = true;
+            if (nParallel === 0) {
+                cb();
+            }
+        })
+        .on('error', err => {
+            log.error('error parsing JSON input', {
+                error: err.message,
+            });
+            return cb(err);
+        });
+}
+
 
 function main() {
     async.series([
@@ -424,7 +480,10 @@ function main() {
             if (FROM_URL) {
                 setupFromUrl(FROM_URL);
             }
-            async.eachSeries(remainingBuckets, listBucket, done);
+            if (KEYS_FROM_STDIN) {
+                return consumeStdin(done);
+            }
+            return async.eachSeries(remainingBuckets, listBucket, done);
         },
     ], err => {
         if (err) {
