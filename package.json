@@ -26,10 +26,10 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
+    "JSONStream": "^1.3.5",
     "arsenal": "github:scality/arsenal#81d05b6",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
-    "JSONStream": "^1.3.5",
     "node-uuid": "^1.4.8",
     "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
