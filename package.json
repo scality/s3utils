@@ -29,6 +29,7 @@
     "arsenal": "github:scality/arsenal#development/8.1",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
+    "node-rdkafka": "2.2.0",
     "node-uuid": "^1.4.8",
     "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
