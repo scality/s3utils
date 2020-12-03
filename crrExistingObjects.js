@@ -20,6 +20,9 @@ const WORKERS = (process.env.WORKERS &&
     Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
     Number.parseInt(process.env.MAX_UPDATES, 10));
+const MAX_UPDATES_PER_SECOND = (
+    process.env.MAX_UPDATES_PER_SECOND &&
+        Number.parseInt(process.env.MAX_UPDATES_PER_SECOND, 10));
 const MAX_SCANNED = (process.env.MAX_SCANNED &&
     Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
@@ -47,6 +50,7 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
+
 if (!STORAGE_TYPE) {
     STORAGE_TYPE = '';
 }
@@ -102,6 +106,8 @@ const bb = new BackbeatClient(options);
 let nProcessed = 0;
 let nSkipped = 0;
 let nUpdated = 0;
+let nUpdatedLastBatch = 0;
+let startBatchTime = Date.now();
 let nErrors = 0;
 let bucketInProgress = null;
 let VersionIdMarker = null;
@@ -298,6 +304,28 @@ function triggerCRROnBucket(bucketName, cb) {
                         }
                         VersionIdMarker = data.NextVersionIdMarker;
                         KeyMarker = data.NextKeyMarker;
+
+                        // if throttling is enabled, wait for some
+                        // time before resuming to the next listing if
+                        // needed
+                        if (MAX_UPDATES_PER_SECOND) {
+                            const nUpdatedDuringBatch = nUpdated - nUpdatedLastBatch;
+                            const elapsedMs = Date.now() - startBatchTime;
+                            const nSleepSeconds = Math.max(
+                                Math.round(nUpdatedDuringBatch / MAX_UPDATES_PER_SECOND
+                                           - elapsedMs / 1000),
+                                0);
+                            nUpdatedLastBatch = nUpdated;
+                            if (nSleepSeconds > 0) {
+                                log.info(`sleeping for ${nSleepSeconds} seconds to ` +
+                                         'throttle updates before continuing listing');
+                                return setTimeout(() => {
+                                    startBatchTime = Date.now();
+                                    done();
+                                }, nSleepSeconds * 1000);
+                            }
+                        }
+                        startBatchTime = Date.now();
                         return done();
                     });
             }),
