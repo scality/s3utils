@@ -20,6 +20,9 @@ const WORKERS = (process.env.WORKERS &&
     Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES &&
     Number.parseInt(process.env.MAX_UPDATES, 10));
+const MAX_UPDATES_INTERVAL_SECONDS = (
+    process.env.MAX_UPDATES_INTERVAL_SECONDS &&
+        Number.parseInt(process.env.MAX_UPDATES_INTERVAL_SECONDS, 10));
 const MAX_SCANNED = (process.env.MAX_SCANNED &&
     Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
@@ -47,6 +50,11 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
+if (MAX_UPDATES_INTERVAL_SECONDS && !MAX_UPDATES) {
+    log.fatal('need to specify MAX_UPDATES with MAX_UPDATES_INTERVAL_SECONDS');
+    process.exit(1);
+}
+
 if (!STORAGE_TYPE) {
     STORAGE_TYPE = '';
 }
@@ -119,6 +127,7 @@ function _logProgress() {
 }
 
 const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
+let startBatchTime = Date.now();
 
 function _objectShouldBeUpdated(objMD) {
     return replicationStatusToProcess.some(filter => {
@@ -298,6 +307,20 @@ function triggerCRROnBucket(bucketName, cb) {
                         }
                         VersionIdMarker = data.NextVersionIdMarker;
                         KeyMarker = data.NextKeyMarker;
+
+                        // if throttling is enabled, wait for some time before resuming
+                        if (MAX_UPDATES_INTERVAL_SECONDS && nUpdated >= MAX_UPDATES) {
+                            const elapsedMs = Date.now() - startBatchTime;
+                            const nSleepSeconds = Math.max(
+                                Math.round((elapsedMs / 1000) - MAX_UPDATES_INTERVAL_SECONDS),
+                                0);
+                            log.info('reached update count limit, sleeping for ' +
+                                     `${nSleepSeconds} seconds and continuing listing`);
+                            return setTimeout(() => {
+                                startBatchTime = Date.now();
+                                done();
+                            }, nSleepSeconds * 1000);
+                        }
                         return done();
                     });
             }),
