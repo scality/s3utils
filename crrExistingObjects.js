@@ -2,6 +2,7 @@ const http = require('http');
 
 const AWS = require('aws-sdk');
 const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
+const { Producer } = require('node-rdkafka');
 
 const { Logger } = require('werelogs');
 
@@ -24,11 +25,16 @@ const MAX_SCANNED = (process.env.MAX_SCANNED &&
     Number.parseInt(process.env.MAX_SCANNED, 10));
 let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
+let KAFKA_HOSTS = process.env.KAFKA_HOSTS;
+let KAFKA_TOPIC = process.env.KAFKA_TOPIC;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 const AWS_SDK_REQUEST_RETRIES = 100;
 const AWS_SDK_REQUEST_DELAY_MS = 30;
+
+const PRODUCER_MESSAGE_MAX_BYTES = 5000020;
+const CLIENT_ID = 'CrrExistingObjectsProducer';
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
@@ -47,6 +53,15 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
+if (!KAFKA_HOSTS) {
+    log.fatal('KAFKA_HOSTS not defined');
+    process.exit(1);
+}
+if (!KAFKA_TOPIC) {
+    log.fatal('KAFKA_TOPIC not defined');
+    process.exit(1);
+}
+
 if (!STORAGE_TYPE) {
     STORAGE_TYPE = '';
 }
@@ -98,6 +113,12 @@ const s3Options = {
 };
 const s3 = new AWS.S3(Object.assign(options, s3Options));
 const bb = new BackbeatClient(options);
+
+const producer = new Producer({
+    'metadata.broker.list': KAFKA_HOSTS,
+    'message.max.bytes': PRODUCER_MESSAGE_MAX_BYTES,
+}, {
+});
 
 let nProcessed = 0;
 let nSkipped = 0;
@@ -180,7 +201,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 return next();
             });
         },
-        // update replication info and put back object blob
+        // update replication info and queue an entry for replication
         next => {
             if (skip) {
                 return next();
@@ -206,12 +227,14 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             };
             objMD.replicationInfo = replicationInfo;
             const mdBlob = JSON.stringify(objMD);
-            return bb.putMetadata({
-                Bucket: bucket,
-                Key: key,
-                ContentLength: Buffer.byteLength(mdBlob),
-                Body: mdBlob,
-            }, next);
+            producer.produce(
+                KAFKA_TOPIC,
+                null, // partition
+                new Buffer(mdBlob), // value
+                `${bucket}/${key}`, // key (for keyed partitioning)
+                Date.now(), // timestamp
+                null);
+            next();
         },
     ], err => {
         ++nProcessed;
@@ -345,13 +368,32 @@ function triggerCRROnBucket(bucketName, cb) {
         });
 }
 
-// trigger the calls to list objects and mark them for crr
-eachSeries(BUCKETS, triggerCRROnBucket, err => {
-    clearInterval(logProgressInterval);
-    if (err) {
-        return log.error('error during task execution', { error: err });
+producer.connect();
+producer.on('ready', () => {
+    // trigger the calls to list objects and mark them for crr
+    eachSeries(BUCKETS, triggerCRROnBucket, err => {
+        clearInterval(logProgressInterval);
+        if (err) {
+            return log.error('error during task execution', { error: err });
+        }
+        return log.info('completed task for all buckets');
+    });
+});
+producer.on('event.error', error => {
+    // This is a bit hacky: the "broker transport failure"
+    // error occurs when the kafka broker reaps the idle
+    // connections every few minutes, and librdkafka handles
+    // reconnection automatically anyway, so we ignore those
+    // harmless errors (moreover with the current
+    // implementation there's no way to access the original
+    // error code, so we match the message instead).
+    if (!['broker transport failure',
+          'all broker connections are down']
+        .includes(error.message)) {
+        log.error('error with producer', {
+            error: error.message,
+        });
     }
-    return log.info('completed task for all buckets');
 });
 
 function stop() {
