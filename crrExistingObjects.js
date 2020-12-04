@@ -230,10 +230,17 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             };
             objMD.replicationInfo = replicationInfo;
             const mdBlob = JSON.stringify(objMD);
+            // create an entry as if coming from the raft log
+            const entry = JSON.stringify({
+                type: 'put',
+                bucket,
+                key,
+                value: mdBlob,
+            });
             producer.produce(
                 KAFKA_TOPIC,
                 null, // partition
-                new Buffer(mdBlob), // value
+                new Buffer(entry), // value
                 `${bucket}/${key}`, // key (for keyed partitioning)
                 Date.now(), // timestamp
                 null);
