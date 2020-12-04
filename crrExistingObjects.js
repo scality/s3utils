@@ -5,6 +5,8 @@ const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
 const { Producer } = require('node-rdkafka');
 
 const { Logger } = require('werelogs');
+const VID_SEP = require('arsenal').versioning.VersioningConstants
+      .VersionId.Separator;
 
 const BackbeatClient = require('./BackbeatClient');
 
@@ -234,7 +236,7 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             const entry = JSON.stringify({
                 type: 'put',
                 bucket,
-                key,
+                key: `${key}${VID_SEP}${objMD.versionId}`,
                 value: mdBlob,
             });
             producer.produce(
