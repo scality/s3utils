@@ -1,7 +1,7 @@
 const http = require('http');
 
 const AWS = require('aws-sdk');
-const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
+const { doWhilst, eachSeries, eachLimit, waterfall, retry } = require('async');
 const { Producer } = require('node-rdkafka');
 
 const { Logger } = require('werelogs');
@@ -40,6 +40,9 @@ const AWS_SDK_REQUEST_DELAY_MS = 30;
 
 const PRODUCER_MESSAGE_MAX_BYTES = 5000020;
 const CLIENT_ID = 'CrrExistingObjectsProducer';
+const PRODUCER_RETRY_DELAY_MS = 5000;
+const PRODUCER_MAX_RETRIES = 60;
+const PRODUCER_POLL_INTERVAL_MS = 2000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide ' +
@@ -208,9 +211,11 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 return next();
             });
         },
-    ], err => {
         // update replication info and queue an entry for replication
-        if (!err && !skip) {
+        next => {
+            if (skip) {
+                return next();
+            }
             const { Rules, Role } = repConfig;
             const destination = Rules[0].Destination.Bucket;
             // set replication properties
@@ -239,14 +244,25 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 key: `${key}${VID_SEP}${objMD.versionId}`,
                 value: mdBlob,
             });
-            producer.produce(
-                KAFKA_TOPIC,
-                null, // partition
-                new Buffer(entry), // value
-                `${bucket}/${key}`, // key (for keyed partitioning)
-                Date.now(), // timestamp
-                null);
-        }
+            return retry({
+                times: PRODUCER_MAX_RETRIES,
+                interval: PRODUCER_RETRY_DELAY_MS,
+            }, done => {
+                try {
+                    producer.produce(
+                        KAFKA_TOPIC,
+                        null, // partition
+                        new Buffer(entry), // value
+                        `${bucket}/${key}`, // key (for keyed partitioning)
+                        Date.now(), // timestamp
+                        null);
+                    return done();
+                } catch (err) {
+                    return done(err);
+                }
+            }, next);
+        },
+    ], err => {
         ++nProcessed;
         if (err) {
             ++nErrors;
@@ -402,6 +418,7 @@ function triggerCRROnBucket(bucketName, cb) {
 
 producer.connect();
 producer.on('ready', () => {
+    producer.setPollInterval(PRODUCER_POLL_INTERVAL_MS);
     // trigger the calls to list objects and mark them for crr
     eachSeries(BUCKETS, triggerCRROnBucket, err => {
         clearInterval(logProgressInterval);
