@@ -425,6 +425,7 @@ producer.on('ready', () => {
         if (err) {
             return log.error('error during task execution', { error: err });
         }
+        producer.disconnect();
         return log.info('completed task for all buckets');
     });
 });
