@@ -258,9 +258,23 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                         null);
                     return done();
                 } catch (err) {
+                    log.error('error producing entry to kafka, retrying', {
+                        bucket,
+                        key,
+                        error: err.message,
+                    });
                     return done(err);
                 }
-            }, next);
+            }, err => {
+                if (err) {
+                    log.error('give up producing entry to kafka after retries', {
+                        bucket,
+                        key,
+                        error: err.message,
+                    });
+                }
+                next(err);
+            });
         },
     ], err => {
         ++nProcessed;
