@@ -244,6 +244,8 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 key: `${key}${VID_SEP}${objMD.versionId}`,
                 value: mdBlob,
             });
+            const { versionId } = objMD;
+            log.debug('replaying object', { bucket, key, versionId });
             return retry({
                 times: PRODUCER_MAX_RETRIES,
                 interval: PRODUCER_RETRY_DELAY_MS,
