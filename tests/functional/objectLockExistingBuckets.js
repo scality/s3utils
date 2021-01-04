@@ -92,26 +92,14 @@ describe('ObjectLockExistingBuckets', () => {
     });
 
 
-    test('should fail if no bucket list provided', done => {
-        exec('node objectLockExistingBuckets.js', (err, stderr) => {
-            assert.strictEqual(err.message,
-                'Command failed: node objectLockExistingBuckets.js \n' +
-                'No buckets given as input, please provide a comma-separated ' +
-                'list of buckets on the command line');
-            const util = require('util');
-            console.log(`\n\n------- err: ${util.inspect(err, false, null)}`);
-            console.log(`\n\n------stderr: ${util.inspect(stderr, false, null)}`);
-            done();
-        });
+    test('should fail if no bucket list provided', () => {
+        expect(() => exec('node objectLockExistingBuckets.js', () => {})
+        .toThrow(/Command failed: node objectLockExistingBuckets.js/));
     });
 
-    test('should enable Object Lock on each existing bucket', done => {
-        exec('node objectLockExistingBuckets.js ' +
-        'test-bucket-0,test-bucket-1,test-bucket-2', (err, stderr, stdout) => {
-            assert.ifError(err);
-            assert.strictEqual(stdout,
-                'Object Lock enabled for specified buckets');
-            done();
-        });
+    test('should enable Object Lock on each existing bucket', () => {
+        expect(() => exec('node objectLockExistingBuckets.js ' +
+        'test-bucket-0,test-bucket-1,test-bucket-2', () => {})
+        .resolves.toBeTruthy());
     });
 });
