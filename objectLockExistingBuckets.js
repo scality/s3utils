@@ -1,5 +1,5 @@
+const { eachSeries, series } = require('async');
 const { MetadataWrapper } = require('arsenal').storage.metadata;
-const { series } = require('async');
 const { Logger } = require('werelogs');
 
 const USAGE = `
@@ -40,13 +40,12 @@ const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide ' +
+    log.error('No buckets given as input, please provide ' +
                   'a comma-separated list of buckets on the command line');
-    console.error(USAGE);
+    log.error(USAGE);
     process.exit(1);
 }
 
-let nSkipped = 0;
 let nUpdated = 0;
 let nErrors = 0;
 let bucketInProgress = null;
@@ -54,7 +53,6 @@ let bucketInProgress = null;
 function _logProgress() {
     log.info('progress update', {
         updated: nUpdated,
-        skipped: nSkipped,
         errors: nErrors,
         bucket: bucketInProgress || null,
     });
@@ -83,8 +81,10 @@ function enableObjectLockOnBucket(bucketName, cb) {
         return metadataClient.updateBucket(bucket, bucketMD, log, err => {
             if (err) {
                 log.error('error updating bucket metadata', { error: err });
+                ++nErrors;
                 return cb(err);
             }
+            ++nUpdated;
             return cb();
         });
     });
@@ -99,6 +99,5 @@ series([
     if (err) {
         return log.error('error during task execution', { error: err });
     }
-    console.log('Object Lock enabled for specified buckets');
     return log.info('completed task for all buckets');
 });

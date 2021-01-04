@@ -102,10 +102,11 @@ describe('ObjectLockExistingBuckets', () => {
     });
 
     test('should enable Object Lock on each existing bucket', done => {
-        exec('cd ../.. && node objectLockExistingBuckets.js test-bucket-0,test-bucket-1,test-bucket-2',
-        (err, stderr, stdout) => {
+        exec('cd ../.. && node objectLockExistingBuckets.js ' +
+        'test-bucket-0,test-bucket-1,test-bucket-2', (err, stderr, stdout) => {
             assert.ifError(err);
-            assert.strictEqual(stdout, 'Object Lock enabled for specified buckets');
+            assert.strictEqual(stdout,
+                'Object Lock enabled for specified buckets');
             done();
         });
     });
