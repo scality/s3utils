@@ -40,7 +40,7 @@ const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.error('No buckets given as input, please provide ' +
+    console.error('No buckets given as input, please provide ' +
         'a comma-separated list of buckets on the command line');
     log.error(USAGE);
     process.exit(1);
