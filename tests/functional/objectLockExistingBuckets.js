@@ -59,7 +59,7 @@ function populateMongo(client, callback) {
     }, callback);
 }
 
-jest.setTimeout(20000);
+jest.setTimeout(60000);
 describe('ObjectLockExistingBuckets', () => {
     let client;
     beforeAll(done => {
@@ -97,7 +97,7 @@ describe('ObjectLockExistingBuckets', () => {
             assert.strictEqual(err.message,
                 'Command failed: node objectLockExistingBuckets.js \n' +
                 'No buckets given as input, please provide a comma-separated ' +
-                'list of buckets on the command line\n');
+                'list of buckets on the command line');
             const util = require('util');
             console.log(`\n\n------- err: ${util.inspect(err, false, null)}`);
             console.log(`\n\n------stderr: ${util.inspect(stderr, false, null)}`);
