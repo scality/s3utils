@@ -12,7 +12,7 @@ Usage:
 `;
 
 const log = new Logger('s3utils::objectLockExistingBuckets');
-const replicaSetHosts = process.env.MONGODB_REPLICASET || 'localhost:27017';
+const replicaSetHosts = process.env.MONGODB_REPLICASET || 'localhost:27018';
 const replicaSet = 'rs0';
 const writeConcern = 'majority';
 const readPreference = 'primary';
@@ -41,7 +41,7 @@ const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.error('No buckets given as input, please provide ' +
-                  'a comma-separated list of buckets on the command line');
+        'a comma-separated list of buckets on the command line');
     log.error(USAGE);
     process.exit(1);
 }

@@ -12,7 +12,7 @@ const dbName = 'metadata';
 const mongoserver = new MongoMemoryReplSet({
     debug: false,
     instanceOpts: [
-        { port: 27017 },
+        { port: 27018 },
     ],
     replSet: {
         name: 'rs0',
