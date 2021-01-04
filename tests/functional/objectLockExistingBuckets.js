@@ -1,7 +1,11 @@
+const assert = require('assert');
+const async = require('async');
+const { BucketInfo } = require('arsenal').models;
 const { exec } = require('child_process');
 const { MongoClientInterface } =
     require('arsenal').storage.metadata.mongoclient;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const werelogs = require('werelogs');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
 const dbName = 'metadata';

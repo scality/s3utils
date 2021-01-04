@@ -62,7 +62,7 @@ function _logProgress() {
 
 const logProgressInterval = setInterval(_logProgress, LOG_PROGRESS_INTERVAL_MS);
 
-function enableObjectLockOnBucket(bucket, cb) {
+function enableObjectLockOnBucket(bucketName, cb) {
     const bucket = bucketName.trim();
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
