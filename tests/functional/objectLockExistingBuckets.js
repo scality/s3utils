@@ -95,9 +95,9 @@ describe('ObjectLockExistingBuckets', () => {
     test('should fail if no bucket list provided', done => {
         exec('node objectLockExistingBuckets.js', (err, stderr) => {
             assert.strictEqual(err.message,
-                'Command failed: node objectLockExistingBuckets.js ' +
+                'Command failed: node objectLockExistingBuckets.js \n' +
                 'No buckets given as input, please provide a comma-separated ' +
-                'list of buckets on the command line');
+                'list of buckets on the command line\n');
             const util = require('util');
             console.log(`\n\n------- err: ${util.inspect(err, false, null)}`);
             console.log(`\n\n------stderr: ${util.inspect(stderr, false, null)}`);
