@@ -93,7 +93,7 @@ describe('ObjectLockExistingBuckets', () => {
 
 
     test('should fail if no bucket list provided', done => {
-        exec('cd ../.. && node objectLockExistingBuckets.js', err => {
+        exec('node objectLockExistingBuckets.js', err => {
             assert.strictEqual(err.message,
                 'No buckets given as input, please provide a comma-separated ' +
                 'list of buckets on the command line');
@@ -102,7 +102,7 @@ describe('ObjectLockExistingBuckets', () => {
     });
 
     test('should enable Object Lock on each existing bucket', done => {
-        exec('cd ../.. && node objectLockExistingBuckets.js ' +
+        exec('node objectLockExistingBuckets.js ' +
         'test-bucket-0,test-bucket-1,test-bucket-2', (err, stderr, stdout) => {
             assert.ifError(err);
             assert.strictEqual(stdout,
