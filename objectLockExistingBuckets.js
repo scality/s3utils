@@ -12,13 +12,12 @@ Usage:
 `;
 
 const log = new Logger('s3utils::objectLockExistingBuckets');
-const replicaSetHosts = process.env.MONGODB_REPLICASET;
+const replicaSetHosts = process.env.MONGODB_REPLICASET || 'localhost:27017';
 const replicaSet = 'rs0';
 const writeConcern = 'majority';
 const readPreference = 'primary';
 const database = process.env.MONGODB_DATABASE || 'metadata';
 const implName = 'mongodb';
-const replicationGroupId = process.env.REPLICATION_GROUP_ID;
 const params = {
     mongodb: {
         replicaSetHosts,
@@ -27,7 +26,6 @@ const params = {
         readPreference,
         database,
     },
-    replicationGroupId,
 };
 if (process.env.MONGODB_AUTH_USERNAME &&
     process.env.MONGODB_AUTH_PASSWORD) {
@@ -48,7 +46,6 @@ if (!BUCKETS || BUCKETS.length === 0) {
     process.exit(1);
 }
 
-let nProcessed = 0;
 let nSkipped = 0;
 let nUpdated = 0;
 let nErrors = 0;
@@ -93,7 +90,6 @@ function enableObjectLockOnBucket(bucket, cb) {
     });
 }
 
-// trigger the calls to list objects and mark them for crr
 series([
     next => metadataClient.setup(next),
     next => eachSeries(BUCKETS, enableObjectLockOnBucket, next),
@@ -103,5 +99,6 @@ series([
     if (err) {
         return log.error('error during task execution', { error: err });
     }
+    console.log('Object Lock enabled for specified buckets');
     return log.info('completed task for all buckets');
 });
