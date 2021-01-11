@@ -14,24 +14,13 @@ const {
     StalledRequestHandler,
 } = require('./StalledRetry/StalledRequestHandler');
 
+const { parseEnvInt } = require('./utils');
+
 const ENDPOINT = process.env.ENDPOINT;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
 const DRY_RUN = !!process.env.DRY_RUN;
-
-/**
- * parse environment variable as a integer number
- * @param {string} env - environment variable value
- * @param {int} defValue - default value if environment cannot be found or is
- *      not int parseable
- * @returns {int} - return integer value
- */
-function parseEnvInt(env, defValue) {
-    return (env && !Number.isNaN(env))
-        ? Number.parseInt(env, 10)
-        : defValue;
-}
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
 const QUEUE_LIMT = parseEnvInt(process.env.QUEUE_LIMT, 1000);
@@ -51,6 +40,12 @@ if (!SECRET_KEY) {
 if (!MONGODB_REPLICASET) {
     throw new Error('MONGODB_REPLICASET not defined');
 }
+
+const HEAP_PROFILER_INTERVAL =
+    parseEnvInt(process.env.HEAP_PROFILER_INTERVAL, 10 * 60 * 100);
+const HEAP_PROFILER_PATH = process.env.HEAP_PROFILER_PATH;
+require('./utils/heapProfiler')(HEAP_PROFILER_PATH, HEAP_PROFILER_INTERVAL);
+
 const log = new Logger('S3Utils::Stalled');
 
 function wrapperFactory(bucketName, cmpDate, cursor, log) {
