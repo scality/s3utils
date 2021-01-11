@@ -30,6 +30,7 @@
     "arsenal": "github:scality/arsenal#81d05b6",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
+    "heapdump": "^0.3.15",
     "node-uuid": "^1.4.8",
     "werelogs": "scality/werelogs",
     "zenkoclient": "scality/zenkoclient#5c7f655"
