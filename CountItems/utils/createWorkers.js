@@ -5,7 +5,7 @@ function createWorkers(numWorkers) {
     if (!cluster.isMaster) return {};
     const workers = {};
     for (let i = 0; i < numWorkers; ++i) {
-        const worker = cluster.fork();
+        const worker = cluster.fork(process.env);
         workers[worker.process.pid] =
             new CountWorkerObj(worker.process.pid, worker);
     }
