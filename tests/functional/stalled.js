@@ -1,6 +1,5 @@
 const async = require('async');
 const werelogs = require('werelogs');
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { BucketInfo, ObjectMD } = require('arsenal').models;
 
 const {
@@ -23,20 +22,8 @@ const loggerConfig = {
 werelogs.configure(loggerConfig);
 
 const logger = new werelogs.Logger('StalledRetry::Test::Functional');
-const dbName = 'metadata';
-
-const mongoserver = new MongoMemoryReplSet({
-    debug: false,
-    instanceOpts: [
-        { port: 27017 },
-    ],
-    replSet: {
-        name: 'rs0',
-        count: 1,
-        dbName,
-        storageEngine: 'ephemeralForTest',
-    },
-});
+const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const dbName = 'stalledRetryTest';
 
 function wrapperFactory(bucketName, cmpDate, cursor, log) {
     return new StalledCursorWrapper(
@@ -153,7 +140,7 @@ function populateMongo(client, callback) {
             });
             async.series([
                 next => client.createBucket(bucketName, bucketMD, logger, next),
-                next => async.timesSeries(1000, (m, done) => {
+                next => async.timesSeries(100, (m, done) => {
                     async.parallel([
                         done => {
                             const objName = `stalled-${m}`;
@@ -209,7 +196,7 @@ describe('StalledRetry', () => {
     beforeAll(done => {
         reqClient = new TrackingClient();
         const opts = {
-            replicaSetHosts: 'localhost:27017',
+            replicaSetHosts: MONGODB_REPLICASET,
             writeConcern: 'majority',
             replicaSet: 'rs0',
             readPreference: 'primary',
@@ -221,9 +208,6 @@ describe('StalledRetry', () => {
         };
         mgoClient = new MongoClientInterfaceStalled(opts);
         async.series([
-            next => mongoserver.waitUntilRunning()
-                .then(() => next())
-                .catch(next),
             next => mgoClient.setup(next),
             next => populateMongo(mgoClient, next),
         ], done);
@@ -231,17 +215,15 @@ describe('StalledRetry', () => {
 
     afterAll(done => {
         async.series([
+            next => mgoClient.db.dropDatabase(next),
             next => mgoClient.close(next),
-            next => mongoserver.stop()
-                .then(() => next())
-                .catch(next),
         ], done);
     });
 
     test('should correct', done => {
         mgoClient.queueStalledObjects((err, res) => {
             expect(err).toBeNull();
-            expect(res).toEqual(20000);
+            expect(res).toEqual(2000);
             done();
         });
     });

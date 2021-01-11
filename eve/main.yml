@@ -41,6 +41,8 @@ stages:
       - ShellCommand:
           name: run test
           command: yarn --silent test:functional 
+          env:
+            MONGODB_REPLICASET: "localhost:27018"
 
   build:
     worker: &builder_worker
