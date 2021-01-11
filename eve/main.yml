@@ -18,10 +18,10 @@ stages:
         - build
   tests:
     worker: &master-worker
-      type: docker
-      path: eve/workers/master
-      volumes:
-        - '/home/eve/workspace'
+      type: kube_pod
+      path: eve/workers/master/pod.yaml
+      images:
+        master: eve/workers/master
     steps:
       - Git: &git_clone
           name: fetch source

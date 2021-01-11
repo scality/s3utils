@@ -36,16 +36,6 @@ spec:
           mountPath: /var/lib/docker
         - name: worker-workspace
           mountPath: /workdir
-    - name: mongo
-      image: scality/ci-mongo:3.6.8
-      imagePullPolicy: IfNotPresent
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 1Gi
-        limits:
-          cpu: 1000m
-          memory: 1Gi
   volumes:
     - name: docker-storage
       emptyDir: {}
