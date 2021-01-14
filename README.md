@@ -489,3 +489,45 @@ If this looks like a potential risk to a customer running the script,
 we suggest to disable those operations on the clients during the time
 the script is running (or alternatively, disable all writes), to avoid
 any such risk.
+
+# Cleanup Noncurrent Versions
+
+This script removes noncurrent versions and current/noncurrent delete
+markers, either all such objects or older than a specified
+last-modified date.
+
+## Usage
+
+```
+node cleanupNoncurrentVersions.js bucket1[,bucket2...]
+```
+
+## Mandatory environment variables
+
+* **ENDPOINT**: S3 endpoint URL
+
+* **ACCESS_KEY**: S3 account/user access key
+
+* **SECRET_KEY**: S3 account/user secret key
+
+## Optional environment variables
+
+* **TARGET_PREFIX**: cleanup only inside this key prefix in each bucket
+
+* **MAX_LISTED**: maximum number of keys listed before exiting (default unlimited)
+
+* **MAX_DELETES**: maximum number of keys to delete before exiting (default unlimited)
+
+* **KEY_MARKER**: key marker on which to start the listing
+
+* **VERSION_ID_MARKER**: version ID marker on which to start the listing
+
+* **OLDER_THAN**: cleanup only objects which last modified date is
+older than this date, e.g. setting to "2021-01-09T00:00:00Z" limits
+the cleanup to objects created or modified before Jan 9th 2021.
+
+## Example
+
+```
+docker run --net=host -ti zenko/s3utils:latest bash -c 'ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
+```
