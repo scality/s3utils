@@ -35,13 +35,12 @@ if (process.env.MONGODB_AUTH_USERNAME &&
     };
 }
 const metadataClient = new MetadataWrapper(implName, params, null, log);
-
+const util = require('util');
+console.log(`\n\n----- metadata client????? ${util.inspect(metadataClient, false, null)}`);
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide ' +
-        'a comma-separated list of buckets on the command line');
     log.error(USAGE);
     process.exit(1);
 }
@@ -67,6 +66,7 @@ function enableObjectLockOnBucket(bucketName, cb) {
 
     return metadataClient.getBucket(bucket, log, (err, bucketMD) => {
         if (err) {
+            console.log(`\n\n-----error???? ${err}`);
             log.error('error getting bucket metadata', { error: err });
             return cb(err);
         }
@@ -80,6 +80,7 @@ function enableObjectLockOnBucket(bucketName, cb) {
         bucketMD.setObjectLockEnabled(true);
         return metadataClient.updateBucket(bucket, bucketMD, log, err => {
             if (err) {
+                console.log(`\n\n-----errorororororro????? ${err}`);
                 log.error('error updating bucket metadata', { error: err });
                 ++nErrors;
                 return cb(err);

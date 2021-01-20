@@ -73,6 +73,8 @@ describe('ObjectLockExistingBuckets', () => {
             logger,
         };
         client = new MongoClientInterface(opts);
+        const util = require('util');
+        console.log(`\n\n-----MongoClientInterfaceeee???? ${util.inspect(client, false, null)}`);
         async.series([
             next => mongoserver.waitUntilRunning()
                 .then(() => next())
