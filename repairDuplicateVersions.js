@@ -249,6 +249,9 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
             path: sproxydDestUrl.pathname,
             method: 'PUT',
             agent: httpAgent,
+            headers: {
+                'Content-Length': Number.parseInt(sourceRes.headers['content-length'], 10),
+            },
         }, targetRes => {
             if (targetRes.statusCode !== 200) {
                 log.error('sproxyd returned HTTP error code', {
