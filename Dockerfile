@@ -14,5 +14,8 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF505
 
 COPY ./ ./
 
+RUN curl -L -o ballot https://github.com/scality/ballot/releases/download/v0.0.0-alpha.20210121162209/ballot-20210121162209-linux-amd64 \
+    && chmod +x ballot
+
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
