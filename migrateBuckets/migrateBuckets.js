@@ -33,6 +33,7 @@ commander.version('1.0.0')
 .option('--https-cert [httpsCert]', 'HTTPS cert')
 .option('--https-ca [httpsCa]', 'HTTPS ca')
 .option('-p, --profile [profile]', 'AWS credentials')
+.option('-r, --region [region]', 'AWS region, us-east-1 by default')
 .parse(process.argv);
 
 const {
@@ -46,6 +47,7 @@ const {
     httpsCert,
     httpsCa,
     profile,
+    region,
 } = commander;
 
 if ((!ACCESS_KEY || !SECRET_KEY) && !profile) {
@@ -67,7 +69,7 @@ let nErrors = 0;
 let nObjProcessed = 0;
 
 const s3Opts = {
-    region: 'us-east-1',
+    region: region || 'us-east-1',
     sslEnabled: false,
     endpoint,
     s3ForcePathStyle: true,
@@ -291,8 +293,6 @@ function _changeObjectsAccount(bucket, log, cb) {
                         if (err) {
                             return done(err);
                         }
-                        log.info(`All objects in bucket ${bucketName} ` +
-                            'successfully updated');
                         return done();
                     });
             });
@@ -303,6 +303,8 @@ function _changeObjectsAccount(bucket, log, cb) {
                     `${bucketName}: ${err}`);
                 return cb(err);
             }
+            log.info(`All objects in bucket ${bucketName} ` +
+            'successfully updated');
             return cb();
         }
     );
