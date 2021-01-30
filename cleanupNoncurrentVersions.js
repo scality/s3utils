@@ -1,4 +1,6 @@
+const fs = require('fs');
 const http = require('http');
+const https = require('https');
 
 const AWS = require('aws-sdk');
 const { doWhilst, eachSeries } = require('async');
@@ -18,6 +20,8 @@ const MAX_LISTED = (process.env.MAX_LISTED &&
 const MARKER = process.env.MARKER;
 const OLDER_THAN = (process.env.OLDER_THAN ?
                     new Date(process.env.OLDER_THAN) : null);
+const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
+const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
@@ -53,6 +57,9 @@ Optional environment variables:
     OLDER_THAN: cleanup only objects which last modified date is older
     than this date, e.g. setting to "2021-01-09T00:00:00Z" limits the
     cleanup to objects created or modified before Jan 9th 2021.
+    HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
+    the S3 endpoint
+    HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
 `;
 
 // We accept console statements for usage purpose
@@ -68,6 +75,7 @@ if (!S3_ENDPOINT) {
     console.error(USAGE);
     process.exit(1);
 }
+const s3EndpointIsHttps = S3_ENDPOINT.startsWith('https:');
 if (!ACCESS_KEY) {
     console.error('ACCESS_KEY not defined');
     console.error(USAGE);
@@ -120,18 +128,30 @@ log.info('Start deleting noncurrent versions and delete markers', {
     olderThan: (OLDER_THAN ? OLDER_THAN.toString() : 'N/A'),
 });
 
+let agent;
+if (s3EndpointIsHttps) {
+    agent = new https.Agent({
+        keepAlive: true,
+        ca: HTTPS_CA_PATH ? fs.readFileSync(HTTPS_CA_PATH) : undefined,
+        rejectUnauthorized: HTTPS_NO_VERIFY !== '1',
+    });
+} else {
+    agent = new http.Agent({ keepAlive: true });
+}
+
 const options = {
     accessKeyId: ACCESS_KEY,
     secretAccessKey: SECRET_KEY,
     endpoint: S3_ENDPOINT,
     region: 'us-east-1',
+    sslEnabled: s3EndpointIsHttps,
     s3ForcePathStyle: true,
     apiVersions: { s3: '2006-03-01' },
     signatureVersion: 'v4',
     signatureCache: false,
     httpOptions: {
         timeout: 0,
-        agent: new http.Agent({ keepAlive: true }),
+        agent,
     },
 };
 /**

@@ -29,6 +29,9 @@ Mandatory Environment Variables:
 Optional Environment Variables:
     WORKERS: maximum concurrency for metadata checks (default 100)
     VERBOSE: set to 1 for more verbose output of verify script
+    HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
+    the S3 endpoint
+    HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
 EOF
     exit 1
 }
