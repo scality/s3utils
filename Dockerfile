@@ -2,6 +2,7 @@ FROM node:10
 
 WORKDIR /usr/src/app
 ENV MONGO_VER 3.6.8
+ENV BALLOT_VERSION 1.0.0
 
 # Keep the .git directory in order to properly report version
 COPY ./package.json .
@@ -14,8 +15,8 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF505
 
 COPY ./ ./
 
-RUN curl -L -o ballot https://github.com/scality/ballot/releases/download/v0.0.0-alpha.20210121162209/ballot-20210121162209-linux-amd64 \
-    && chmod +x ballot
+ADD https://github.com/scality/ballot/releases/download/v${BALLOT_VERSION}/ballot-v${BALLOT_VERSION}-linux-amd64 /usr/src/app/ballot
+RUN chmod +x /usr/src/app/ballot
 
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
