@@ -27,7 +27,9 @@ let KEY_MARKER = process.env.KEY_MARKER;
 let VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
 const REPLICATION_GROUP_ID = process.env.REPLICATION_GROUP_ID;
 
-const LISTING_LIMIT = 1000;
+const LISTING_LIMIT = (process.env.LISTING_LIMIT &&
+    Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
+
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
