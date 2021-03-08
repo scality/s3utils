@@ -4,12 +4,6 @@ const {
     MongoClientInterface,
 } = require('arsenal').storage.metadata.mongoclient;
 
-const USERSBUCKET = '__usersbucket';
-const METASTORE = '__metastore';
-const INFOSTORE = '__infostore';
-const PENSIEVE = 'PENSIEVE';
-const MPU_BUCKET_PREFIX = 'mpuShadowBucket';
-
 class MongoClientInterfaceStalled extends MongoClientInterface {
     constructor(params) {
         super(params);
@@ -38,9 +32,9 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
         ]);
     }
 
-    queueStalledObjects(cb) {
+    queueStalledObjects(expiredBy, cb) {
         const cmpDate = new Date();
-        cmpDate.setHours(cmpDate.getHours() - 1);
+        cmpDate.setHours(cmpDate.getHours() - expiredBy);
         const reqHandler = this.requestHandlerFactory(this.logger);
 
         let stalledCount = 0;
@@ -48,13 +42,8 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
             if (err) {
                 return cb(err);
             }
-            return async.eachLimit(collections, 1, (value, next) => {
-                const skipBucket = value.name === METASTORE ||
-                    value.name === INFOSTORE ||
-                    value.name === USERSBUCKET ||
-                    value.name === PENSIEVE ||
-                    value.name.startsWith(MPU_BUCKET_PREFIX);
-                if (skipBucket) {
+            return async.eachSeries(collections, (value, next) => {
+                if (this._isSpecialCollection(value.name)) {
                     // skip
                     return next();
                 }
@@ -69,7 +58,7 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                 return reqHandler.handleRequests(wrapper, (err, results) => {
                     if (err) {
                         this.logger.error(
-                            'encounted error while processing requests',
+                            'encountered error while processing requests',
                             { method: 'queueStalledObjects', error: err }
                         );
                         return next(err);
@@ -77,6 +66,7 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
 
                     this.logger.debug('completed handling requests', {
                         method: 'queueStalledObjects',
+                        bucket: value.name,
                         info: results,
                     });
 

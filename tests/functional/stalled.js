@@ -143,7 +143,21 @@ function populateMongo(client, callback) {
                 next => async.timesSeries(100, (m, done) => {
                     async.parallel([
                         done => {
-                            const objName = `stalled-${m}`;
+                            const objName = `stalled-1hr-${m}`;
+                            const cmpDate = new Date();
+                            cmpDate.setHours(cmpDate.getHours() - 1);
+                            const lastModified = cmpDate.toUTCString();
+                            return client.putObject(
+                                bucketName,
+                                objName,
+                                createStalledObject(objName, lastModified),
+                                { versionId: null, versioning: true },
+                                logger,
+                                done
+                            );
+                        },
+                        done => {
+                            const objName = `stalled-10hr-${m}`;
                             const cmpDate = new Date();
                             cmpDate.setHours(cmpDate.getHours() - 10);
                             const lastModified = cmpDate.toUTCString();
@@ -220,10 +234,26 @@ describe('StalledRetry', () => {
         ], done);
     });
 
-    test('should correct', done => {
-        mgoClient.queueStalledObjects((err, res) => {
+    test('should correctly process stalled entries (all stalled)', done => {
+        mgoClient.queueStalledObjects(1, (err, res) => {
+            expect(err).toBeNull();
+            expect(res).toEqual(4000);
+            done();
+        });
+    });
+
+    test('should correctly process stalled entries (skip 1hr exp)', done => {
+        mgoClient.queueStalledObjects(5, (err, res) => {
             expect(err).toBeNull();
             expect(res).toEqual(2000);
+            done();
+        });
+    });
+
+    test('should correctly process stalled entries (skip 1+10hr exp)', done => {
+        mgoClient.queueStalledObjects(11, (err, res) => {
+            expect(err).toBeNull();
+            expect(res).toEqual(0);
             done();
         });
     });

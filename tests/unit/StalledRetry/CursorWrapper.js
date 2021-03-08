@@ -70,7 +70,7 @@ describe('StalledCursorWrapper', () => {
             expect(wrapper.cursor.isPaused()).toEqual(true);
             expect(wrapper.completed).toEqual(false);
             // expect 2 entries to be queued from the first item
-            expect(wrapper.queue.length).toEqual(2);
+            expect(wrapper.buffer.length).toEqual(2);
             done();
         }, 100);
     });
@@ -100,7 +100,7 @@ describe('StalledCursorWrapper', () => {
             expect(wrapper.cursor.isPaused()).toEqual(false);
             expect(wrapper.completed).toEqual(false);
             // expect 2 entries to be queued from the first item
-            expect(wrapper.queue.length).toEqual(0);
+            expect(wrapper.buffer.length).toEqual(0);
             done();
         }, 100);
     });
@@ -130,7 +130,7 @@ describe('StalledCursorWrapper', () => {
             expect(wrapper.cursor.isPaused()).toEqual(false);
             expect(wrapper.completed).toEqual(false);
             // expect 2 entries to be queued from the first item
-            expect(wrapper.queue.length).toEqual(2);
+            expect(wrapper.buffer.length).toEqual(2);
             done();
         }, 100);
     });
@@ -181,7 +181,7 @@ describe('StalledCursorWrapper', () => {
             expect(wrapper.cursorEnd).toEqual(true);
             expect(wrapper.completed).toEqual(false);
             // expect 2 entries to be queued from the first item
-            expect(wrapper.queue.length).toEqual(2);
+            expect(wrapper.buffer.length).toEqual(2);
             done();
         }, 100);
     });
@@ -202,13 +202,13 @@ describe('StalledCursorWrapper', () => {
         setTimeout(() => {
             expect(wrapper.cursorErr).toBeNull();
             expect(wrapper.cursorEnd).toEqual(true);
-            expect(wrapper.completed).toEqual(false);
+            expect(wrapper.completed).toEqual(true);
             done();
         }, 100);
     });
 
     describe('::getBatch', () => {
-        test('should wait on source for data', done => {
+        test('should add getBatch request to queue', done => {
             const wrapper = new StalledCursorWrapper(
                 mockCursor,
                 {
@@ -219,25 +219,46 @@ describe('StalledCursorWrapper', () => {
                 }
             );
 
-            writeItemsTo(mockCursor, [
-                generateObjectMD(
-                    'testobject-0',
-                    generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2'
-                ),
-                generateObjectMD(
-                    'testobject-1',
-                    generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2'
-                ),
-            ]);
+            wrapper.getBatch(1, () => {});
 
-            wrapper.getBatch(1, (err, batch) => {
+            setTimeout(() => {
+                expect(wrapper.getBatchCallbacks).toHaveLength(1);
+                done();
+            }, 100);
+        });
+
+        test('should call queued callback when size is met', done => {
+            const wrapper = new StalledCursorWrapper(
+                mockCursor,
+                {
+                    queueLimit: 1000,
+                    bucketName: 'test-bucket',
+                    cmpDate,
+                    log,
+                }
+            );
+
+            wrapper.getBatch(5, (err, batch) => {
                 expect(err).toBeNull();
-                expect(batch.length).toEqual(1);
-                expect(wrapper.queue.length).toEqual(3);
+                expect(batch.length).toEqual(5);
+                expect(wrapper.buffer.length).toEqual(1);
                 done();
             });
+
+            setTimeout(() => {
+                writeItemsTo(mockCursor, [
+                    generateObjectMD(
+                        'testobject-0',
+                        generateModifiedDateString(cmpDate, -24),
+                        'us-east-1,us-east-2,us-east-3'
+                    ),
+                    generateObjectMD(
+                        'testobject-1',
+                        generateModifiedDateString(cmpDate, -24),
+                        'us-east-1,us-east-2,us-east-3'
+                    ),
+                ]);
+            }, 100);
         });
 
         test('should destroy source on completion', done => {
@@ -264,6 +285,7 @@ describe('StalledCursorWrapper', () => {
                 wrapper.getBatch(1, err => {
                     expect(err).toBeNull();
                     expect(wrapper.cursorEnd).toEqual(true);
+                    expect(wrapper.completed).toEqual(true);
                     expect(wrapper.cursor).toEqual(null);
                     done();
                 });
@@ -290,6 +312,90 @@ describe('StalledCursorWrapper', () => {
             setTimeout(() => {
                 mockCursor.emit('error', new Error('test error'));
             }, 100);
+        });
+
+        test('should call queued getBatch requests on source end', done => {
+            const wrapper = new StalledCursorWrapper(
+                mockCursor,
+                {
+                    queueLimit: 1000,
+                    bucketName: 'test-bucket',
+                    cmpDate,
+                    log,
+                }
+            );
+
+            writeItemsTo(mockCursor, [
+                generateObjectMD(
+                    'testobject-0',
+                    generateModifiedDateString(cmpDate, -24),
+                    'us-east-1,us-east-2,us-east-3'
+                ),
+                generateObjectMD(
+                    'testobject-1',
+                    generateModifiedDateString(cmpDate, -24),
+                    'us-east-1,us-east-2,us-east-3'
+                ),
+            ]);
+
+            wrapper.getBatch(3, (err, batch) => {
+                expect(err).toBeNull();
+                expect(batch.length).toEqual(3);
+                expect(wrapper.completed).toEqual(false);
+            });
+
+            wrapper.getBatch(2, (err, batch) => {
+                expect(err).toBeNull();
+                expect(batch.length).toEqual(2);
+                expect(wrapper.completed).toEqual(false);
+            });
+
+            wrapper.getBatch(1, (err, batch) => {
+                expect(err).toBeNull();
+                expect(batch.length).toEqual(1);
+                expect(wrapper.completed).toEqual(true);
+                done();
+            });
+
+            mockCursor.end();
+        });
+
+        test('should resume paused source', done => {
+            const wrapper = new StalledCursorWrapper(
+                mockCursor,
+                {
+                    queueLimit: 1000,
+                    bucketName: 'test-bucket',
+                    cmpDate,
+                    log,
+                }
+            );
+
+            mockCursor.pause();
+            writeItemsTo(mockCursor, [
+                generateObjectMD(
+                    'testobject-0',
+                    generateModifiedDateString(cmpDate, -24),
+                    'us-east-1,us-east-2,us-east-3'
+                ),
+                generateObjectMD(
+                    'testobject-1',
+                    generateModifiedDateString(cmpDate, -24),
+                    'us-east-1,us-east-2,us-east-3'
+                ),
+            ]);
+
+            setTimeout(() => {
+                expect(wrapper.cursor.isPaused()).toEqual(true);
+                wrapper.getBatch(1, (err, batch) => {
+                    expect(err).toBeNull();
+                    expect(batch.length).toEqual(1);
+                    expect(wrapper.completed).toEqual(false);
+                    expect(wrapper.cursorEnd).toEqual(false);
+                    expect(wrapper.cursor.isPaused()).toEqual(false);
+                    done();
+                });
+            }, 1000);
         });
     });
 });

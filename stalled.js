@@ -24,10 +24,12 @@ const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'metadata';
 const DRY_RUN = !!process.env.DRY_RUN;
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
-const QUEUE_LIMT = parseEnvInt(process.env.QUEUE_LIMT, 1000);
+const QUEUE_LIMIT = parseEnvInt(process.env.QUEUE_LIMIT, 1000);
 const CONCURRENT_REQUESTS = parseEnvInt(process.env.CONCURRENT_REQUESTS, 5);
+const EXPIRED_BY_HOUR =
+    Math.max(parseEnvInt(process.env.EXPIRED_BY_HOUR, 1), 1);
 
-assert(BATCH_SIZE <= QUEUE_LIMT);
+assert(BATCH_SIZE <= QUEUE_LIMIT);
 
 if (!ENDPOINT) {
     throw new Error('ENDPOINT not defined!');
@@ -42,10 +44,10 @@ if (!MONGODB_REPLICASET) {
     throw new Error('MONGODB_REPLICASET not defined');
 }
 
-const HEAP_PROFILER_INTERVAL =
-    parseEnvInt(process.env.HEAP_PROFILER_INTERVAL, 10 * 60 * 100);
+const HEAP_PROFILER_INTERVAL_MS =
+    parseEnvInt(process.env.HEAP_PROFILER_INTERVAL_MS, 10 * 60 * 1000);
 const HEAP_PROFILER_PATH = process.env.HEAP_PROFILER_PATH;
-require('./utils/heapProfiler')(HEAP_PROFILER_PATH, HEAP_PROFILER_INTERVAL);
+require('./utils/heapProfiler')(HEAP_PROFILER_PATH, HEAP_PROFILER_INTERVAL_MS);
 
 const log = new Logger('S3Utils::Stalled');
 
@@ -54,7 +56,7 @@ function wrapperFactory(bucketName, cmpDate, cursor, log) {
         cursor,
         {
             log,
-            queueLimit: QUEUE_LIMT,
+            queueLimit: QUEUE_LIMIT,
             cmpDate,
             bucketName,
         }
@@ -103,7 +105,7 @@ mongoclient.setup(err => {
         log.error('error connecting to mongodb', err);
         return process.exit(1);
     }
-    return mongoclient.queueStalledObjects((err, res) => {
+    return mongoclient.queueStalledObjects(EXPIRED_BY_HOUR, (err, res) => {
         if (err) {
             log.error('error occurred', err);
             return process.exit(1);

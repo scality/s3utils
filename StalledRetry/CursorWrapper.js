@@ -1,5 +1,6 @@
 const MongoError = require('mongodb').MongoError;
 const { encode } = require('arsenal').versioning.VersionID;
+const { once } = require('arsenal').jsutil;
 
 function objectToEntries(bucketName, cmpDate, data) {
     if (!data || typeof data !== 'object' ||
@@ -31,10 +32,6 @@ function objectToEntries(bucketName, cmpDate, data) {
     });
 }
 
-function randomNumber(min, max) {
-    return Math.floor(Math.random() * (max - min) + min);
-}
-
 class StalledCursorWrapper {
     constructor(cursor, params) {
         this.info = {
@@ -47,10 +44,11 @@ class StalledCursorWrapper {
 
         this.queueLimit = params.queueLimit || 1000;
 
-        this.queue = [];
+        this.buffer = [];
+        this.getBatchCallbacks = [];
         this.cursor = cursor;
-        this.cursorEnd = false;
         this.cursorErr = null;
+        this.cursorEnd = false;
 
         this.completed = false;
 
@@ -64,22 +62,26 @@ class StalledCursorWrapper {
                 this.cmpDate,
                 data) || [];
 
-            if (entries.length > 0) {
-                this.info.stalled += entries.length;
+            if (entries.length < 0) {
+                return;
+            }
 
-                this.queue.push(...entries);
+            this.info.stalled += entries.length;
+            this.buffer.push(...entries);
 
-                if (this.queue.length >= this.queueLimit) {
-                    this.cursor.pause();
-                }
+            this._fulfillGetBatch();
+
+            if (this.buffer.length >= this.queueLimit) {
+                this.cursor.pause();
             }
         });
 
         this.cursor.on('end', () => {
             this.log.debug('reached end of cursor', {
-                inQueue: this.queue.length,
+                inQueue: this.buffer.length,
             });
             this.cursorEnd = true;
+            this._cleanUp();
         });
 
         this.cursor.on('error', err => {
@@ -97,56 +99,99 @@ class StalledCursorWrapper {
 
             this.cursorEnd = true;
             this.cursorErr = err;
-            this.cleanUp();
+
+            this.buffer = [];
+            this._cleanUp();
         });
+    }
+
+    _fulfillGetBatch() {
+        if (this.getBatchCallbacks.length === 0) {
+            return;
+        }
+
+        while (this.buffer.length > 0 && this.getBatchCallbacks.length > 0) {
+            const i = this.getBatchCallbacks.length - 1;
+            // TODO: implement a min-heap for callback on size
+            // atm, size is the same for all getBatch requests, so only the
+            // last items is checked
+            if (this.getBatchCallbacks[i].size <= this.buffer.length) {
+                const { size, cb } = this.getBatchCallbacks.pop();
+                cb(null, this.buffer.splice(0, size));
+            } else {
+                break;
+            }
+        }
+
+        if (this.cursor.isPaused() && this.buffer.length < this.queueLimit) {
+            this.cursor.resume();
+        }
+
+        if (this.cursorEnd && this.buffer.length === 0) {
+            this._cleanUp();
+        }
     }
 
     getInfo() {
         return this.info;
     }
 
-    cleanUp() {
+    _cleanUp() {
         if (this.cursor && typeof this.cursor.destroy === 'function') {
             this.cursor.destroy();
+            this.cursor = null;
         }
 
-        this.cursor = null;
-        this.queue = [];
-        this.completed = true;
+        this.getBatchCallbacks.forEach(({ size, cb }) => {
+            if (this.cursorErr !== null) {
+                return cb(this.cursorErr, null);
+            }
+
+            if (this.completed) {
+                return cb(null, null);
+            }
+
+            const batch = this.buffer.splice(0, size);
+            if (this.buffer.length === 0) {
+                this.completed = true;
+            }
+
+            return cb(null, batch);
+        });
+
+        this.getBatchCallbacks = [];
+        if (this.buffer.length === 0) {
+            this.completed = true;
+        }
     }
 
     getBatch(size, cb) {
         if (this.cursorErr !== null) {
-            return cb(this.cursorErr, null);
+            cb(this.cursorErr, null);
+            return;
         }
 
         if (this.completed) {
-            return cb(null, null);
+            cb(null, null);
+            return;
         }
 
-        if (this.cursorEnd || this.queue.length >= size) {
-            const batch = this.queue.splice(0, size);
-
-            // resume cursor if it is paused
-            if (this.queue.length < this.queueLimit && this.cursor.isPaused()) {
-                this.cursor.resume();
-            }
-
-            // set wrapper to completed
-            if (this.cursorEnd && this.queue.length === 0) {
-                this.cleanUp();
-            }
-
-            if (this.cursorEnd && batch.length === 0) {
-                return cb(null, null);
-            }
-
-            return cb(null, batch);
+        if (size === 0) {
+            cb(null, []);
+            return;
         }
 
-        return setTimeout(
-            () => this.getBatch(size, cb),
-            randomNumber(100, 500));
+        this.getBatchCallbacks.push({ size, cb: once(cb) });
+
+        if (this.cursor && this.cursor.isPaused()) {
+            this._fulfillGetBatch();
+        }
+
+        if (this.cursorEnd) {
+            this._cleanUp();
+        }
+
+        return;
     }
 }
 
