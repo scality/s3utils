@@ -8,10 +8,10 @@ branches:
 stages:
   pre-merge:
     worker: &master-worker
-      type: docker
-      path: eve/workers/master
-      volumes:
-        - '/home/eve/workspace'
+      type: kube_pod
+      path: eve/workers/master/pod.yaml
+      images:
+        master: eve/workers/master
     steps:
       - Git:
           name: fetch source
@@ -31,4 +31,6 @@ stages:
       - ShellCommand:
           name: run test
           command: yarn --silent test:functional 
+          env:
+            MONGODB_REPLICASET: "localhost:27018"
 
