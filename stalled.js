@@ -21,7 +21,7 @@ const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_KEY = process.env.SECRET_KEY;
 const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
 const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'metadata';
-const DRY_RUN = process.env.DRY_RUN && process.env.DRY_RUN !== '0';
+const DRY_RUN = process.env.DRY_RUN && process.env.DRY_RUN !== 'false';
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
 const QUEUE_LIMIT = parseEnvInt(process.env.QUEUE_LIMIT, 1000);

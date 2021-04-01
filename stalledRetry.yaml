@@ -31,5 +31,25 @@ spec:
               value: ""
             - name: MONGODB_REPLICASET
               value: ""
+            - name: MONGODB_DATABASE
+              value: "metadata"
             - name: DRY_RUN
               value: "false"
+            - name: EXPIRED_BY_HOUR
+              value: "1"
+              # limits the number of retry resources per retry request
+            - name: BATCH_SIZE
+              value: "10"
+              # limits the number of retry resource entries in queue
+            - name: QUEUE_LIMIT
+              value: "1000"
+              # limits the number of parallel retry requests
+            - name: CONCURRENT_REQUESTS
+              value: "5"
+            - name: ENABLE_HEAP_PROFILER
+              value: "1"
+            - name: HEAP_PROFILER_INTERVAL_MS
+              value: "600000"
+              # path to write heap snapshots
+            - name: HEAP_PROFILER_PATH
+              value: "/path/to/write"
