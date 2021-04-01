@@ -1,7 +1,6 @@
 const cluster = require('cluster');
 const async = require('async');
 const werelogs = require('werelogs');
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { MongoClientInterface } =
     require('arsenal').storage.metadata.mongoclient;
 const { BucketInfo, ObjectMD } = require('arsenal').models;
@@ -12,19 +11,8 @@ const { createMongoParams } = require('../../CountItems/utils');
 const createWorkers = require('../../CountItems/utils/createWorkers');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
-const dbName = 'metadata';
-const mongoserver = new MongoMemoryReplSet({
-    debug: false,
-    instanceOpts: [
-        { port: 27017 },
-    ],
-    replSet: {
-        name: 'rs0',
-        count: 1,
-        dbName,
-        storageEngine: 'ephemeralForTest',
-    },
-});
+const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const dbName = 'countItemsTest';
 
 const expectedResults = {
     objects: 100,
@@ -127,10 +115,15 @@ function populateMongo(client, callback) {
 
 jest.setTimeout(120000);
 describe('CountItems', () => {
+    const oldEnv = process.env;
     let client;
+
     beforeAll(done => {
+        process.env = Object.assign({}, oldEnv);
+        process.env.MONGODB_DATABASE = dbName;
+
         const opts = {
-            replicaSetHosts: 'localhost:27017',
+            replicaSetHosts: MONGODB_REPLICASET,
             writeConcern: 'majority',
             replicaSet: 'rs0',
             readPreference: 'primary',
@@ -140,9 +133,6 @@ describe('CountItems', () => {
         };
         client = new MongoClientInterface(opts);
         async.series([
-            next => mongoserver.waitUntilRunning()
-                .then(() => next())
-                .catch(next),
             next => client.setup(next),
             next => populateMongo(client, next),
         ], done);
@@ -150,10 +140,8 @@ describe('CountItems', () => {
 
     afterAll(done => {
         async.series([
+            next => client.db.dropDatabase(next),
             next => client.close(next),
-            next => mongoserver.stop()
-                .then(() => next())
-                .catch(next),
         ], done);
     });
 

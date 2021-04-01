@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
-    "test:functional": "MONGODB_REPLICASET=localhost:27017 LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose  --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
+    "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
   },
   "repository": {
     "type": "git",
@@ -40,7 +40,6 @@
     "eslint-config-scality": "github:scality/Guidelines",
     "eslint-plugin-jest": "^23.6.0",
     "eslint-plugin-react": "^4.3.0",
-    "jest": "^23.6.0",
-    "mongodb-memory-server": "^6.2.4"
+    "jest": "^23.6.0"
   }
 }
