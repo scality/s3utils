@@ -1,4 +1,5 @@
 const getObjectURL = require('../../VerifyBucketSproxydKeys/getObjectURL');
+const getBucketdURL = require('../../VerifyBucketSproxydKeys/getBucketdURL');
 const FindDuplicateSproxydKeys =
       require('../../VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
 
@@ -8,6 +9,23 @@ describe('verifyBucketSproxydKeys', () => {
         expect(getObjectURL('foobucket')).toEqual('s3://foobucket');
         expect(getObjectURL('foobucket', 'fooobject'))
             .toEqual('s3://foobucket/fooobject');
+    });
+
+    test('getBucketdURL', () => {
+        expect(getBucketdURL('bucketd:9000', {
+            Bucket: 'bucket',
+            Key: 'key',
+        })).toEqual('http://bucketd:9000/default/bucket/bucket/key');
+        expect(getBucketdURL('bucketd:9000', {
+            Bucket: 'bucket',
+            Key: 'key&$@=;:+ ,?\u0000/bar',
+        })).toEqual('http://bucketd:9000/default/bucket/bucket/key%26%24%40%3D%3B%3A%2B%20%2C%3F%00%2Fbar');
+        expect(getBucketdURL('bucketd:9000', {
+            Bucket: 'bucket',
+            MaxKeys: 1000,
+            KeyMarker: 'key&$@=;:+ ,?\u0000/bar',
+        })).toEqual('http://bucketd:9000/default/bucket/bucket?maxKeys=1000'
+                    + '&marker=key%26%24%40%3D%3B%3A%2B%20%2C%3F%00%2Fbar');
     });
 
     test('FindDuplicateSproxydKeys', () => {

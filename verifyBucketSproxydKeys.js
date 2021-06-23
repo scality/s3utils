@@ -11,6 +11,7 @@ const { jsutil } = require('arsenal');
 const { Logger } = require('werelogs');
 
 const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
+const getBucketdURL = require('./VerifyBucketSproxydKeys/getBucketdURL');
 const FindDuplicateSproxydKeys = require('./VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
 
 const DEFAULT_WORKERS = 100;
@@ -56,7 +57,8 @@ This script verifies that :
 1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
 2. sproxyd keys are unique across versions of the same object
 
-It can help to identify objects affected by the S3C-1959 bug (1) or S3C-2731 (2).
+It can help to identify objects affected by the S3C-1959 bug (1), or
+either of S3C-2731 or S3C-3778 (2).
 
 Usage:
     node verifyBucketSproxydKeys.js
@@ -71,8 +73,8 @@ Mandatory environment variables:
     or:
         KEYS_FROM_STDIN: reads objects to scan from stdin if this environment variable is
           set, where the input is a stream of JSON objects, each of the form:
-          {"bucket":"bucketname","key":"objectkey\u0000objectversion"}
-          note: if "\u0000objectversion" is not present, it checks the master key
+          {"bucket":"bucketname","key":"objectkey\\0objectversion"}
+          note: if "\\0objectversion" is not present, it checks the master key
 
 Optional environment variables:
     WORKERS: concurrency value for sproxyd requests (default ${DEFAULT_WORKERS})
@@ -247,7 +249,10 @@ function raftSessionsToBuckets(cb) {
 }
 
 function fetchObjectLocations(bucket, objectKey, cb) {
-    const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/${encodeURI(objectKey)}`;
+    const url = getBucketdURL(BUCKETD_HOSTPORT, {
+        Bucket: bucket,
+        Key: objectKey,
+    });
     httpRequest('GET', url, (err, res) => {
         if (err) {
             return cb(err);
@@ -343,8 +348,11 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
 }
 
 function listBucketIter(bucket, cb) {
-    const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}?maxKeys=`
-          + `${LISTING_LIMIT}&marker=${status.KeyMarker ? encodeURI(status.KeyMarker) : ''}`;
+    const url = getBucketdURL(BUCKETD_HOSTPORT, {
+        Bucket: bucket,
+        MaxKeys: LISTING_LIMIT,
+        KeyMarker: status.KeyMarker,
+    });
     httpRequest('GET', url, (err, res) => {
         if (err) {
             return cb(err);
