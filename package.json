@@ -38,7 +38,7 @@
   "devDependencies": {
     "eslint": "^2.13.1",
     "eslint-config-airbnb": "^6.2.0",
-    "eslint-config-scality": "github:scality/Guidelines",
+    "eslint-config-scality": "github:scality/Guidelines#20dfffc",
     "eslint-plugin-jest": "^23.6.0",
     "eslint-plugin-react": "^4.3.0",
     "jest": "^23.6.0"
