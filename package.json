@@ -1,6 +1,6 @@
 {
   "name": "s3utils",
-  "version": "1.0.0",
+  "version": "1.4.1-crr-improvements.2",
   "engines": {
     "node": ">= 10"
   },
