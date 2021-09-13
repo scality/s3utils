@@ -2,7 +2,7 @@ FROM node:10
 
 WORKDIR /usr/src/app
 ENV MONGO_VER 3.6.8
-ENV BALLOT_VERSION 1.0.0
+ENV BALLOT_VERSION 1.0.1
 
 # Keep the .git directory in order to properly report version
 COPY ./package.json .
