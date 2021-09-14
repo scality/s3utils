@@ -161,7 +161,13 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
                 next(err);
             });
         },
-    ], cb);
+    ], err => {
+        if (err) {
+            log.error('error in _requeueObject waterfall',
+                      { error: err.message });
+        }
+        return cb();
+    });
     /* eslint-enable no-param-reassign */
 }
 
