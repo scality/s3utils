@@ -161,7 +161,12 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
                 next(err);
             });
         },
-    ], cb);
+    ], err => {
+        if (err) {
+            log.error('Failed to requeue object for replication');
+        }
+        return cb();
+    });
     /* eslint-enable no-param-reassign */
 }
 
