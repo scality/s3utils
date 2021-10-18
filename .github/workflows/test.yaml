@@ -11,7 +11,7 @@ jobs:
       mongodb:
         image: scality/ci-mongo:3.6.8
         ports:
-          - '27018:27017'
+          - '27018:27018'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
