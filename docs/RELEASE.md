@@ -32,9 +32,7 @@ To release a production image:
 
 * Create a PR and merge the `package.json` change.
 
-* Tag the repository using the same tag.
-
-* [Force a build](https://eve.devsca.com/github/scality/s3utils/#/builders/bootstrap/force/force) using: 
+* Run the workflow [action release](https://github.com/scality/s3utils/actions/workflows/release.yml) using
   * A given branch that ideally matches the tag.
-  * The `release` stage.
-  * An extra property with the name `tag` and its value being the actual tag.
+  * Fill the field `tag` with the actual tag
+  * Fill the field `prerelease` with true if it's one
