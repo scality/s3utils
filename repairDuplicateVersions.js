@@ -304,8 +304,9 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
     sourceReq.end();
 }
 
-function repairObject(objInfo, cb) {
+export function repairObject(objInfo, cb) {
     async.mapValues({
+        
         objectUrl: objInfo.objectUrl,
         objectUrl2: objInfo.objectUrl2,
     }, (url, key, done) => {
@@ -436,3 +437,4 @@ process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
+
