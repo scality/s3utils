@@ -57,7 +57,7 @@ function getBucketdURL(hostPort, params) {
     if (params.Key !== undefined) {
         baseURL += `/${encodeURIComponent(params.Key)}`;
     }
-    const queryParams = [];
+    const queryParams = ['listingType=DelimiterMaster'];
     if (params.MaxKeys) {
         queryParams.push(`maxKeys=${params.MaxKeys}`);
     }
@@ -68,34 +68,31 @@ function getBucketdURL(hostPort, params) {
 }
 
 function listBucketMasterKeys(params, cb) {
-    const { bucket, marker, hostPort, maxKeys, workers } = params;
+    const { bucket, marker, hostPort, maxKeys } = params;
     const url = getBucketdURL(hostPort, {
         Bucket: bucket,
         MaxKeys: maxKeys,
         KeyMarker: marker,
     });
     // TODO: get to a maxKeys number of master keys
-    httpRequest('GET', url, (err, res) => {
+    async.retry({
+        times: 100,
+        interval: 5000,
+    }, done => httpRequest('GET', url, (err, res) => {
         if (err) {
-            return cb(err);
+            return done(err);
         }
         if (res.statusCode !== 200) {
-            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+            return done(new Error(`GET ${url} returned status ${res.statusCode}`));
         }
         const resp = JSON.parse(res.body);
         const { Contents, IsTruncated } = resp;
-
-        return async.filterLimit(Contents, workers, (item, itemDone) => {
-            const isMaster = item.key.lastIndexOf('\0') === -1;
-            return itemDone(null, isMaster);
-        }, (err, filtered) => {
-            let marker = '';
-            if (IsTruncated) {
-                marker = Contents[Contents.length - 1].key;
-            }
-            cb(null, IsTruncated, marker, filtered);
-        });
-    });
+        let marker = '';
+        if (IsTruncated) {
+            marker = Contents[Contents.length - 1].key;
+        }
+        return done(null, IsTruncated, marker, Contents);
+    }), cb);
 }
 
 module.exports = {

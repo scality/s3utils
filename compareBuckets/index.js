@@ -26,8 +26,7 @@ const LOG_PROGRESS_INTERVAL = (
         && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
       || DEFAULT_LOG_PROGRESS_INTERVAL;
 
-const SRC_KEY_MARKER = process.env.SRC_KEY_MARKER || '';
-const DST_KEY_MARKER = process.env.DST_KEY_MARKER || '';
+const KEY_MARKER = process.env.KEY_MARKER || '';
 
 const LISTING_LIMIT = (
     process.env.LISTING_LIMIT
@@ -49,8 +48,7 @@ Mandatory environment variables:
     DST_BUCKET: bucket to be scanned
 
 Optional environment variables:
-    SRC_KEY_MARKER: key to continue listing from on the source bucket
-    DST_KEY_MARKER: key to continue listing from on the destination bucket
+    KEY_MARKER: key to continue listing from
     LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
 `;
@@ -90,11 +88,11 @@ const status = {
 function logProgress(message, status) {
     log.info(message, {
         targetSourceBucket: status.srcBucketInProgress,
-        sourceKeyMarker: status.srcKeyMarker,
         missingInSourceCount: status.missingInSrcCount,
         targetDestinationBucket: status.dstBucketInProgress,
-        destinationKeyMarker: status.dstKeyMarker,
         missingInDestinationCount: status.missingInDstCount,
+        keyMarker: status.srcKeyMarker < status.dstKeyMarker ?
+            status.srcKeyMarker : status.dstKeyMarker,
     });
 }
 
@@ -104,14 +102,14 @@ function main() {
     const params = {
         bucketdSrcParams: {
             bucket: SRC_BUCKET,
-            marker: SRC_KEY_MARKER,
+            marker: KEY_MARKER,
             hostPort: SRC_BUCKETD_HOSTPORT,
             maxKeys: LISTING_LIMIT,
             workers: WORKERS,
         },
         bucketdDstParams: {
             bucket: DST_BUCKET,
-            marker: DST_KEY_MARKER,
+            marker: KEY_MARKER,
             hostPort: DST_BUCKETD_HOSTPORT,
             maxKeys: LISTING_LIMIT,
             workers: WORKERS,
