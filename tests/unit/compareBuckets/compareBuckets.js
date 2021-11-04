@@ -137,7 +137,7 @@ describe('compareBuckets', () => {
         });
     });
 
-    it('should succesufully perform compare (single listing call)', done => {
+    it('should successfully perform compare (single listing call)', done => {
         listBucketMasterKeys.mockImplementation((params, cb) => {
             if (params.bucket === 'src') {
                 return cb(null, false, '3', [

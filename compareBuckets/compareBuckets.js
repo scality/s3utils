@@ -18,8 +18,6 @@ function compareBuckets(params, log, cb) {
 
     let srcDone = false;
     let dstDone = false;
-    let srcMarker = '';
-    let dstMarker = '';
     let srcContents = [];
     let dstContents = [];
 
@@ -39,8 +37,8 @@ function compareBuckets(params, log, cb) {
 
                             srcContents = contents;
                             srcDone = !isTruncated;
-                            srcMarker = marker;
-                            statusObj.srcKeyMarker = srcMarker;
+                            bucketdSrcParams.marker = marker;
+                            statusObj.srcKeyMarker = marker;
                             return _done();
                         });
                 },
@@ -57,8 +55,8 @@ function compareBuckets(params, log, cb) {
 
                             dstContents = contents;
                             dstDone = !isTruncated;
-                            dstMarker = marker;
-                            statusObj.dstKeyMarker = dstMarker;
+                            bucketdDstParams.marker = marker;
+                            statusObj.dstKeyMarker = marker;
                             return _done();
                         });
                 },
@@ -123,7 +121,7 @@ function compareBuckets(params, log, cb) {
 
                 srcContents = srcContents.slice(srcIdx);
                 dstContents = dstContents.slice(dstIdx);
-                return setTimeout(() => done(null), 500);
+                return process.nextTick(() => done(null));
             });
         },
         () => (!srcDone || !dstDone || srcContents.length > 0 || dstContents.length > 0),
