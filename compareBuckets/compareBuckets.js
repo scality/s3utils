@@ -4,13 +4,29 @@
 
 const async = require('async');
 
-const { listBucketMasterKeys, getObjectURL } = require('./utils');
+const { listBucketMasterKeys } = require('./utils');
+
+function getReportObject(bucket, entry, verbose) {
+    const md = JSON.parse(entry.value);
+    const obj = {
+        bucket,
+        objectKey: entry.key,
+    };
+
+    if (verbose) {
+        obj.lastModified = md['last-modified'];
+        obj.status = md.replicationInfo ? md.replicationInfo.status : '';
+    }
+
+    return obj;
+}
 
 function compareBuckets(params, log, cb) {
     const {
         bucketdSrcParams,
         bucketdDstParams,
         statusObj,
+        verbose,
     } = params;
 
     statusObj.srcBucketInProgress = bucketdSrcParams.bucket;
@@ -70,11 +86,13 @@ function compareBuckets(params, log, cb) {
 
                 if (srcDone && srcContents.length === 0) {
                     while (dstIdx < dstContents.length) {
-                        log.error('missing object in source', {
-                            bucket: bucketdSrcParams.bucket,
-                            object: dstContents[dstIdx].key,
-                            objectUrl: getObjectURL(bucketdDstParams.bucket, dstContents[dstIdx].key),
-                        });
+                        log.error('missing object in source',
+                            getReportObject(
+                                bucketdSrcParams.bucket,
+                                dstContents[dstIdx],
+                                verbose
+                            ));
+                        ++statusObj.dstProcessedCount;
                         ++statusObj.missingInSrcCount;
                         ++dstIdx;
                     }
@@ -82,11 +100,13 @@ function compareBuckets(params, log, cb) {
 
                 if (dstDone && dstContents.length === 0) {
                     while (srcIdx < srcContents.length) {
-                        log.error('missing object in destination', {
-                            bucket: bucketdDstParams.bucket,
-                            object: srcContents[srcIdx].key,
-                            objectUrl: getObjectURL(bucketdSrcParams.bucket, srcContents[srcIdx].key),
-                        });
+                        log.error('missing object in destination',
+                            getReportObject(
+                                bucketdDstParams.bucket,
+                                srcContents[srcIdx],
+                                verbose
+                            ));
+                        ++statusObj.srcProcessedCount;
                         ++statusObj.missingInDstCount;
                         ++srcIdx;
                     }
@@ -94,27 +114,33 @@ function compareBuckets(params, log, cb) {
 
                 while (srcIdx < srcContents.length && dstIdx < dstContents.length) {
                     if (srcContents[srcIdx].key < dstContents[dstIdx].key) {
-                        log.error('missing object in destination', {
-                            bucket: bucketdDstParams.bucket,
-                            object: srcContents[srcIdx].key,
-                            objectUrl: getObjectURL(bucketdSrcParams.bucket, srcContents[srcIdx].key),
-                        });
+                        log.error('missing object in destination',
+                            getReportObject(
+                                bucketdDstParams.bucket,
+                                srcContents[srcIdx],
+                                verbose
+                            ));
+                        ++statusObj.srcProcessedCount;
                         ++statusObj.missingInDstCount;
                         ++srcIdx;
                         continue;
                     }
 
                     if (srcContents[srcIdx].key > dstContents[dstIdx].key) {
-                        log.error('missing object in source', {
-                            bucket: bucketdSrcParams.bucket,
-                            object: dstContents[dstIdx].key,
-                            objectUrl: getObjectURL(bucketdDstParams.bucket, dstContents[dstIdx].key),
-                        });
+                        log.error('missing object in source',
+                            getReportObject(
+                                bucketdSrcParams.bucket,
+                                dstContents[dstIdx],
+                                verbose
+                            ));
+                        ++statusObj.dstProcessedCount;
                         ++statusObj.missingInSrcCount;
                         ++dstIdx;
                         continue;
                     }
 
+                    ++statusObj.dstProcessedCount;
+                    ++statusObj.srcProcessedCount;
                     ++dstIdx;
                     ++srcIdx;
                 }

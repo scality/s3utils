@@ -26,6 +26,8 @@ const LOG_PROGRESS_INTERVAL = (
         && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
       || DEFAULT_LOG_PROGRESS_INTERVAL;
 
+const VERBOSE = process.env.VERBOSE === '1';
+
 const KEY_MARKER = process.env.KEY_MARKER || '';
 
 const LISTING_LIMIT = (
@@ -51,6 +53,7 @@ Optional environment variables:
     KEY_MARKER: key to continue listing from
     LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
+    VERBOSE: set to 1 for more verbose output (show last-modified dates and replication statuses of objects)
 `;
 
 if (!SRC_BUCKETD_HOSTPORT) {
@@ -77,6 +80,8 @@ if (!DST_BUCKET) {
 const log = new Logger('s3utils:compareListings');
 
 const status = {
+    srcProcessedCount: 0,
+    dstProcessedCount: 0,
     missingInSrcCount: 0,
     missingInDstCount: 0,
     dstBucketInProgress: null,
@@ -87,10 +92,16 @@ const status = {
 
 function logProgress(message, status) {
     log.info(message, {
-        targetSourceBucket: status.srcBucketInProgress,
-        missingInSourceCount: status.missingInSrcCount,
-        targetDestinationBucket: status.dstBucketInProgress,
-        missingInDestinationCount: status.missingInDstCount,
+        source: {
+            bucket: status.srcBucketInProgress,
+            objectsMissingInDestination: status.missingInDstCount,
+            objectsScanned: status.srcProcessedCount,
+        },
+        destination: {
+            bucket: status.dstBucketInProgress,
+            objectsMissingInSource: status.missingInSrcCount,
+            objectsScanned: status.dstProcessedCount,
+        },
         keyMarker: status.srcKeyMarker < status.dstKeyMarker ?
             status.srcKeyMarker : status.dstKeyMarker,
     });
@@ -114,6 +125,7 @@ function main() {
             maxKeys: LISTING_LIMIT,
             workers: WORKERS,
         },
+        verbose: VERBOSE,
         statusObj: status,
     };
     compareBuckets(params, log, err => {
