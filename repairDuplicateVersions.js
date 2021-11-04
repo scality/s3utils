@@ -306,7 +306,7 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
 
 export function repairObject(objInfo, cb) {
     async.mapValues({
-        
+
         objectUrl: objInfo.objectUrl,
         objectUrl2: objInfo.objectUrl2,
     }, (url, key, done) => {
@@ -382,7 +382,7 @@ export function repairObject(objInfo, cb) {
                     objectUrl: objInfo.objectUrl,
                 });
                 status.objectsRepaired += 1;
-                return cb();
+                return cb(null, { copiedKeys, objectUrl } );
             });
         });
     });
