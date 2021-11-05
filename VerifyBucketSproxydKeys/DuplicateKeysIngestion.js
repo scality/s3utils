@@ -1,19 +1,40 @@
 const { whilst, waterfall } = require('async');
+const { httpRequest } = require('../VerifyBucketSproxydKeys');
+
+const {
+    BUCKETD_HOSTPORT,
+    RAFT_SESSIONS
+} = process.env;
 
 //in order to send keys to DuplicateKeysWindow, we need to read the raft journals
 //furthermore, there should be only one of this service across all servers. Ballot should be useful here
-
-class RaftJournalEntries {
-    constructor(limit, offset) {
+class RaftJournalReader {
+    constructor(begin, limit, session_id) {
+        this.begin = begin;
         this.limit = limit;
-        this.offset = offset;
+        this.url = this._getJournalUrl(session_id)
     }
 
-    getEntries(offset, limit, next) {
-    //TODO
+    _getJournalUrl(session_id) {
+        return `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${session_id}`;
     }
 
-    processEntries(entries, next) {
+    getEntries(begin, limit, cb) {
+        const requestUrl = `${this.url}/log?begin=${begin}&limit=${limit}&targetLeader=False`;
+        
+        return httpRequest('GET', requestUrl, (err, res) => {
+                if (err) {
+                    return cb(err);
+                }
+                if (res.statusCode !== 200) {
+                    return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+                }
+                const entries = JSON.parse(res.body);
+                return cb(null, entries);
+        });
+    }
+
+    processEntries(entries, cb) {
     //TODO
     }
 
