@@ -174,7 +174,7 @@ setInterval(() => logProgress('progress update'),
     LOG_PROGRESS_INTERVAL * 1000);
 
 
-function httpRequest(method, url, cb) {
+export function httpRequest(method, url, cb) {
     const cbOnce = jsutil.once(cb);
     const urlObj = new URL(url);
     const req = http.request({

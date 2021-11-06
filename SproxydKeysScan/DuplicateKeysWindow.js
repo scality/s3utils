@@ -1,6 +1,5 @@
 const log = new Logger('s3utils:DuplicateKeysWinow');
-const { repairObject } = require('../VerifyBucketSproxydKeys');
-const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
+
 /**
  * @class
  * @classdesc sets a maximum window size. Objects inserted when BoundedMap 
@@ -43,40 +42,12 @@ class MultiMap extends Map {
     }
 }
 
-const subscribers = new MultiMap();
-subscribers.set('duplicateSproxyKeyFound', async (params) => {
-    const [objectUrl, existingObjectUrl] = [params.objectId, params.existingObjectId].map(id => getObjectURL(id));
-    const objInfo = {
-        objectUrl: objectUrl,
-        objectUrl2: existingObjectUrl,
-    };
-    
-    return repairObject(objInfo, (err, res) => {
-        if (err) {
-            //what behavior is needed when repairObject fails? Possibly retry up to N times. Send repairObject to a jobs queue and requeue on failure?
-            log.error('an error occurred repairing object', {
-                objectUrl: objInfo.objectUrl,
-                error: { message: err.message },
-            });
-            // status.objectsErrors += 1; 
-            // TODO: handle status in a rolling window. (Maybe not needed?)
-        } else {
-            // once objects are repaired, what are the new keys? They should be inserted into BoundedMap and continue being tracked
-            // we can delete old key 
-            for (const [sproxydKey, newKey] in Object.entries(res.copiedKeys)) {
-                params.context.sproxydKeys.delete(sproxydKey)
-                params.context.sproxydKeys.setAndUpdate(newKey, res.objectUrl); //should be id instead of Url
-            };
-        };
-    });
-})
-
 /**
  * @class
  * @classdesc support data structure to check sproxyd keys
  * and handle any needed repairs in near real-time
  */
- class SproxydKeys {
+ class SproxydKeysProcessor {
      /**
      * @constructor
      * @param {number} windowSize - maximum number of sproxyd keys to track
@@ -113,4 +84,9 @@ subscribers.set('duplicateSproxyKeyFound', async (params) => {
             checkDuplicate(key, objectId);
         });
     }
+ }
+
+ export {
+     SproxydKeysProcessor,
+     MultiMap,
  }
