@@ -30,7 +30,6 @@ class RaftJournalReader {
 
     getBatch(cb) {
         const requestUrl = `${this.url}/log?begin=${this.begin}&limit=${this.limit}&targetLeader=False`;
-        // console.log('we are calling the real thing.');
         return httpRequest('GET', requestUrl, (err, res) => {
             if (err) {
                 return cb(err);
@@ -58,11 +57,13 @@ class RaftJournalReader {
         return cb(null, extractedKeys);
     }
 
-    updateStatus(extractedKeys) {
+    updateStatus(extractedKeys, cb) {
         extractedKeys.forEach(entry => {
             this.processor.insert(entry.masterKey, entry.sproxydKeys);
         });
         this.begin += this.limit;
+        log.info('updateStatus succeeded');
+        return cb();
     }
 
     runOnce() {

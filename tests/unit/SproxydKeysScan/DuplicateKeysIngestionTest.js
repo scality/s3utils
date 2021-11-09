@@ -59,10 +59,24 @@ describe('RaftJournalReader', () => {
         });
     });
 
-    describe('::updateStatus', () => {
-        test('should update sproxydKeysMap with processed keys', done => {
-            // TODO
-            done();
+    describe.only('::updateStatus', () => {
+        raftJournalReader.getBatch((err, body) => {
+            raftJournalReader.processBatch(body, (err, extractedKeys) => {
+                const oldBegin = raftJournalReader.begin;
+                const insert = raftJournalReader.processor.insert = jest.fn().mockReturnValue(true);
+
+                raftJournalReader.updateStatus(extractedKeys, () => {
+                    test('updates sproxydKeysMap with processed keys', () => {
+                        expect(insert).toHaveBeenCalled();
+                    });
+
+                    test('updates begin property in RaftJournalReader instance', () => {
+                        const newBegin = raftJournalReader.begin;
+                        const limit = raftJournalReader.limit;
+                        expect(newBegin).toEqual(oldBegin + limit);
+                    });
+                });
+            });
         });
     });
 });
