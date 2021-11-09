@@ -304,7 +304,11 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
     sourceReq.end();
 }
 
-export function repairObject(objInfo, cb) {
+// function repairObject(objInfo, cb) {
+//     return curriedRepairObject(status)(objInfo, cb);
+// }
+
+function repairObject(objInfo, cb) {
     async.mapValues({
 
         objectUrl: objInfo.objectUrl,
@@ -382,7 +386,7 @@ export function repairObject(objInfo, cb) {
                     objectUrl: objInfo.objectUrl,
                 });
                 status.objectsRepaired += 1;
-                return cb(null, { copiedKeys, objectUrl } );
+                return cb(null, { copiedKeys, objectUrl: objInfo.objectUrl });
             });
         });
     });
@@ -438,3 +442,9 @@ process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
 
+module.exports = {
+    fetchObjectMetadata,
+    putObjectMetadata,
+    copySproxydKey,
+    httpRequest,
+};

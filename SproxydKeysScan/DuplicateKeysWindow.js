@@ -1,9 +1,10 @@
-const log = new Logger('s3utils:DuplicateKeysWinow');
+// const { Logger } = require('werelogs');
+// const log = new Logger('s3utils:DuplicateKeysWinow');
 
 /**
  * @class
- * @classdesc sets a maximum window size. Objects inserted when BoundedMap 
- * is full cause the oldest entry to be deleted.  
+ * @classdesc sets a maximum window size. Objects inserted when BoundedMap
+ * is full cause the oldest entry to be deleted.
  */
 class BoundedMap extends Map {
     /**
@@ -11,15 +12,16 @@ class BoundedMap extends Map {
      * @param {number} maxSize - oldest entries are removed when BoundedMap exceeds this size
      */
     constructor(maxSize) {
-        this.maxSize = maxSize
-        this.iterator = super[Symbol.iterator]()
+        super();
+        this.maxSize = maxSize;
+        this.iterator = super[Symbol.iterator]();
     }
-    
+
     setAndUpdate(key, value) {
         super.set(key, value);
-        
+
         if (super.size > this.maxSize) {
-            //slide window 
+            // slide window
             const oldestKey = this.iterator.next().value[0];
             super.delete(oldestKey);
         }
@@ -47,11 +49,11 @@ class MultiMap extends Map {
  * @classdesc support data structure to check sproxyd keys
  * and handle any needed repairs in near real-time
  */
- class SproxydKeysProcessor {
+class SproxydKeysProcessor {
      /**
      * @constructor
      * @param {number} windowSize - maximum number of sproxyd keys to track
-     * @param { MultiMap } subscribers - Map of events to handlers that listen for and respond to SproxydKeys events 
+     * @param { MultiMap } subscribers - Map of events to handlers that listen for and respond to SproxydKeys events
      */
     constructor(windowSize, subscribers) {
         // mapping schema:
@@ -70,23 +72,22 @@ class MultiMap extends Map {
             const params = {
                 objectId,
                 existingObjectId,
-                key, 
-                context:this
+                key,
+                context: this,
             };
-            subscribers['duplicateSproxyKeyFound'].forEach(handler => handler(params));                
+            if (this.subscribers.duplicateSproxyKeyFound) {
+                this.subscribers.duplicateSproxyKeyFound.forEach(handler => handler(params));
+            }
         } else {
             this.sproxydKeys.setAndUpdate(key, objectId);
-        };
+        }
     }
 
     insert(objectId, keys) {
         keys.forEach(key => {
-            checkDuplicate(key, objectId);
+            this.checkDuplicate(key, objectId);
         });
     }
  }
 
- export {
-     SproxydKeysProcessor,
-     MultiMap,
- }
+module.exports = { SproxydKeysProcessor, MultiMap };

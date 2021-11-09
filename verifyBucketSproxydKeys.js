@@ -174,7 +174,7 @@ setInterval(() => logProgress('progress update'),
     LOG_PROGRESS_INTERVAL * 1000);
 
 
-export function httpRequest(method, url, cb) {
+function httpRequest(method, url, cb) {
     const cbOnce = jsutil.once(cb);
     const urlObj = new URL(url);
     const req = http.request({
@@ -529,3 +529,5 @@ process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
+
+module.exports = { httpRequest };
