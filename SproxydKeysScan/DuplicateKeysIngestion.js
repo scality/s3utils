@@ -50,12 +50,12 @@ class RaftJournalReader {
         body.log.forEach(log => {
             log.entries.forEach(entry => {
                 const masterKey = entry.key.split('\0')[0];
-                const sproxydKeys = entry.value.location.map(loc => loc.key);
-                extractedKeys.append({ masterKey, sproxydKeys });
+                const sproxydKeys = JSON.parse(entry.value).location.map(loc => loc.key);
+                extractedKeys.push({ masterKey, sproxydKeys });
             });
         });
-
-        return cb(extractedKeys);
+        log.info('processBatch succeeded');
+        return cb(null, extractedKeys);
     }
 
     updateStatus(extractedKeys) {
