@@ -5,22 +5,22 @@ const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIng
 const { subscribers } = require('../../../SproxydKeysScan/sproxydKeysSubscribers');
 const fs = require('fs');
 
-describe('RaftJournalReader', () => {
-    let raftJournalReader = null;
-    raftJournalReader = new RaftJournalReader(1, 10, 1, subscribers);
+
+function _setupJournalReader() {
+    const raftJournalReader = new RaftJournalReader(1, 10, 1, subscribers);
     const data = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
     const body = JSON.parse(data);
+
     raftJournalReader.getBatch = jest.fn(cb => cb(null, body));
+    raftJournalReader.processor.insert = jest.fn().mockReturnValue(true);
+    return raftJournalReader;
+}
 
-    beforeEach(() => {
-    // todo
-    });
-
-    afterEach(() => {
-    // todo
-    });
+describe('RaftJournalReader', () => {
+    let raftJournalReader = null;
 
     describe('::getBatch', () => {
+        raftJournalReader = _setupJournalReader();
         test('should correctly read mocked data', () => {
             raftJournalReader.getBatch((err, body) => {
                 expect(err).toBe(null);
@@ -31,6 +31,7 @@ describe('RaftJournalReader', () => {
     });
 
     describe('::processBatch', () => {
+        raftJournalReader = _setupJournalReader();
         raftJournalReader.getBatch((err, body) => {
             raftJournalReader.processBatch(body, (err, res) => {
                 test('processes logs into a list of { masterKey, sproxydKeys }', () => {
@@ -59,11 +60,12 @@ describe('RaftJournalReader', () => {
         });
     });
 
-    describe.only('::updateStatus', () => {
+    describe('::updateStatus', () => {
+        raftJournalReader = _setupJournalReader();
         raftJournalReader.getBatch((err, body) => {
             raftJournalReader.processBatch(body, (err, extractedKeys) => {
                 const oldBegin = raftJournalReader.begin;
-                const insert = raftJournalReader.processor.insert = jest.fn().mockReturnValue(true);
+                const insert = raftJournalReader.processor.insert;
 
                 raftJournalReader.updateStatus(extractedKeys, () => {
                     test('updates sproxydKeysMap with processed keys', () => {
@@ -73,9 +75,21 @@ describe('RaftJournalReader', () => {
                     test('updates begin property in RaftJournalReader instance', () => {
                         const newBegin = raftJournalReader.begin;
                         const limit = raftJournalReader.limit;
-                        expect(newBegin).toEqual(oldBegin + limit);
+                        expect(newBegin).toEqual(Math.min(raftJournalReader.cseq + 1, oldBegin + limit));
                     });
                 });
+            });
+        });
+    });
+
+    describe('::runOnce', () => {
+        raftJournalReader = _setupJournalReader();
+        raftJournalReader.runOnce((err, timeout) => {
+            test('inserts correct sproxyd key data into SproxydKeyProcessor', () => {
+                expect(err).toBe(null);
+                expect(timeout).toBe(0);
+                expect(raftJournalReader.getBatch).toHaveBeenCalled();
+                expect(raftJournalReader.processor.insert).toHaveBeenCalled();
             });
         });
     });

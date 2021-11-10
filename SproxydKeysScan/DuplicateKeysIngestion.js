@@ -1,4 +1,4 @@
-const { whilst, waterfall } = require('async');
+const { waterfall } = require('async');
 const { httpRequest } = require('../repairDuplicateVersions');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 // const { subscribers } = require('./SproxydKeysSubscribers');
@@ -16,7 +16,9 @@ const {
 class RaftJournalReader {
     constructor(begin, limit, sessionId, subscribers) {
         this.begin = begin;
+        this.cseq = null;
         this.limit = limit;
+        this.sessionId = sessionId;
         this.url = this._getJournalUrl(sessionId);
         this.processor = new SproxydKeysProcessor(
             DUPLICATE_KEYS_WINDOW_SIZE,
@@ -28,6 +30,10 @@ class RaftJournalReader {
         return `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
     }
 
+    _setCseq(body) {
+        this.cseq = body.info.cseq;
+    }
+
     getBatch(cb) {
         const requestUrl = `${this.url}/log?begin=${this.begin}&limit=${this.limit}&targetLeader=False`;
         return httpRequest('GET', requestUrl, (err, res) => {
@@ -37,12 +43,17 @@ class RaftJournalReader {
             if (res.statusCode !== 200) {
                 return cb(new Error(`GET ${requestUrl} returned status ${res.statusCode}`));
             }
+            if (!res || !res.body) {
+                return cb(new Error(`GET ${requestUrl} returned empty body`));
+            }
             const body = JSON.parse(res.body);
             return cb(null, body);
         });
     }
 
     processBatch(body, cb) {
+        this._setCseq(body);
+
         // {masterKey, sproxydKeys}
         const extractedKeys = [];
 
@@ -61,17 +72,20 @@ class RaftJournalReader {
         extractedKeys.forEach(entry => {
             this.processor.insert(entry.masterKey, entry.sproxydKeys);
         });
-        this.begin += this.limit;
+
+        // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
+        this.begin = Math.min(this.limit + this.begin, this.cseq + 1);
         log.info('updateStatus succeeded');
-        return cb();
+        return cb(null, true);
     }
 
-    runOnce() {
+    runOnce(cb) {
         return waterfall([
             next => this.getBatch(
                 (err, res) => {
                     if (err) {
                         log.error('in getBatch', { error: err.message });
+                        next(err);
                     } else {
                         next(null, res);
                     }
@@ -80,24 +94,36 @@ class RaftJournalReader {
                 (err, extractedKeys) => {
                     if (err) {
                         log.error('in processBatch', { error: err.message });
+                        next(err);
                     } else {
                         next(null, extractedKeys);
                     }
                 }),
-            extractedKeys => this.updateStatus(extractedKeys),
-        ], (err, next) => {
+            (extractedKeys, next) => this.updateStatus(extractedKeys,
+                (err, res) => {
+                    if (err) {
+                        log.error('in updateStatus', { error: err.message });
+                        next(err);
+                    } else {
+                        next(null, res);
+                    }
+                }),
+        ], err => {
             if (err) {
-                log.error('error in RaftJournalEntries:run', { error: err.message });
+                cb(err, 5000);
+            } else {
+                cb(null, 0);
             }
-            return next();
         });
     }
 
     run() {
-        whilst(
-            () => true,
-            this.runOnce()
-        );
+        this.runOnce((err, timeout) => {
+            if (err) {
+                log.error('Error in runOnce', { error: err });
+            }
+            setTimeout(this.run, timeout);
+        });
     }
 }
 
