@@ -60,8 +60,8 @@ describe('DuplicateKeysWindow', () => {
             multiMap.set('event_1', handler1);
             multiMap.set('event_1', handler2);
 
-            expect(multiMap.get("event_1")).toBeInstanceOf(Array);
-            expect(multiMap.get("event_1").length).toEqual(2);
+            expect(multiMap.get('event_1')).toBeInstanceOf(Array);
+            expect(multiMap.get('event_1').length).toEqual(2);
         });
     });
 
