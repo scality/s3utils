@@ -2,7 +2,6 @@ const { BoundedMap, MultiMap, SproxydKeysProcessor } = require('../../../Sproxyd
 const randomize = require('randomatic');
 const range = require('lodash/range');
 
-// EE46F879EB689D97C28532E120D5FB5940D7C420
 describe.only('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
         test('grows in size up to the limit with each unique key', () => {
@@ -49,17 +48,26 @@ describe.only('DuplicateKeysWindow', () => {
 
     describe('MultiMap', () => {
         test('sets multiple values for each key', () => {
+            const handler1 = () => {};
+            const handler2 = () => {};
 
+            const multiMap = new MultiMap();
+            multiMap.set('event_1', handler1);
+            multiMap.set('event_1', handler2);
+
+            expect(multiMap.get("event_1")).toBeInstanceOf(Array);
+            expect(multiMap.get("event_1").length).toEqual(2);
         });
     });
 
     describe('SproxydKeyProcessor', () => {
-        test('sets and updates keys without when all unique keys are inserted', () => {
 
+        test('sets and updates keys when all unique keys are inserted', () => {
+            // TODO
         });
 
         test('calls duplicateSproxydKeyFound handler when duplicate is found', () => {
-
+            // TODO
         });
     });
 });

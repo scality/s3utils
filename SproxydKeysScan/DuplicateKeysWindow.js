@@ -41,7 +41,7 @@ class MultiMap extends Map {
             super.set(key, [value]);
         } else {
             const current = super.get(key);
-            current.append(value);
+            current.push(value);
             super.set(key, current);
         }
     }
