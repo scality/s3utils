@@ -2,7 +2,7 @@ process.env.BUCKETD_HOSTPORT = 'localhost:9000';
 process.env.SPROXYD_HOSTPORT = 'localhost';
 
 const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIngestion');
-const { subscribers } = require('../../../SproxydKeysScan/sproxydKeysSubscribers');
+const { subscribers } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
 const fs = require('fs');
 
 function getMockResponse(mockStatusCode) {
