@@ -20,11 +20,14 @@ class BoundedMap extends Map {
     setAndUpdate(key, value) {
         super.set(key, value);
 
+        let removedKey = null;
         if (super.size > this.maxSize) {
-            // slide window
+            // slide window and set key to remove
             const oldestKey = this.iterator.next().value[0];
             super.delete(oldestKey);
+            removedKey = oldestKey;
         }
+        return removedKey;
     }
 }
 
@@ -90,4 +93,4 @@ class SproxydKeysProcessor {
     }
  }
 
-module.exports = { SproxydKeysProcessor, MultiMap };
+module.exports = { SproxydKeysProcessor, MultiMap, BoundedMap };
