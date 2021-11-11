@@ -5,33 +5,73 @@ const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIng
 const { subscribers } = require('../../../SproxydKeysScan/sproxydKeysSubscribers');
 const fs = require('fs');
 
+function getMockResponse(mockStatusCode) {
+    const mockBody = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
+    const mockResponse = {
+        body: mockBody,
+        statusCode: mockStatusCode,
+    };
+    return mockResponse;
+}
 
-function _setupJournalReader() {
+const mockHttpRequest = (err, res) => jest.fn((method, requestUrl, callback) => callback(err, res));
+
+function setupJournalReader() {
     const raftJournalReader = new RaftJournalReader(1, 10, 1, subscribers);
-    const data = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
-    const body = JSON.parse(data);
-
-    raftJournalReader.getBatch = jest.fn(cb => cb(null, body));
     raftJournalReader.processor.insert = jest.fn().mockReturnValue(true);
     return raftJournalReader;
 }
 
 describe('RaftJournalReader', () => {
-    let raftJournalReader = null;
-
     describe('::getBatch', () => {
-        raftJournalReader = _setupJournalReader();
+        const raftJournalReader = setupJournalReader(getMockResponse(200));
+        afterEach(() => {
+            raftJournalReader._httpRequest.mockReset();
+        });
+
+        const returnedError = (err, body) => {
+            expect(raftJournalReader._httpRequest).toHaveBeenCalled();
+            expect(err).not.toBe(null);
+            expect(body).toBe(undefined);
+        };
+
         test('should correctly read mocked data', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             raftJournalReader.getBatch((err, body) => {
+                expect(raftJournalReader._httpRequest).toHaveBeenCalled();
                 expect(err).toBe(null);
                 expect(body).not.toBe(null);
                 expect(body.log).not.toBe(null);
             });
         });
+
+        test('should return error with a none-200 status code', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(500));
+            raftJournalReader.getBatch((err, body) => {
+                returnedError(err, body);
+            });
+        });
+
+        test('should return error with a missing body', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, { statusCode: 200 });
+            raftJournalReader.getBatch((err, body) => {
+                returnedError(err, body);
+            });
+        });
+
+        test('should return error with null response', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, null);
+            raftJournalReader.getBatch((err, body) => {
+                returnedError(err, body);
+            });
+        });
     });
 
     describe('::processBatch', () => {
-        raftJournalReader = _setupJournalReader();
+        const raftJournalReader = setupJournalReader(getMockResponse(200));
+        raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(200));
+        afterAll(() => raftJournalReader._httpRequest.mockReset());
+
         raftJournalReader.getBatch((err, body) => {
             raftJournalReader.processBatch(body, (err, res) => {
                 test('processes logs into a list of { masterKey, sproxydKeys }', () => {
@@ -61,7 +101,10 @@ describe('RaftJournalReader', () => {
     });
 
     describe('::updateStatus', () => {
-        raftJournalReader = _setupJournalReader();
+        const raftJournalReader = setupJournalReader(getMockResponse(200));
+        raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(200));
+        afterAll(() => raftJournalReader._httpRequest.mockReset());
+
         raftJournalReader.getBatch((err, body) => {
             raftJournalReader.processBatch(body, (err, extractedKeys) => {
                 const oldBegin = raftJournalReader.begin;
@@ -69,6 +112,7 @@ describe('RaftJournalReader', () => {
 
                 raftJournalReader.updateStatus(extractedKeys, () => {
                     test('updates sproxydKeysMap with processed keys', () => {
+                        expect(raftJournalReader._httpRequest).toHaveBeenCalled();
                         expect(insert).toHaveBeenCalled();
                     });
 
@@ -83,14 +127,46 @@ describe('RaftJournalReader', () => {
     });
 
     describe('::runOnce', () => {
-        raftJournalReader = _setupJournalReader();
-        raftJournalReader.runOnce((err, timeout) => {
-            test('inserts correct sproxyd key data into SproxydKeyProcessor', () => {
+        const raftJournalReader = setupJournalReader(getMockResponse(200));
+        raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(200));
+        afterEach(() => raftJournalReader._httpRequest.mockReset());
+
+        test('inserts correct sproxyd key data into SproxydKeyProcessor', () => {
+            expect(raftJournalReader.begin).toEqual(1);
+            raftJournalReader.runOnce((err, timeout) => {
                 expect(err).toBe(null);
                 expect(timeout).toBe(0);
-                expect(raftJournalReader.getBatch).toHaveBeenCalled();
+                expect(raftJournalReader._httpRequest).toHaveBeenCalled();
                 expect(raftJournalReader.processor.insert).toHaveBeenCalled();
+                expect(raftJournalReader.begin).toBeGreaterThan(1);
             });
         });
+
+        const waitsFiveSeconds = (err, timeout) => {
+            expect(err).not.toBe(null);
+            expect(timeout).toBe(5000);
+            expect(raftJournalReader._httpRequest).toHaveBeenCalled();
+            expect(raftJournalReader.processor.insert).not.toHaveBeenCalled();
+        };
+
+        test('should set a timeout of 5000 milliseconds when there is any error during ingestion', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(500));
+            raftJournalReader.processor.insert.mockReset();
+            raftJournalReader.runOnce((err, timeout) => {
+                waitsFiveSeconds(err, timeout);
+            });
+        });
+
+        test('should set a timeout of 5000 milliseconds when there is no new data from raft journal', () => {
+            raftJournalReader._httpRequest = mockHttpRequest(null, null);
+            raftJournalReader.processor.insert.mockReset();
+            raftJournalReader.runOnce((err, timeout) => {
+                waitsFiveSeconds(err, timeout);
+            });
+        });
+    });
+
+    describe('::run', () => {
+    // TODO: should return a timeout of 0 milliseconds for first iteration, followed by 5000 for each iteration onwards
     });
 });

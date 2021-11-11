@@ -24,6 +24,7 @@ class RaftJournalReader {
             DUPLICATE_KEYS_WINDOW_SIZE,
             subscribers
         );
+        this._httpRequest = httpRequest;
     }
 
     _getJournalUrl(sessionId) {
@@ -36,16 +37,18 @@ class RaftJournalReader {
 
     getBatch(cb) {
         const requestUrl = `${this.url}/log?begin=${this.begin}&limit=${this.limit}&targetLeader=False`;
-        return httpRequest('GET', requestUrl, (err, res) => {
+        return this._httpRequest('GET', requestUrl, (err, res) => {
             if (err) {
                 return cb(err);
-            }
-            if (res.statusCode !== 200) {
-                return cb(new Error(`GET ${requestUrl} returned status ${res.statusCode}`));
             }
             if (!res || !res.body) {
                 return cb(new Error(`GET ${requestUrl} returned empty body`));
             }
+
+            if (res.statusCode !== 200) {
+                return cb(new Error(`GET ${requestUrl} returned status ${res.statusCode}`));
+            }
+
             const body = JSON.parse(res.body);
             return cb(null, body);
         });
@@ -120,7 +123,7 @@ class RaftJournalReader {
     run() {
         this.runOnce((err, timeout) => {
             if (err) {
-                log.error('Error in runOnce', { error: err });
+                log.error('Error in runOnce. Retrying in 5 seconds', { error: err });
             }
             setTimeout(this.run, timeout);
         });
