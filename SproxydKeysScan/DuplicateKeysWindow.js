@@ -78,8 +78,8 @@ class SproxydKeysProcessor {
                 key,
                 context: this,
             };
-            if (this.subscribers.duplicateSproxyKeyFound) {
-                this.subscribers.duplicateSproxyKeyFound.forEach(handler => handler(params));
+            if (this.subscribers.get('duplicateSproxyKeyFound')) {
+                this.subscribers.get('duplicateSproxyKeyFound').forEach(handler => handler.handle(params));
             }
         } else {
             this.sproxydKeys.setAndUpdate(key, objectId);

@@ -166,7 +166,7 @@ describe('RaftJournalReader', () => {
         });
     });
 
-    describe('::run', () => {
+    describe.skip('::run', () => {
     // TODO: should return a timeout of 0 milliseconds for first iteration, followed by 5000 for each iteration onwards
     });
 });

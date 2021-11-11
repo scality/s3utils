@@ -1,8 +1,13 @@
+process.env.BUCKETD_HOSTPORT = 'localhost:9000';
+process.env.SPROXYD_HOSTPORT = 'localhost';
+
 const { BoundedMap, MultiMap, SproxydKeysProcessor } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
+const { DuplicateSproxydKeyFoundHandler } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
+
 const randomize = require('randomatic');
 const range = require('lodash/range');
 
-describe.only('DuplicateKeysWindow', () => {
+describe('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
         test('grows in size up to the limit with each unique key', () => {
             const boundedMap = new BoundedMap(20);
@@ -61,13 +66,40 @@ describe.only('DuplicateKeysWindow', () => {
     });
 
     describe('SproxydKeyProcessor', () => {
+        const windowSize = 10;
+
+        const setupProcessor = windowSize => {
+            const subscribers = new MultiMap();
+            const duplicateHandler = new DuplicateSproxydKeyFoundHandler();
+            duplicateHandler._repairObject = jest.fn().mockReturnValue((err, res) => [err, res]);
+            subscribers.set('duplicateSproxyKeyFound', duplicateHandler);
+
+            const processor = new SproxydKeysProcessor(windowSize, subscribers);
+            return [processor, duplicateHandler];
+        };
 
         test('sets and updates keys when all unique keys are inserted', () => {
-            // TODO
+            const [processor, duplicateHandler] = setupProcessor();
+
+            const masterKey = 'masterKey-1';
+            const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
+            processor.insert(masterKey, sproxydKeys);
+            expect(duplicateHandler._repairObject).not.toHaveBeenCalled();
+            expect(processor.sproxydKeys.size).toEqual(windowSize);
         });
 
         test('calls duplicateSproxydKeyFound handler when duplicate is found', () => {
-            // TODO
+            const [processor, duplicateHandler] = setupProcessor();
+
+            const masterKey1 = 'masterKey-1';
+            const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
+            const masterKey2 = 'masterKey-2';
+
+            processor.insert(masterKey1, sproxydKeys);
+            processor.insert(masterKey2, sproxydKeys);
+
+            expect(duplicateHandler._repairObject).toHaveBeenCalledTimes(windowSize);
+            expect(processor.sproxydKeys.size).toEqual(windowSize);
         });
     });
 });
