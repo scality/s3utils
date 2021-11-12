@@ -447,4 +447,5 @@ module.exports = {
     putObjectMetadata,
     copySproxydKey,
     httpRequest,
+    repairObject
 };

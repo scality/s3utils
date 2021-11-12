@@ -49,5 +49,5 @@ class DuplicateSproxydKeyFoundHandler {
     }
 }
 
-subscribers.set('duplicateSproxyKeyFound', DuplicateSproxydKeyFoundHandler);
+subscribers.set('duplicateSproxyKeyFound', new DuplicateSproxydKeyFoundHandler());
 module.exports = { subscribers, DuplicateSproxydKeyFoundHandler };

@@ -7,7 +7,7 @@ const { DuplicateSproxydKeyFoundHandler } = require('../../../SproxydKeysScan/Sp
 const randomize = require('randomatic');
 const range = require('lodash/range');
 
-describe('DuplicateKeysWindow', () => {
+describe.skip('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
         test('grows in size up to the limit with each unique key', () => {
             const boundedMap = new BoundedMap(20);

@@ -22,7 +22,7 @@ function setupJournalReader() {
     return raftJournalReader;
 }
 
-describe('RaftJournalReader', () => {
+describe.skip('RaftJournalReader', () => {
     describe('::getBatch', () => {
         const raftJournalReader = setupJournalReader(getMockResponse(200));
         afterEach(() => {

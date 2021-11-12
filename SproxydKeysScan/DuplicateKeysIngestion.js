@@ -1,7 +1,7 @@
 const { waterfall } = require('async');
 const { httpRequest } = require('../repairDuplicateVersions');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
-// const { subscribers } = require('./SproxydKeysSubscribers');
+const { subscribers } = require('./SproxydKeysSubscribers');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
 
@@ -14,7 +14,7 @@ const {
 // in order to send keys to DuplicateKeysWindow, we need to read the raft journals
 // furthermore, there should be only one of this service across all servers. Ballot should be useful here
 class RaftJournalReader {
-    constructor(begin, limit, sessionId, subscribers) {
+    constructor(begin, limit, sessionId) {
         this.begin = begin;
         this.cseq = null;
         this.limit = limit;
@@ -60,12 +60,29 @@ class RaftJournalReader {
         // {masterKey, sproxydKeys}
         const extractedKeys = [];
 
-        body.log.forEach(log => {
-            log.entries.forEach(entry => {
-                const masterKey = entry.key.split('\0')[0];
-                const sproxydKeys = JSON.parse(entry.value).location.map(loc => loc.key);
-                extractedKeys.push({ masterKey, sproxydKeys });
-            });
+        body.log.forEach(record => {
+            if (record.method === 8) {
+                record.entries.forEach(entry => {
+                    const masterKey = entry.key.split('\0')[0];
+                    if (!entry.value) {
+                        return;
+                    }
+
+                    let json = null;
+                    try {
+                        json = JSON.parse(entry.value);
+                    } catch (err) {
+                        log.error('json corrupted');
+                        return;
+                    }
+
+                    if (!json.location || !Array.isArray(json.location)) {
+                        return;
+                    }
+                    const sproxydKeys = json.location.map(loc => loc.key);
+                    extractedKeys.push({ masterKey, sproxydKeys });
+                });
+            }
         });
         log.info('processBatch succeeded');
         return cb(null, extractedKeys);
@@ -121,11 +138,12 @@ class RaftJournalReader {
     }
 
     run() {
-        this.runOnce((err, timeout) => {
+        const context = this;
+        context.runOnce((err, timeout) => {
             if (err) {
                 log.error('Error in runOnce. Retrying in 5 seconds', { error: err });
             }
-            setTimeout(this.run, timeout);
+            setTimeout(() => context.run(), timeout);
         });
     }
 }
@@ -134,14 +152,14 @@ class RaftJournalReader {
 // TODO: Optionally get initial lookback window of ~30 seconds and populate the map before continuing.
 // Otherwise, start from the last cseq. One reader should be intialized per raft session in its own process.
 
-function stop() {
-    log.info('stopping raft journal ingestion');
-    process.exit(0);
-}
+// function stop() {
+//     log.info('stopping raft journal ingestion');
+//     process.exit(0);
+// }
 
-process.on('SIGINT', stop);
-process.on('SIGHUP', stop);
-process.on('SIGQUIT', stop);
-process.on('SIGTERM', stop);
+// process.on('SIGINT', stop);
+// process.on('SIGHUP', stop);
+// process.on('SIGQUIT', stop);
+// process.on('SIGTERM', stop);
 
 module.exports = { RaftJournalReader };
