@@ -1,5 +1,5 @@
 const { waterfall } = require('async');
-const { httpRequest } = require('../repairDuplicateVersions');
+const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 const { subscribers } = require('./SproxydKeysSubscribers');
 const { Logger } = require('werelogs');

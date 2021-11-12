@@ -1,5 +1,5 @@
-process.env.BUCKETD_HOSTPORT = 'localhost:9000';
-process.env.SPROXYD_HOSTPORT = 'localhost';
+// process.env.BUCKETD_HOSTPORT = 'localhost:9000';
+// process.env.SPROXYD_HOSTPORT = 'localhost';
 
 const { BoundedMap, MultiMap, SproxydKeysProcessor } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
 const { DuplicateSproxydKeyFoundHandler } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
@@ -7,7 +7,7 @@ const { DuplicateSproxydKeyFoundHandler } = require('../../../SproxydKeysScan/Sp
 const randomize = require('randomatic');
 const range = require('lodash/range');
 
-describe.skip('DuplicateKeysWindow', () => {
+describe('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
         test('grows in size up to the limit with each unique key', () => {
             const boundedMap = new BoundedMap(20);

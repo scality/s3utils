@@ -1,8 +1,7 @@
 module.exports = {
     testEnvironment: 'node',
     moduleFileExtensions: ['js', 'jsx', 'json', 'node'],
-    setupFiles: [],
+    setupFiles: ['<rootDir>/tests/conf/envSetup.js'],
     testMatch: ['**/tests/**/*.js?(x)'],
-    testPathIgnorePatterns: ['tests/unit/SproxydKeysScan'],
 };
 

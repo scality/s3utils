@@ -1,5 +1,5 @@
-process.env.BUCKETD_HOSTPORT = 'localhost:9000';
-process.env.SPROXYD_HOSTPORT = 'localhost';
+// process.env.BUCKETD_HOSTPORT = 'localhost:9000';
+// process.env.SPROXYD_HOSTPORT = 'localhost';
 
 const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIngestion');
 const { subscribers } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
@@ -22,7 +22,7 @@ function setupJournalReader() {
     return raftJournalReader;
 }
 
-describe.skip('RaftJournalReader', () => {
+describe('RaftJournalReader', () => {
     describe('::getBatch', () => {
         const raftJournalReader = setupJournalReader(getMockResponse(200));
         afterEach(() => {

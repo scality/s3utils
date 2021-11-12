@@ -1,5 +1,5 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
-const { repairObject } = require('../repairDuplicateVersions');
+const { repairObject } = require('../repairDuplicateVersionsSuite');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
