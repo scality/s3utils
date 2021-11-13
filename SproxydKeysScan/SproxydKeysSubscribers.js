@@ -1,6 +1,7 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
+const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
 
@@ -11,21 +12,19 @@ class DuplicateSproxydKeyFoundHandler {
     constructor() {
         this._repairObject = repairObject;
         this._getObjectURL = getObjectURL;
+        this._getBucketdURL = getBucketdURL;
     }
 
     handle(params) {
         const [objectUrl, existingObjectUrl] =
             [params.objectId, params.existingObjectId]
-                .map(id => this._getObjectURL(id));
+                .map(object => this._getObjectURL(params.bucket, object));
 
         const objInfo = {
             objectUrl,
             objectUrl2: existingObjectUrl,
         };
-        // const status = {
-        //     objectsRepaired: 0,
-        //     objectsSkipped: 0,
-        // };
+
         return this._repairObject(objInfo, (err, res) => {
             if (err) {
                 // what behavior is needed when repairObject fails? Possibly retry up to N times.

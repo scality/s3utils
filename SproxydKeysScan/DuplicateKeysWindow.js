@@ -69,7 +69,7 @@ class SproxydKeysProcessor {
         this.subscribers = subscribers;
     }
 
-    checkDuplicate(key, objectId) {
+    checkDuplicate(key, objectId, bucket) {
         const existingObjectId = this.sproxydKeys.get(key);
         if (existingObjectId && existingObjectId !== objectId) {
             log.info(`existing object key found: Existing { key: ${key}, id: ${existingObjectId} } 
@@ -79,6 +79,7 @@ class SproxydKeysProcessor {
                 existingObjectId,
                 key,
                 context: this,
+                bucket,
             };
             if (this.subscribers.get('duplicateSproxyKeyFound')) {
                 this.subscribers.get('duplicateSproxyKeyFound').forEach(handler => handler.handle(params));
@@ -88,9 +89,9 @@ class SproxydKeysProcessor {
         }
     }
 
-    insert(objectId, keys) {
+    insert(objectId, keys, bucket) {
         keys.forEach(key => {
-            this.checkDuplicate(key, objectId);
+            this.checkDuplicate(key, objectId, bucket);
         });
     }
  }

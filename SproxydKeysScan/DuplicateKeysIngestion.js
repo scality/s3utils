@@ -63,10 +63,11 @@ class RaftJournalReader {
         body.log.forEach(record => {
             if (record.method === 8) {
                 record.entries.forEach(entry => {
-                    const masterKey = entry.key.split('\0')[0];
                     if (!entry.value) {
                         return;
                     }
+                    const masterKey = entry.key.split('\0')[0];
+                    const bucket = record.db;
 
                     let json = null;
                     try {
@@ -80,7 +81,7 @@ class RaftJournalReader {
                         return;
                     }
                     const sproxydKeys = json.location.map(loc => loc.key);
-                    extractedKeys.push({ masterKey, sproxydKeys });
+                    extractedKeys.push({ masterKey, sproxydKeys, bucket });
                 });
             }
         });
@@ -90,7 +91,7 @@ class RaftJournalReader {
 
     updateStatus(extractedKeys, cb) {
         extractedKeys.forEach(entry => {
-            this.processor.insert(entry.masterKey, entry.sproxydKeys);
+            this.processor.insert(entry.masterKey, entry.sproxydKeys, entry.bucket);
         });
 
         // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
