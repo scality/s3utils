@@ -11,7 +11,7 @@ function getMockResponse(mockStatusCode) {
     return mockResponse;
 }
 
-const mockHttpRequest = (err, res) => jest.fn((method, requestUrl, callback) => callback(err, res));
+const mockHttpRequest = (err, res) => jest.fn((method, requestUrl, requestBody, callback) => callback(err, res));
 
 function setupJournalReader() {
     const raftJournalReader = new RaftJournalReader(1, 10, 1, subscribers);
@@ -28,6 +28,12 @@ describe.only('RaftJournalReader', () => {
 
         const returnedError = (err, body) => {
             expect(raftJournalReader._httpRequest).toHaveBeenCalled();
+            expect(raftJournalReader._httpRequest).toHaveBeenCalledWith(
+                'GET',
+                expect.anything(),
+                null,
+                expect.anything()
+            );
             expect(err).not.toBe(null);
             expect(body).toBe(undefined);
         };
@@ -36,6 +42,12 @@ describe.only('RaftJournalReader', () => {
             raftJournalReader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             raftJournalReader.getBatch((err, body) => {
                 expect(raftJournalReader._httpRequest).toHaveBeenCalled();
+                expect(raftJournalReader._httpRequest).toHaveBeenCalledWith(
+                    'GET',
+                    expect.anything(),
+                    null,
+                    expect.anything()
+                );
                 expect(err).toBe(null);
                 expect(body).not.toBe(null);
                 expect(body.log).not.toBe(null);

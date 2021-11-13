@@ -1,18 +1,15 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
-const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
 
-// TODO: maybe should just be a class
 const subscribers = new MultiMap();
 
 class DuplicateSproxydKeyFoundHandler {
     constructor() {
         this._repairObject = repairObject;
         this._getObjectURL = getObjectURL;
-        this._getBucketdURL = getBucketdURL;
     }
 
     handle(params) {

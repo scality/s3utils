@@ -244,6 +244,8 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
                 objectUrl,
                 sproxydKey,
                 httpCode: sourceRes.statusCode,
+                sproxydSourceUrl,
+                sproxydDestUrl
             });
             return sourceRes.resume().once('end', () => cbOnce(errors.InternalError));
         }
@@ -262,6 +264,8 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
                     objectUrl,
                     sproxydKey: newKey,
                     httpCode: targetRes.statusCode,
+                    sproxydSourceUrl,
+                    sproxydDestUrl
                 });
                 return cbOnce(errors.InternalError);
             }

@@ -37,7 +37,7 @@ class RaftJournalReader {
 
     getBatch(cb) {
         const requestUrl = `${this.url}/log?begin=${this.begin}&limit=${this.limit}&targetLeader=False`;
-        return this._httpRequest('GET', requestUrl, (err, res) => {
+        return this._httpRequest('GET', requestUrl, null, (err, res) => {
             if (err) {
                 return cb(err);
             }
@@ -90,9 +90,14 @@ class RaftJournalReader {
     }
 
     updateStatus(extractedKeys, cb) {
-        extractedKeys.forEach(entry => {
-            this.processor.insert(entry.masterKey, entry.sproxydKeys, entry.bucket);
-        });
+        for (const entry of extractedKeys) {
+            try {
+                this.processor.insert(entry.masterKey, entry.sproxydKeys, entry.bucket);
+            } catch (err) {
+                log.error('insert key failed in updateStatus', { err, entry });
+                return cb(err, null);
+            }
+        }
 
         // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
         this.begin = Math.min(this.limit + this.begin, this.cseq + 1);
