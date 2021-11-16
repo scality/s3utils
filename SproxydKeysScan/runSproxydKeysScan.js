@@ -1,4 +1,3 @@
-const async = require('async');
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
 const { Logger } = require('werelogs');
@@ -33,18 +32,9 @@ function stop() {
 }
 
 function main() {
-    async.series(
-        getSproxydAlias,
-        runJournalReader,
-        err => {
-            if (err) {
-                log.error('unrecoverable error while scanning sproxydKeys', {
-                    error: { message: err.message },
-                });
-                process.exit(1);
-            }
-        }
-    );
+    getSproxydAlias(() => {
+        runJournalReader();
+    });
 }
 
 main();

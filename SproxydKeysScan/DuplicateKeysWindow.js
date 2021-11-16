@@ -55,29 +55,26 @@ class MultiMap extends Map {
 class SproxydKeysProcessor {
      /**
      * @constructor
-     * @param {number} windowSize - maximum number of sproxyd keys to track
+     * @param { number } windowSize - maximum number of sproxyd keys to track
      * @param { MultiMap } subscribers - Map of events to handlers that listen for and respond to SproxydKeys events
      */
     constructor(windowSize, subscribers) {
-        // mapping schema:
-        // {
-        //     "sproxydKey1": "s3://bucket1/masterKey1",
-        //     "sproxydKey2": "s3://bucket1/masterKey1",
-        //     "sproxydKey3": "s3://bucket1/masterKey2"
-        // }
+        // { sproxydKey: objectKey }
         this.sproxydKeys = new BoundedMap(windowSize);
         this.subscribers = subscribers;
     }
 
-    checkDuplicate(key, objectId, bucket) {
-        const existingObjectId = this.sproxydKeys.get(key);
-        if (existingObjectId && existingObjectId !== objectId) {
-            log.info(`existing object key found: Existing { key: ${key}, id: ${existingObjectId} } 
-                Current { key: ${key}, id: ${objectId}}`);
+    checkDuplicate(sproxydKey, objectKey, bucket) {
+        const existingObjectKey = this.sproxydKeys.get(sproxydKey);
+        if (existingObjectKey && existingObjectKey !== objectKey) {
+            log.info(`existing object key found: 
+                Existing { sproxydKey: ${sproxydKey}, objectKey: ${existingObjectKey} } 
+                Current { sproxydKey: ${sproxydKey}, objectKey: ${objectKey}}`
+            );
             const params = {
-                objectId,
-                existingObjectId,
-                key,
+                objectKey,
+                existingObjectKey,
+                sproxydKey,
                 context: this,
                 bucket,
             };
@@ -89,13 +86,13 @@ class SproxydKeysProcessor {
                 }
             }
         } else {
-            this.sproxydKeys.setAndUpdate(key, objectId);
+            this.sproxydKeys.setAndUpdate(sproxydKey, objectKey);
         }
     }
 
-    insert(objectId, keys, bucket) {
-        for (const key of keys) {
-            this.checkDuplicate(key, objectId, bucket);
+    insert(objectKey, sproxydKeys, bucket) {
+        for (const sproxydKey of sproxydKeys) {
+            this.checkDuplicate(sproxydKey, objectKey, bucket);
         }
     }
  }

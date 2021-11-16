@@ -42,6 +42,7 @@ class RaftJournalReader {
                 return cb(err);
             }
             if (!res || !res.body) {
+                this.begin = 1;
                 return cb(new Error(`GET ${requestUrl} returned empty body`));
             }
 
@@ -57,7 +58,7 @@ class RaftJournalReader {
     processBatch(body, cb) {
         this._setCseq(body);
 
-        // {masterKey, sproxydKeys}
+        // { objectKey, sproxydKeys }
         const extractedKeys = [];
 
         body.log.forEach(record => {
@@ -66,7 +67,7 @@ class RaftJournalReader {
                     if (!entry.value) {
                         return;
                     }
-                    const masterKey = entry.key.split('\0')[0];
+                    const objectKey = entry.key;
                     const bucket = record.db;
 
                     let json = null;
@@ -81,7 +82,7 @@ class RaftJournalReader {
                         return;
                     }
                     const sproxydKeys = json.location.map(loc => loc.key);
-                    extractedKeys.push({ masterKey, sproxydKeys, bucket });
+                    extractedKeys.push({ objectKey, sproxydKeys, bucket });
                 });
             }
         });
@@ -92,7 +93,7 @@ class RaftJournalReader {
     updateStatus(extractedKeys, cb) {
         for (const entry of extractedKeys) {
             try {
-                this.processor.insert(entry.masterKey, entry.sproxydKeys, entry.bucket);
+                this.processor.insert(entry.objectKey, entry.sproxydKeys, entry.bucket);
             } catch (err) {
                 log.error('insert key failed in updateStatus', { err, entry });
                 return cb(err, null);
@@ -157,15 +158,5 @@ class RaftJournalReader {
 
 // TODO: Optionally get initial lookback window of ~30 seconds and populate the map before continuing.
 // Otherwise, start from the last cseq. One reader should be intialized per raft session in its own process.
-
-// function stop() {
-//     log.info('stopping raft journal ingestion');
-//     process.exit(0);
-// }
-
-// process.on('SIGINT', stop);
-// process.on('SIGHUP', stop);
-// process.on('SIGQUIT', stop);
-// process.on('SIGTERM', stop);
 
 module.exports = { RaftJournalReader };

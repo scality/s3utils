@@ -83,7 +83,7 @@ describe.only('RaftJournalReader', () => {
 
         raftJournalReader.getBatch((err, body) => {
             raftJournalReader.processBatch(body, (err, res) => {
-                test('processes logs into a list of { masterKey, sproxydKeys }', () => {
+                test('processes logs into a list of { objectKey, sproxydKeys }', () => {
                     expect(err).toBe(null);
                     expect(res).not.toBe(null);
                     expect(res).toBeInstanceOf(Array);
@@ -91,10 +91,10 @@ describe.only('RaftJournalReader', () => {
                 });
 
                 const obj = res[0];
-                test('has correct masterKeys', () => {
-                    expect(obj.masterKey).not.toBe(null);
-                    expect(typeof obj.masterKey).toBe('string');
-                    expect(obj.masterKey).toEqual('crr_testing/small-object-8');
+                test('has correct objectKeys', () => {
+                    expect(obj.objectKey).not.toBe(null);
+                    expect(typeof obj.objectKey).toBe('string');
+                    expect(obj.objectKey).toEqual('crr_testing/small-object-8\u000098364713705553999999RG001  1.26.11');
                 });
 
                 test('has correct sproxydKeys', () => {

@@ -1,6 +1,6 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
-const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
+const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
 
@@ -9,37 +9,35 @@ const subscribers = new MultiMap();
 class DuplicateSproxydKeyFoundHandler {
     constructor() {
         this._repairObject = repairObject;
-        this._getObjectURL = getObjectURL;
+        this._getBucketdURL = getBucketdURL;
+        this.bucketdHost = process.env.BUCKETD_HOSTPORT;
+    }
+
+    _cmp(a, b) {
+        // here largest string is first (which is the older version)
+        // older version is chosen to repair
+        if (a > b) { return -1; }
+        if (b > a) { return 1; }
+        return 0;
     }
 
     handle(params) {
-        const [objectUrl, existingObjectUrl] =
-            [params.objectId, params.existingObjectId]
-                .map(object => this._getObjectURL(params.bucket, object));
+        const [objectUrl, objectUrl2] =
+            [{ Bucket: params.bucket, Key: params.objectKey }, { Bucket: params.bucket, Key: params.existingObjectKey }]
+                .map(_params => this._getBucketdURL(this.bucketdHost, _params))
+                .sort(this._cmp);
 
         const objInfo = {
             objectUrl,
-            objectUrl2: existingObjectUrl,
+            objectUrl2,
         };
 
-        return this._repairObject(objInfo, (err, res) => {
+        return this._repairObject(objInfo, err => {
             if (err) {
-                // what behavior is needed when repairObject fails? Possibly retry up to N times.
-                // Send repairObject to a jobs queue and requeue on failure?
                 log.error('an error occurred repairing object', {
                     objectUrl: objInfo.objectUrl,
                     error: { message: err.message },
                 });
-                // status.objectsErrors += 1;
-                // TODO: handle status in a rolling window. (Maybe not needed?)
-            } else {
-                // once objects are repaired, what are the new keys?
-                // They should be inserted into BoundedMap and continue being tracked
-                // we can delete old key
-                for (const [sproxydKey, newKey] of Object.entries(res.copiedKeys)) {
-                    params.context.sproxydKeys.delete(sproxydKey);
-                    params.context.sproxydKeys.setAndUpdate(newKey, res.objectUrl); // should be id instead of Url
-                }
             }
         });
     }

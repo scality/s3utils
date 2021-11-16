@@ -78,9 +78,9 @@ describe('DuplicateKeysWindow', () => {
         test('sets and updates keys when all unique keys are inserted', () => {
             const [processor, duplicateHandler] = setupProcessor();
 
-            const masterKey = 'masterKey-1';
+            const objectKey = 'objectKey-1';
             const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
-            processor.insert(masterKey, sproxydKeys);
+            processor.insert(objectKey, sproxydKeys);
             expect(duplicateHandler._repairObject).not.toHaveBeenCalled();
             expect(processor.sproxydKeys.size).toEqual(windowSize);
         });
@@ -88,12 +88,12 @@ describe('DuplicateKeysWindow', () => {
         test('calls duplicateSproxydKeyFound handler when duplicate is found', () => {
             const [processor, duplicateHandler] = setupProcessor();
 
-            const masterKey1 = 'masterKey-1';
+            const objectKey1 = 'objectKey-1';
             const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
-            const masterKey2 = 'masterKey-2';
+            const objectKey2 = 'objectKey-2';
 
-            processor.insert(masterKey1, sproxydKeys);
-            processor.insert(masterKey2, sproxydKeys);
+            processor.insert(objectKey1, sproxydKeys);
+            processor.insert(objectKey2, sproxydKeys);
 
             expect(duplicateHandler._repairObject).toHaveBeenCalledTimes(windowSize);
             expect(processor.sproxydKeys.size).toEqual(windowSize);
