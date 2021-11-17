@@ -19,7 +19,7 @@ function setupJournalReader() {
     return raftJournalReader;
 }
 
-describe.only('RaftJournalReader', () => {
+describe('RaftJournalReader', () => {
     describe('::getBatch', () => {
         const raftJournalReader = setupJournalReader(getMockResponse(200));
         afterEach(() => {

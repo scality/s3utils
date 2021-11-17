@@ -42,7 +42,6 @@ class RaftJournalReader {
                 return cb(err);
             }
             if (!res || !res.body) {
-                this.begin = 1;
                 return cb(new Error(`GET ${requestUrl} returned empty body`));
             }
 
@@ -68,6 +67,11 @@ class RaftJournalReader {
                         return;
                     }
                     const objectKey = entry.key;
+                    if (!objectKey.includes('\u0000')) {
+                        // skip non-versioned objectKeys
+                        return;
+                    }
+
                     const bucket = record.db;
 
                     let json = null;
@@ -148,7 +152,7 @@ class RaftJournalReader {
         const context = this;
         context.runOnce((err, timeout) => {
             if (err) {
-                log.error('Error in runOnce. Retrying in 5 seconds', { error: err });
+                log.error('Retrying in 5 seconds', { error: err });
             }
             setTimeout(() => context.run(), timeout);
         });

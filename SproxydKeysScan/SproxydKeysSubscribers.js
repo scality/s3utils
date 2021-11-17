@@ -1,6 +1,6 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
-const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
+const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
 
@@ -9,8 +9,7 @@ const subscribers = new MultiMap();
 class DuplicateSproxydKeyFoundHandler {
     constructor() {
         this._repairObject = repairObject;
-        this._getBucketdURL = getBucketdURL;
-        this.bucketdHost = process.env.BUCKETD_HOSTPORT;
+        this._getObjectURL = getObjectURL;
     }
 
     _cmp(a, b) {
@@ -23,8 +22,8 @@ class DuplicateSproxydKeyFoundHandler {
 
     handle(params) {
         const [objectUrl, objectUrl2] =
-            [{ Bucket: params.bucket, Key: params.objectKey }, { Bucket: params.bucket, Key: params.existingObjectKey }]
-                .map(_params => this._getBucketdURL(this.bucketdHost, _params))
+            [params.objectKey, params.existingObjectKey]
+                .map(objectKey => this._getObjectURL(params.bucket, objectKey))
                 .sort(this._cmp);
 
         const objInfo = {
@@ -35,10 +34,11 @@ class DuplicateSproxydKeyFoundHandler {
         return this._repairObject(objInfo, err => {
             if (err) {
                 log.error('an error occurred repairing object', {
-                    objectUrl: objInfo.objectUrl,
+                    objInfo,
                     error: { message: err.message },
                 });
             }
+            // res { copiedKeys, objectUrl }
         });
     }
 }
