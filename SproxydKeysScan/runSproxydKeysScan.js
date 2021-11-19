@@ -8,6 +8,7 @@ const env = {
     SPROXYD_KEY_BEGIN: process.env.SPROXYD_KEY_BEGIN,
     SPROXYD_KEY_LIMIT: process.env.SPROXYD_KEY_LIMIT,
     RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
+    LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW,
 };
 
 for (const [key, value] of Object.entries(env)) {

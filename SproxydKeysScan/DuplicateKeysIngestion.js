@@ -7,14 +7,15 @@ const log = new Logger('s3utils:DuplicateKeysIngestion');
 
 const {
     BUCKETD_HOSTPORT,
-    // RAFT_SESSIONS,
     DUPLICATE_KEYS_WINDOW_SIZE,
+    LOOKBACK_WINDOW,
 } = process.env;
 
 // in order to send keys to DuplicateKeysWindow, we need to read the raft journals
 // furthermore, there should be only one of this service across all servers. Ballot should be useful here
 class RaftJournalReader {
     constructor(begin, limit, sessionId) {
+        this.lookBack = LOOKBACK_WINDOW;
         this.begin = begin;
         this.cseq = null;
         this.limit = limit;
@@ -33,6 +34,26 @@ class RaftJournalReader {
 
     _setCseq(body) {
         this.cseq = body.info.cseq;
+    }
+
+    setBegin(cb) {
+        if (this.begin) {
+            return cb(null);
+        }
+        // fetch one record to get cseq
+        const requestUrl = `${this.url}/log?begin=${1}&limit=${1}&targetLeader=False`;
+        return this._httpRequest('GET', requestUrl, null, (err, res) => {
+            if (err) {
+                log.error('unable to fetch cseq', { err });
+                return cb(err);
+            }
+            const body = JSON.parse(res.body);
+            this._setCseq(body);
+
+            // make sure begin is at least 1
+            this.begin = Math.max(1, this.cseq - this.lookBack);
+            return cb(null);
+        });
     }
 
     getBatch(cb) {
@@ -112,6 +133,15 @@ class RaftJournalReader {
 
     runOnce(cb) {
         return waterfall([
+            next => this.setBegin(
+                err => {
+                    if (err) {
+                        log.error('in setBegin', { error: err.message });
+                        next(err);
+                    } else {
+                        next(null);
+                    }
+                }),
             next => this.getBatch(
                 (err, res) => {
                     if (err) {
@@ -158,9 +188,5 @@ class RaftJournalReader {
         });
     }
 }
-
-
-// TODO: Optionally get initial lookback window of ~30 seconds and populate the map before continuing.
-// Otherwise, start from the last cseq. One reader should be intialized per raft session in its own process.
 
 module.exports = { RaftJournalReader };
