@@ -5,7 +5,6 @@ const { Logger } = require('werelogs');
 const log = new Logger('s3utils:SproxydKeysScan:run');
 
 const env = {
-    SPROXYD_KEY_BEGIN: process.env.SPROXYD_KEY_BEGIN,
     SPROXYD_KEY_LIMIT: process.env.SPROXYD_KEY_LIMIT,
     RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
     LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW,
@@ -18,7 +17,12 @@ for (const [key, value] of Object.entries(env)) {
     }
 }
 
+env.SPROXYD_KEY_BEGIN = process.env.SPROXYD_KEY_BEGIN;
+
 function runJournalReader() {
+    if (env.SPROXYD_KEY_BEGIN === undefined) {
+        log.info('SPROXYD_KEY_BEGIN is not defined. Ingestion will start at latest cseq - LOOKBACK_WINDOW');
+    }
     const reader = new RaftJournalReader(
         env.SPROXYD_KEY_BEGIN,
         env.SPROXYD_KEY_LIMIT,

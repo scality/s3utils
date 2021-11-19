@@ -11,8 +11,12 @@ const {
     LOOKBACK_WINDOW,
 } = process.env;
 
-// in order to send keys to DuplicateKeysWindow, we need to read the raft journals
-// furthermore, there should be only one of this service across all servers. Ballot should be useful here
+/**
+ * @class
+ * @classdesc In order to send keys to DuplicateKeysWindow, we need to read the raft journals.
+ * There is only one of this service per raft session across all servers. Ballot is used
+ * to coordinate the readers
+ */
 class RaftJournalReader {
     constructor(begin, limit, sessionId) {
         this.lookBack = LOOKBACK_WINDOW;
