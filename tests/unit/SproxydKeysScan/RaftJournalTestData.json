@@ -66,6 +66,20 @@
           }
         ],
         "method": 8
+      },
+      {
+        "db": "source-bucket",
+        "entries": [
+          {
+            "key": "crr_testing/empty-object",
+            "value": "{\"owner-display-name\":\"test_1635224174\",\"owner-id\":\"5bf2c287f3fb5646f8eb3909572544525c5992ecaa0934021d49001b41feffaa\",\"content-length\":0,\"content-md5\":\"d41d8cd98f00b204e9800998ecf8427e\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":null,\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"PENDING\",\"backends\":[{\"site\":\"crr_target\",\"status\":\"PENDING\",\"dataStoreVersionId\":\"\"}],\"content\":[\"METADATA\"],\"destination\":\"arn:aws:s3:::target-bucket\",\"storageClass\":\"crr_target\",\"role\":\"arn:aws:iam::149364012177:role/bb-replication-1635232529564,arn:aws:iam::514306224276:role/bb-replication-1635232529665\",\"storageType\":\"\",\"dataStoreVersionId\":\"\"},\"dataStoreName\":\"us-east-1\",\"last-modified\":\"2021-11-19T23:07:37.561Z\",\"md-model-version\":3,\"versionId\":\"98362636742413999999RG001  196.182.2\"}"
+          },
+          {
+            "key": "crr_testing/empty-object\u000098362636742413999999RG001  196.182.2",
+            "value": "{\"owner-display-name\":\"test_1635224174\",\"owner-id\":\"5bf2c287f3fb5646f8eb3909572544525c5992ecaa0934021d49001b41feffaa\",\"content-length\":0,\"content-md5\":\"d41d8cd98f00b204e9800998ecf8427e\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":null,\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"PENDING\",\"backends\":[{\"site\":\"crr_target\",\"status\":\"PENDING\",\"dataStoreVersionId\":\"\"}],\"content\":[\"METADATA\"],\"destination\":\"arn:aws:s3:::target-bucket\",\"storageClass\":\"crr_target\",\"role\":\"arn:aws:iam::149364012177:role/bb-replication-1635232529564,arn:aws:iam::514306224276:role/bb-replication-1635232529665\",\"storageType\":\"\",\"dataStoreVersionId\":\"\"},\"dataStoreName\":\"us-east-1\",\"last-modified\":\"2021-11-19T23:07:37.561Z\",\"md-model-version\":3,\"versionId\":\"98362636742413999999RG001  196.182.2\"}"
+          }
+        ],
+        "method": 8
       }
     ]
   }

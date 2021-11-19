@@ -108,6 +108,7 @@ class RaftJournalReader {
                         return;
                     }
 
+                    // skip empty objects
                     if (!json.location || !Array.isArray(json.location)) {
                         return;
                     }
