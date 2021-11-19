@@ -56,6 +56,7 @@ class RaftJournalReader {
 
             // make sure begin is at least 1
             this.begin = Math.max(1, this.cseq - this.lookBack);
+            log.info(`initial begin: ${this.begin}`);
             return cb(null);
         });
     }
