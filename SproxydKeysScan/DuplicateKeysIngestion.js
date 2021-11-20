@@ -261,7 +261,7 @@ class RaftJournalReader {
     }
 
     /**
-     * Continously runs runOnce after either a 0 or 5000 millisecond timeout. 
+     * Continously runs runOnce after either a 0 or 5000 millisecond timeout.
      * 0 millisecond timeout is used when there are more Raft Journal Objects to scan (this.begin < this.cseq)
      * @returns {undefined}
      */
