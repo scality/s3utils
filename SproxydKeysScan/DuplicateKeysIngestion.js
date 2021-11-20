@@ -11,6 +11,7 @@ const {
     LOOKBACK_WINDOW,
 } = process.env;
 
+
 /**
  * @class
  * @classdesc In order to send keys to DuplicateKeysWindow, we need to read the raft journals.
@@ -18,6 +19,12 @@ const {
  * to coordinate the readers
  */
 class RaftJournalReader {
+    /**
+     *
+     * @param {(number|undefined)} begin - The first cseq number to read from. Automatically set if undefined.
+     * @param {number} limit - How many Raft Journal entries to fetch with each poll.
+     * @param {number} sessionId - Raft Session Id that the reader will poll from.
+     */
     constructor(begin, limit, sessionId) {
         this.lookBack = LOOKBACK_WINDOW;
         this.begin = begin;
@@ -32,14 +39,28 @@ class RaftJournalReader {
         this._httpRequest = httpRequest;
     }
 
+     /**
+     * @param {string} sessionId - Raft session ID
+     * @returns {string} - Url string for given Raft sesssion ID
+     */
     _getJournalUrl(sessionId) {
         return `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
     }
 
+    /**
+     * @param {Object} body - Paginated response body from JournalUrl/log
+     * @returns {void}
+     */
     _setCseq(body) {
         this.cseq = body.info.cseq;
     }
 
+    /**
+     * If this.begin is undefined, latest cseq is fetched and this.begin is set to this.cseq - this.lookBack
+     * @param {function(err:Error)} cb - callback
+     * @returns {undefined}
+     * @callback called with (err:Error)
+     */
     setBegin(cb) {
         if (this.begin) {
             return cb(null);
@@ -54,13 +75,40 @@ class RaftJournalReader {
             const body = JSON.parse(res.body);
             this._setCseq(body);
 
-            // make sure begin is at least 1
+            // make sure begin is at least 1 since Raft Journal logs are 1-indexed
             this.begin = Math.max(1, this.cseq - this.lookBack);
             log.info(`initial begin: ${this.begin}`);
             return cb(null);
         });
     }
 
+    /**
+    * @typedef {Object} LogObjectEntry
+    * @property {string} key - ObjectKey which may be version or unversioned.
+    * @property {string} value - All metadata for the object with the accompanying Sproxyd Key.
+     */
+
+    /**
+     * @typedef {Object} RaftJournalLogObject
+     * @property {string} db - source bucket name
+     * @property {number} method - the type of operation that created the log object.
+     * @property {Array.<LogObjectEntry>} entries - Array of LogObjectEntry
+     */
+
+    /**
+     * @typedef {Object} RaftJournalBody
+     * @property {number} info.start - the offset that this request started reading from.
+     * @property {number} info.cseq - total number of logged objects in this raft session.
+     * @property {number} info.prune - ???
+       @property {Array.<RaftJournalLogObject>} log - Array of RaftJournalLogObject
+     */
+
+    /**
+     * Fetches RaftJournalBody
+     * @param {function(err: Error, res: RaftJournalBody)} cb - callback
+     * @returns {undefined}
+     * @callback called with (err:Error, body:RaftJournalBody)
+     */
     getBatch(cb) {
         const requestUrl = `${this.url}/log?begin=${this.begin}&limit=${this.limit}&targetLeader=False`;
         return this._httpRequest('GET', requestUrl, null, (err, res) => {
@@ -79,7 +127,19 @@ class RaftJournalReader {
             return cb(null, body);
         });
     }
+    /**
+     * @typedef {Object} ExtractedKey
+     * @property {string} ObjectKey - unversioned object key
+     * @property {Array.<string>} sproxydKeys - Array of sproxydKeys for the given object key
+     */
 
+    /**
+     * Extracts Sproxyd Keys for a given object key
+     * @param {RaftJournalBody} body - RaftJournalBody instance
+     * @param {function(err: Error, res: Array.<ExtractedKey>)} cb - callback
+     * @returns {undefined}
+     * @callback called with (err:Error, extractedKeys:Array.<ExtractedKey>)
+     */
     processBatch(body, cb) {
         this._setCseq(body);
 
@@ -121,6 +181,13 @@ class RaftJournalReader {
         return cb(null, extractedKeys);
     }
 
+    /**
+     * Hands off keys to the processor and updates this.begin to mark next offset to read from.
+     * @param {Array.<ExtractedKey>} extractedKeys - Array of ExtractedKey instances.
+     * @param {function(err:Error, res:Boolean)} cb - callback. Response res is true if success.
+     * @returns {undefined}
+     * @callback called with (err:Error, res: Boolean).
+     */
     updateStatus(extractedKeys, cb) {
         for (const entry of extractedKeys) {
             try {
@@ -136,6 +203,15 @@ class RaftJournalReader {
         log.info('updateStatus succeeded');
         return cb(null, true);
     }
+
+    /**
+     * Reads, processes, and updates status of one batch of objects from the the Raft Journal.
+     * If an error occurs at any point in the process, or if there are no new objects to be processed
+     * a timeout of 5 seconds is set before polling again.
+     * @param {function(err:Error, res:number)} cb - callback. Response res is a timeout in milliseconds.
+     * @returns {undefined}
+     * @callback called with (err:Error, res:number)
+     */
 
     runOnce(cb) {
         return waterfall([
@@ -184,6 +260,11 @@ class RaftJournalReader {
         });
     }
 
+    /**
+     * Continously runs runOnce after either a 0 or 5000 millisecond timeout. 
+     * 0 millisecond timeout is used when there are more Raft Journal Objects to scan (this.begin < this.cseq)
+     * @returns {undefined}
+     */
     run() {
         const context = this;
         context.runOnce((err, timeout) => {
