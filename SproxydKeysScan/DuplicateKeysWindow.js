@@ -1,5 +1,5 @@
 const { Logger } = require('werelogs');
-const log = new Logger('s3utils:DuplicateKeysWinow');
+const log = new Logger('s3utils:DuplicateKeysWindow');
 
 /**
  * @class
@@ -86,9 +86,10 @@ class SproxydKeysProcessor {
     checkDuplicate(sproxydKey, objectKey, bucket) {
         const existingObjectKey = this.sproxydKeys.get(sproxydKey);
         if (existingObjectKey && existingObjectKey !== objectKey) {
-            log.info(`existing object key found: 
-                Existing { sproxydKey: ${sproxydKey}, objectKey: ${existingObjectKey} } 
-                Current { sproxydKey: ${sproxydKey}, objectKey: ${objectKey}}`
+            log.warn('object keys with a duplicate sproxyd key found', {
+                objectKeys: [existingObjectKey, objectKey],
+                sproxydKey,
+            });
             );
             const params = {
                 objectKey,
@@ -97,7 +98,7 @@ class SproxydKeysProcessor {
                 context: this,
                 bucket,
             };
-            const handlers = this.subscribers.get('duplicateSproxyKeyFound');
+            const handlers = this.subscribers.get('duplicateSproxydKeyFound');
 
             if (handlers) {
                 for (const handler of handlers) {

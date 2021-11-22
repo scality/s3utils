@@ -5,20 +5,22 @@ const { Logger } = require('werelogs');
 const log = new Logger('s3utils:SproxydKeysScan:run');
 
 const env = {
+    BUCKETD_HOSTPORT: process.env.BUCKETD_HOSTPORT,
+    SPROXYD_HOSTPORT: process.env.SPROXYD_HOSTPORT,
     SPROXYD_KEY_LIMIT: process.env.SPROXYD_KEY_LIMIT,
     RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
     LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW,
 };
 
 const USAGE = `
-runSproxydKeyScan.js
+runSproxydKeysScan.js
 
 This script continously polls the Raft Journal of a given Raft session id.
 When a duplicate sproxyd key is found for objects with different versioned object keys, 
 a repair is done by creating new sproxyd keys.
 
 Usage:
-    node runSproxydKeyScan.js
+    node runSproxydKeysScan.js
 
 Mandatory environment variables:
     BUCKETD_HOSTPORT: <bucketd_host>:<bucketd_port>

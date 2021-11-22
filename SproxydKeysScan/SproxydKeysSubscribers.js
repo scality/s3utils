@@ -2,7 +2,7 @@ const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 const { Logger } = require('werelogs');
-const log = new Logger('s3utils:DuplicateKeysIngestion');
+const log = new Logger('s3utils:SproxydKeysSubscribers');
 
 const subscribers = new MultiMap();
 
@@ -62,5 +62,5 @@ class DuplicateSproxydKeyFoundHandler {
     }
 }
 
-subscribers.set('duplicateSproxyKeyFound', new DuplicateSproxydKeyFoundHandler());
+subscribers.set('duplicateSproxydKeyFound', new DuplicateSproxydKeyFoundHandler());
 module.exports = { subscribers, DuplicateSproxydKeyFoundHandler };

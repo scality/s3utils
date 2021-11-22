@@ -63,10 +63,10 @@ class RaftJournalReader {
      */
     setBegin(cb) {
         if (this.begin) {
-            return cb(null);
+            return process.nextTick(cb);
         }
         // fetch one record to get cseq
-        const requestUrl = `${this.url}/log?begin=${1}&limit=${1}&targetLeader=False`;
+        const requestUrl = `${this.url}/log?begin=1&limit=1&targetLeader=False`;
         return this._httpRequest('GET', requestUrl, null, (err, res) => {
             if (err) {
                 log.error('unable to fetch cseq', { err });
@@ -78,7 +78,7 @@ class RaftJournalReader {
             // make sure begin is at least 1 since Raft Journal logs are 1-indexed
             this.begin = Math.max(1, this.cseq - this.lookBack);
             log.info(`initial begin: ${this.begin}`);
-            return cb(null);
+            return cb();
         });
     }
 
@@ -164,7 +164,10 @@ class RaftJournalReader {
                     try {
                         json = JSON.parse(entry.value);
                     } catch (err) {
-                        log.error('json corrupted');
+                        log.error('json corrupted', {
+                            begin: this.begin,
+                            limit: this.limit,
+                        });
                         return;
                     }
 
@@ -177,7 +180,10 @@ class RaftJournalReader {
                 });
             }
         });
-        log.info('processBatch succeeded');
+        log.debug('processBatch succeeded', {
+            begin: this.begin,
+            limit: this.limit,
+        });
         return cb(null, extractedKeys);
     }
 
@@ -194,13 +200,13 @@ class RaftJournalReader {
                 this.processor.insert(entry.objectKey, entry.sproxydKeys, entry.bucket);
             } catch (err) {
                 log.error('insert key failed in updateStatus', { err, entry });
-                return cb(err, null);
+                return cb(err);
             }
         }
 
         // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
         this.begin = Math.min(this.limit + this.begin, this.cseq + 1);
-        log.info('updateStatus succeeded');
+        log.debug('updateStatus succeeded');
         return cb(null, true);
     }
 
