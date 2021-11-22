@@ -90,7 +90,6 @@ class SproxydKeysProcessor {
                 objectKeys: [existingObjectKey, objectKey],
                 sproxydKey,
             });
-            );
             const params = {
                 objectKey,
                 existingObjectKey,
