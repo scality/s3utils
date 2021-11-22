@@ -36,7 +36,7 @@ describe('RaftJournalReader', () => {
             reader.lookBack = 5;
 
             reader.setBegin(err => {
-                expect(err).toBe(null);
+                expect(err).toBe(undefined);
                 expect(reader.begin).toEqual(reader.cseq - reader.lookBack);
             });
         });
@@ -46,7 +46,7 @@ describe('RaftJournalReader', () => {
             reader.lookBack = Infinity;
 
             reader.setBegin(err => {
-                expect(err).toBe(null);
+                expect(err).toBe(undefined);
                 expect(reader.begin).toEqual(1);
             });
         });
@@ -56,7 +56,7 @@ describe('RaftJournalReader', () => {
             reader.lookBack = Infinity;
 
             reader.setBegin(err => {
-                expect(err).toBe(null);
+                expect(err).toBe(undefined);
                 expect(reader._httpRequest).not.toHaveBeenCalled();
                 expect(reader.begin).toEqual(3);
             });
