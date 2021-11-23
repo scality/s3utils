@@ -99,7 +99,6 @@ class RaftJournalReader {
      * @typedef {Object} RaftJournalBody
      * @property {number} info.start - the offset that this request started reading from.
      * @property {number} info.cseq - total number of logged objects in this raft session.
-     * @property {number} info.prune - ???
        @property {Array.<RaftJournalLogObject>} log - Array of RaftJournalLogObject
      */
 
@@ -147,6 +146,7 @@ class RaftJournalReader {
         const extractedKeys = [];
 
         body.log.forEach(record => {
+            // method 8 is batch
             if (record.method === 8) {
                 record.entries.forEach(entry => {
                     if (!entry.value) {

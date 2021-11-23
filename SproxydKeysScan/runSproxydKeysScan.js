@@ -7,7 +7,7 @@ const log = new Logger('s3utils:SproxydKeysScan:run');
 const env = {
     BUCKETD_HOSTPORT: process.env.BUCKETD_HOSTPORT,
     SPROXYD_HOSTPORT: process.env.SPROXYD_HOSTPORT,
-    SPROXYD_KEY_LIMIT: process.env.SPROXYD_KEY_LIMIT,
+    RAFT_LOG_BATCH_SIZE: process.env.RAFT_LOG_BATCH_SIZE,
     RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
     LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW,
 };
@@ -25,14 +25,14 @@ Usage:
 Mandatory environment variables:
     BUCKETD_HOSTPORT: <bucketd_host>:<bucketd_port>
     SPROXYD_HOSTPORT: <sproxyd_host>:<sproxyd_port>
-    SPROXYD_KEY_LIMIT: Number of objects to fetch at each poll of the Raft Journal.
+    RAFT_LOG_BATCH_SIZE: Number of records to fetch at each poll of the Raft Journal.
     RAFT_SESSION_ID: Session id from which to read Journal.
     LOOKBACK_WINDOW: When the process is started/restarted it will begin at cseq - LOOKBACK_WINDOW 
-        unless SPROXYD_KEY_BEGIN is set explicitly. 
+        unless RAFT_LOG_BEGIN_SEQ is set explicitly. 
     DUPLICATE_KEYS_WINDOW_SIZE: Max unique sproxydkeys that the Map will store.
 
 Optional environment variables:
-    SPROXYD_KEY_BEGIN: offset to begin scanning from. Leave this out if you wish to begin 
+    RAFT_LOG_BEGIN_SEQ: offset to begin scanning from. Leave this out if you wish to begin 
     at latest cseq - LOOKBACK_WINDOW
 `;
 for (const [key, value] of Object.entries(env)) {
@@ -43,19 +43,19 @@ for (const [key, value] of Object.entries(env)) {
     }
 }
 
-env.SPROXYD_KEY_BEGIN = process.env.SPROXYD_KEY_BEGIN;
+env.RAFT_LOG_BEGIN_SEQ = process.env.RAFT_LOG_BEGIN_SEQ;
 
 /**
  * Creates new reader and runs until stop().
  * @returns {undefined}
  */
 function runJournalReader() {
-    if (env.SPROXYD_KEY_BEGIN === undefined) {
-        log.info('SPROXYD_KEY_BEGIN is not defined. Ingestion will start at latest cseq - LOOKBACK_WINDOW');
+    if (env.RAFT_LOG_BEGIN_SEQ === undefined) {
+        log.info('RAFT_LOG_BEGIN_SEQ is not defined. Ingestion will start at latest cseq - LOOKBACK_WINDOW');
     }
     const reader = new RaftJournalReader(
-        env.SPROXYD_KEY_BEGIN,
-        env.SPROXYD_KEY_LIMIT,
+        env.RAFT_LOG_BEGIN_SEQ,
+        env.RAFT_LOG_BATCH_SIZE,
         env.RAFT_SESSION_ID
     );
     reader.run();
