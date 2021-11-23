@@ -114,12 +114,21 @@ class RaftJournalReader {
             if (err) {
                 return cb(err);
             }
-            if (!res || !res.body) {
-                return cb(new Error(`GET ${requestUrl} returned empty body`));
+
+            if (!res) {
+                return cb(new Error(`GET ${requestUrl} returned empty response at ${this.begin}`));
+            }
+
+            if (res.statusCode === 416) {
+                return cb(new RangeError(`GET ${requestUrl} found no new records at ${this.begin}`));
             }
 
             if (res.statusCode !== 200) {
-                return cb(new Error(`GET ${requestUrl} returned status ${res.statusCode}`));
+                return cb(new Error(`GET ${requestUrl} returned status ${res.statusCode} at ${this.begin}`));
+            }
+
+            if (!res.body) {
+                return cb(new Error(`GET ${requestUrl} returned empty body at ${this.begin}`));
             }
 
             const body = JSON.parse(res.body);
@@ -275,7 +284,11 @@ class RaftJournalReader {
         const context = this;
         context.runOnce((err, timeout) => {
             if (err) {
-                log.error('Retrying in 5 seconds', { error: err });
+                if (err instanceof RangeError) {
+                    log.debug(err);
+                } else {
+                    log.error('Retrying in 5 seconds', { error: err });
+                }
             }
             setTimeout(() => context.run(), timeout);
         });
