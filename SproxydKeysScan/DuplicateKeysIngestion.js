@@ -63,7 +63,7 @@ class RaftJournalReader {
      */
     setBegin(cb) {
         if (this.begin) {
-            return cb();
+            return process.nextTick(cb);
         }
         // fetch one record to get cseq
         const requestUrl = `${this.url}/log?begin=1&limit=1&targetLeader=False`;
