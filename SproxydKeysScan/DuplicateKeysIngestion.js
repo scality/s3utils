@@ -26,7 +26,7 @@ class RaftJournalReader {
      * @param {number} sessionId - Raft Session Id that the reader will poll from.
      */
     constructor(begin, limit, sessionId) {
-        this.lookBack = LOOKBACK_WINDOW;
+        this.lookBack = Number.parseInt(LOOKBACK_WINDOW, 10);
         this.begin = begin;
         this.cseq = null;
         this.limit = limit;
