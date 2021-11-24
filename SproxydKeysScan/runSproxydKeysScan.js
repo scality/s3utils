@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
 const { Logger } = require('werelogs');
@@ -38,7 +39,7 @@ Optional environment variables:
 for (const [key, value] of Object.entries(env)) {
     if (!value) {
         log.info(`${key} must be defined`);
-        log.info(USAGE);
+        console.error(USAGE);
         process.exit(1);
     }
 }
