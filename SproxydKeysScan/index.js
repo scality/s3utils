@@ -14,14 +14,12 @@ const env = {
 };
 
 const USAGE = `
-runSproxydKeysScan.js
-
 This script continously polls the Raft Journal of a given Raft session id.
 When a duplicate sproxyd key is found for objects with different versioned object keys, 
 a repair is done by creating new sproxyd keys.
 
 Usage:
-    node runSproxydKeysScan.js
+    node SproxydKeysScan
 
 Mandatory environment variables:
     BUCKETD_HOSTPORT: <bucketd_host>:<bucketd_port>
