@@ -8,9 +8,9 @@ const log = new Logger('s3utils:SproxydKeysScan:run');
 const env = {
     BUCKETD_HOSTPORT: process.env.BUCKETD_HOSTPORT,
     SPROXYD_HOSTPORT: process.env.SPROXYD_HOSTPORT,
-    RAFT_LOG_BATCH_SIZE: process.env.RAFT_LOG_BATCH_SIZE,
     RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
-    LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW,
+    RAFT_LOG_BATCH_SIZE: process.env.RAFT_LOG_BATCH_SIZE || 1000,
+    LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW || 10000,
 };
 
 const USAGE = `
@@ -24,8 +24,8 @@ Usage:
 Mandatory environment variables:
     BUCKETD_HOSTPORT: <bucketd_host>:<bucketd_port>
     SPROXYD_HOSTPORT: <sproxyd_host>:<sproxyd_port>
-    RAFT_LOG_BATCH_SIZE: Number of records to fetch at each poll of the Raft Journal.
     RAFT_SESSION_ID: Session id from which to read Journal.
+    RAFT_LOG_BATCH_SIZE: Number of records to fetch at each poll of the Raft Journal.
     LOOKBACK_WINDOW: When the process is started/restarted it will begin at cseq - LOOKBACK_WINDOW 
         unless RAFT_LOG_BEGIN_SEQ is set explicitly. 
     DUPLICATE_KEYS_WINDOW_SIZE: Max unique sproxydkeys that the Map will store.
