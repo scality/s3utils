@@ -5,7 +5,7 @@ function getObjectURL(bucket, objectKey) {
     if (!objectKey) {
         return `s3://${bucket}`;
     }
-    return `s3://${bucket}/${encodeURI(objectKey)}`;
+    return `s3://${bucket}/${encodeURIComponent(objectKey)}`;
 }
 
 module.exports = getObjectURL;

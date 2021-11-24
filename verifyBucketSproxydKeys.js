@@ -529,3 +529,5 @@ process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
+
+module.exports = { httpRequest };
