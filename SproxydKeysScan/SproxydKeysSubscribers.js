@@ -17,34 +17,28 @@ class DuplicateSproxydKeyFoundHandler {
     }
 
     /**
-     * Helper to compare precedence of two strings.
-     * The largest string is first (which is the older version).
-     * Older version is chosen to repair.
-     * @param {string} a - Versioned Object key.
-     * @param {string} b - Versioned Object key.
-     * @returns {number} 0, 1, -1 to determine order.
-     */
-    _cmp(a, b) {
-        if (a > b) { return -1; }
-        if (b > a) { return 1; }
-        return 0;
-    }
-
-    /**
      * Takes two object keys with an erroneously shared sproxyd key and repairs the older version of the two.
      * @param {Object} params - input params.
      * @param {string} params.objectKey - Object Key which was attempted to be inserted into the Map.
-     * @param {string} params.existingBucketMD - Object Key with the same sproxyd Key that was already in Map.
-     * @param {string} sparams.proxydKey - Share sproxyd key between the existing and new object key.
+     * @param {string} params.existingObjectKey - Object Key with the same sproxyd Key that was already in Map.
+     * @param {string} params.sproxydKey - Shared sproxyd key between the existing and new object key.
      * @param {Class} params.context - Instance of SproxydKeysProcessor from which handle was called.
      * @param {string} params.bucket - bucket name.
      * @returns {undefined}
      */
     handle(params) {
-        const [objectUrl, objectUrl2] =
+        // The largest string is last (which is the older version).
+        // Older version is chosen to repair.
+        const [newerVersionKey, olderVersionKey] =
             [params.objectKey, params.existingObjectKey]
-                .map(objectKey => this._getObjectURL(params.bucket, objectKey))
-                .sort(this._cmp);
+            .sort();
+
+        // remove older version, insert newer version into sproxyd key map
+        params.context.sproxydKeys.set(params.sproxydKey, newerVersionKey);
+
+        const [objectUrl, objectUrl2] =
+        [olderVersionKey, newerVersionKey]
+                .map(objectKey => this._getObjectURL(params.bucket, objectKey));
 
         const objInfo = {
             objectUrl,
