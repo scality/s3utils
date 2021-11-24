@@ -53,9 +53,9 @@ function runJournalReader() {
         log.info('RAFT_LOG_BEGIN_SEQ is not defined. Ingestion will start at latest cseq - LOOKBACK_WINDOW');
     }
     const reader = new RaftJournalReader(
-        env.RAFT_LOG_BEGIN_SEQ,
-        env.RAFT_LOG_BATCH_SIZE,
-        env.RAFT_SESSION_ID
+        Number.parseInt(env.RAFT_LOG_BEGIN_SEQ, 10),
+        Number.parseInt(env.RAFT_LOG_BATCH_SIZE, 10),
+        Number.parseInt(env.RAFT_SESSION_ID, 10)
     );
     reader.run();
 }
