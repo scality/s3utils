@@ -1,6 +1,5 @@
-const { BoundedMap, MultiMap, SproxydKeysProcessor } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
-const { DuplicateSproxydKeyFoundHandler } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
-
+const { BoundedMap, MultiMap } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
+const { setupProcessor } = require('../../utils/setupProcessor');
 const randomize = require('randomatic');
 const range = require('lodash/range');
 
@@ -65,18 +64,8 @@ describe('DuplicateKeysWindow', () => {
     describe('SproxydKeyProcessor', () => {
         const windowSize = 10;
 
-        const setupProcessor = windowSize => {
-            const subscribers = new MultiMap();
-            const duplicateHandler = new DuplicateSproxydKeyFoundHandler();
-            duplicateHandler._repairObject = jest.fn().mockReturnValue((err, res) => [err, res]);
-            subscribers.set('duplicateSproxydKeyFound', duplicateHandler);
-
-            const processor = new SproxydKeysProcessor(windowSize, subscribers);
-            return [processor, duplicateHandler];
-        };
-
         test('sets and updates keys when all unique keys are inserted', () => {
-            const [processor, duplicateHandler] = setupProcessor();
+            const [processor, duplicateHandler] = setupProcessor(windowSize);
 
             const objectKey = 'objectKey-1';
             const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
@@ -86,7 +75,7 @@ describe('DuplicateKeysWindow', () => {
         });
 
         test('calls duplicateSproxydKeyFound handler when duplicate is found', () => {
-            const [processor, duplicateHandler] = setupProcessor();
+            const [processor, duplicateHandler] = setupProcessor(windowSize);
 
             const objectKey1 = 'objectKey-1';
             const sproxydKeys = range(windowSize).map(() => randomize('A0', 40));
@@ -100,3 +89,4 @@ describe('DuplicateKeysWindow', () => {
         });
     });
 });
+
