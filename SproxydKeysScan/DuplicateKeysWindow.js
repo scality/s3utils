@@ -1,5 +1,6 @@
 const { Logger } = require('werelogs');
-const log = new Logger('s3utils:DuplicateKeysWindow');
+const { ProxyLoggerCreator } = require('./Logging');
+const log = new ProxyLoggerCreator(new Logger('s3utils:DuplicateKeysWindow'));
 
 /**
  * @class
@@ -89,6 +90,7 @@ class SproxydKeysProcessor {
             log.warn('object keys with a duplicate sproxyd key found', {
                 objectKeys: [existingObjectKey, objectKey],
                 sproxydKey,
+                eventMessage: 'duplicateFound',
             });
             const params = {
                 objectKey,
