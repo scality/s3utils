@@ -2,16 +2,10 @@
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
 const { Logger } = require('werelogs');
+const { env } = require('./env');
 
 const log = new Logger('s3utils:SproxydKeysScan:run');
 
-const env = {
-    BUCKETD_HOSTPORT: process.env.BUCKETD_HOSTPORT,
-    SPROXYD_HOSTPORT: process.env.SPROXYD_HOSTPORT,
-    RAFT_SESSION_ID: process.env.RAFT_SESSION_ID,
-    RAFT_LOG_BATCH_SIZE: process.env.RAFT_LOG_BATCH_SIZE || 1000,
-    LOOKBACK_WINDOW: process.env.LOOKBACK_WINDOW || 10000,
-};
 
 const USAGE = `
 This script continously polls the Raft Journal of a given Raft session id.

@@ -4,12 +4,13 @@ const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 const { subscribers } = require('./SproxydKeysSubscribers');
 const { Logger } = require('werelogs');
 const log = new Logger('s3utils:DuplicateKeysIngestion');
+const { env } = require('./env');
 
 const {
     BUCKETD_HOSTPORT,
     DUPLICATE_KEYS_WINDOW_SIZE,
     LOOKBACK_WINDOW,
-} = process.env;
+} = env;
 
 
 /**
