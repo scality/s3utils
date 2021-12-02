@@ -27,6 +27,8 @@ const LOG_PROGRESS_INTERVAL = (
       || DEFAULT_LOG_PROGRESS_INTERVAL;
 
 const VERBOSE = process.env.VERBOSE === '1';
+const COMPARE_VERSION_ID = process.env.COMPARE_VERSION_ID === '1';
+const COMPARE_OBJECT_SIZE = process.env.COMPARE_OBJECT_SIZE === '1';
 
 const KEY_MARKER = process.env.KEY_MARKER || '';
 
@@ -54,6 +56,8 @@ Optional environment variables:
     LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     VERBOSE: set to 1 for more verbose output (show last-modified dates and replication statuses of objects)
+    COMPARE_VERSION_ID: set to 1 to have additional check by comapring version ids (cannot be set with COMPARE_OBJECT_SIZE)
+    COMPARE_OBJECT_SIZE: set to 1 to have additional check by comparing object sizes (cannot be set with COMPARE_VERSION_ID)
 `;
 
 if (!SRC_BUCKETD_HOSTPORT) {
@@ -74,6 +78,11 @@ if (!SRC_BUCKET) {
 
 if (!DST_BUCKET) {
     console.error('ERROR: BUCKET not defined');
+    console.error(USAGE);
+}
+
+if (COMPARE_VERSION_ID && COMPARE_OBJECT_SIZE) {
+    console.error('ERROR: COMPARE_VERSION_ID and COMPARE_OBJECT_SIZE cannot be set together');
     console.error(USAGE);
 }
 
@@ -126,6 +135,8 @@ function main() {
             workers: WORKERS,
         },
         verbose: VERBOSE,
+        compareVersionId: COMPARE_VERSION_ID,
+        compareObjectSize: COMPARE_OBJECT_SIZE,
         statusObj: status,
     };
     compareBuckets(params, log, err => {

@@ -243,49 +243,70 @@ describe('compareBuckets', () => {
 });
 
 describe('commpareObjectsReports', () => {
-    const mismatchedContentLength1 = JSON.stringify({
-        'versionId': '1',
-        'content-length': 100,
-        'content-md5': 'aaa',
-    });
-
-    const mismatchedContentLength2 = JSON.stringify({
+    const objectMDVersion1Size200 = JSON.stringify({
         'versionId': '1',
         'content-length': 200,
         'content-md5': 'bbb',
     });
 
-    const mismatchedVersionId1 = JSON.stringify({
+    const objectMDVersion1Size100 = JSON.stringify({
         'versionId': '1',
         'content-length': 100,
         'content-md5': 'aaa',
     });
 
-    const mismatchedVersionId2 = JSON.stringify({
+    const objectMDVersion2Size100 = JSON.stringify({
         'versionId': '2',
         'content-length': 100,
         'content-md5': 'aaa',
     });
 
-    it('should return null if verbose is not set', () => {
+    it('should return null if compare options are not set', () => {
         const report = compareObjectsReport(
             'sourceBucket',
-            { key: 'key1', value: mismatchedContentLength1 },
+            { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
-            { key: 'key1', value: mismatchedContentLength2 },
-            false
+            { key: 'key1', value: objectMDVersion1Size200 },
+            {}
         );
 
         expect(report).toBeNull();
     });
 
+    it('should return report if content-length does match', () => {
+        const report = compareObjectsReport(
+            'sourceBucket',
+            { key: 'key1', value: objectMDVersion1Size100 },
+            'destinationBucket',
+            { key: 'key1', value: objectMDVersion1Size100 },
+            { compareObjectSize: true }
+        );
+
+        expect(report).toEqual({
+            sourceObject: {
+                bucket: 'sourceBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+            destinationObject: {
+                bucket: 'destinationBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+        });
+    });
+
     it('should return report if content-length does not match', () => {
         const report = compareObjectsReport(
             'sourceBucket',
-            { key: 'key1', value: mismatchedContentLength1 },
+            { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
-            { key: 'key1', value: mismatchedContentLength2 },
-            true
+            { key: 'key1', value: objectMDVersion1Size200 },
+            { compareObjectSize: true }
         );
 
         expect(report).toEqual({
@@ -303,19 +324,44 @@ describe('commpareObjectsReports', () => {
                 size: 200,
                 contentMD5: 'bbb',
             },
-            error: [
-                { msg: 'destination object size does not match source object' },
-            ],
+            error: 'destination object size does not match source object',
         });
     });
 
     it('should return report if version-id does not match', () => {
         const report = compareObjectsReport(
             'sourceBucket',
-            { key: 'key1', value: mismatchedVersionId1 },
+            { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
-            { key: 'key1', value: mismatchedVersionId2 },
-            true
+            { key: 'key1', value: objectMDVersion1Size100 },
+            { compareVersionId: true }
+        );
+
+        expect(report).toEqual({
+            sourceObject: {
+                bucket: 'sourceBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+            destinationObject: {
+                bucket: 'destinationBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+        });
+    });
+
+    it('should return report if version-id does not match', () => {
+        const report = compareObjectsReport(
+            'sourceBucket',
+            { key: 'key1', value: objectMDVersion1Size100 },
+            'destinationBucket',
+            { key: 'key1', value: objectMDVersion2Size100 },
+            { compareVersionId: true }
         );
 
         expect(report).toEqual({
@@ -333,9 +379,7 @@ describe('commpareObjectsReports', () => {
                 size: 100,
                 contentMD5: 'aaa',
             },
-            error: [
-                { msg: 'destination object version-id does not match source object' },
-            ],
+            error: 'destination object version-id does not match source object',
         });
     });
 });

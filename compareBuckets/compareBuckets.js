@@ -21,13 +21,9 @@ function getReportObject(bucket, entry, verbose) {
     return obj;
 }
 
-function compareObjectsReport(srcBucket, src, dstBucket, dst, verbose) {
+function compareObjectsReport(srcBucket, src, dstBucket, dst, options) {
     const srcMD = JSON.parse(src.value);
     const dstMD = JSON.parse(dst.value);
-
-    if (!verbose) {
-        return null;
-    }
 
     const report = {
         sourceObject: {
@@ -44,28 +40,30 @@ function compareObjectsReport(srcBucket, src, dstBucket, dst, verbose) {
             size: dstMD['content-length'],
             contentMD5: dstMD['content-md5'],
         },
-        error: [],
     };
 
-    const srcSize = Number.parseInt(srcMD['content-length'], 10);
-    const dstSize = Number.parseInt(dstMD['content-length'], 10);
+    if (options.compareVersionId) {
+        const srcVersionID = srcMD.versionId;
+        const dstVersionID = dstMD.versionId;
 
-    if (srcSize !== dstSize) {
-        report.error.push({
-            msg: 'destination object size does not match source object',
-        });
+        if (srcVersionID !== dstVersionID) {
+            report.error = 'destination object version-id does not match source object';
+        }
+        return report;
     }
 
-    const srcVersionID = srcMD.versionId;
-    const dstVersionID = dstMD.versionId;
+    if (options.compareObjectSize) {
+        const srcSize = Number.parseInt(srcMD['content-length'], 10);
+        const dstSize = Number.parseInt(dstMD['content-length'], 10);
 
-    if (srcVersionID !== dstVersionID) {
-        report.error.push({
-            msg: 'destination object version-id does not match source object',
-        });
+        if (srcSize !== dstSize) {
+            report.error = 'destination object size does not match source object';
+        }
+
+        return report;
     }
 
-    return report;
+    return null;
 }
 
 function compareBuckets(params, log, cb) {
@@ -74,6 +72,8 @@ function compareBuckets(params, log, cb) {
         bucketdDstParams,
         statusObj,
         verbose,
+        compareVersionId,
+        compareObjectSize,
     } = params;
 
     statusObj.srcBucketInProgress = bucketdSrcParams.bucket;
@@ -191,15 +191,14 @@ function compareBuckets(params, log, cb) {
                         srcContents[srcIdx],
                         bucketdDstParams.bucket,
                         dstContents[dstIdx],
-                        verbose
+                        {
+                            compareVersionId,
+                            compareObjectSize,
+                        }
                     );
 
-                    if (report) {
-                        if (report.error.length > 0) {
-                            log.info('object mismatch found', report);
-                        } else {
-                            log.info('objects match', report);
-                        }
+                    if (report && report.error) {
+                        log.info('object mismatch found', report);
                     }
 
                     ++statusObj.dstProcessedCount;
