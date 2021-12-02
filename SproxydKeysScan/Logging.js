@@ -77,12 +77,10 @@ class ProxyLoggerCreator {
         const logLevels = new Set(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
         const handlers = {
             get(target, prop) {
-                if (typeof target[prop] === 'function') {
+                if (typeof target[prop] === 'function' && logLevels.has(prop)) {
                     return new Proxy(target[prop], {
                         apply: (target, thisArg, argumentsList) => {
-                            if (logLevels.has(prop)) {
-                                context.logLevelHandler.apply(context, argumentsList);
-                            }
+                            context.logLevelHandler.apply(context, argumentsList);
                             return Reflect.apply(target, thisArg, argumentsList);
                         },
                     });
