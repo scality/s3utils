@@ -21,6 +21,53 @@ function getReportObject(bucket, entry, verbose) {
     return obj;
 }
 
+function compareObjectsReport(srcBucket, src, dstBucket, dst, verbose) {
+    const srcMD = JSON.parse(src.value);
+    const dstMD = JSON.parse(dst.value);
+
+    if (!verbose) {
+        return null;
+    }
+
+    const report = {
+        sourceObject: {
+            bucket: srcBucket,
+            key: src.key,
+            versionId: srcMD.versionId,
+            size: srcMD['content-length'],
+            contentMD5: srcMD['content-md5'],
+        },
+        destinationObject: {
+            bucket: dstBucket,
+            key: dst.key,
+            versionId: dstMD.versionId,
+            size: dstMD['content-length'],
+            contentMD5: dstMD['content-md5'],
+        },
+        error: [],
+    };
+
+    const srcSize = Number.parseInt(srcMD['content-length'], 10);
+    const dstSize = Number.parseInt(dstMD['content-length'], 10);
+
+    if (srcSize !== dstSize) {
+        report.error.push({
+            msg: 'destination object size does not match source object',
+        });
+    }
+
+    const srcVersionID = srcMD.versionId;
+    const dstVersionID = dstMD.versionId;
+
+    if (srcVersionID !== dstVersionID) {
+        report.error.push({
+            msg: 'destination object version-id does not match source object',
+        });
+    }
+
+    return report;
+}
+
 function compareBuckets(params, log, cb) {
     const {
         bucketdSrcParams,
@@ -86,7 +133,7 @@ function compareBuckets(params, log, cb) {
 
                 if (srcDone && srcContents.length === 0) {
                     while (dstIdx < dstContents.length) {
-                        log.error('missing object in source',
+                        log.info('missing object in source',
                             getReportObject(
                                 bucketdSrcParams.bucket,
                                 dstContents[dstIdx],
@@ -100,7 +147,7 @@ function compareBuckets(params, log, cb) {
 
                 if (dstDone && dstContents.length === 0) {
                     while (srcIdx < srcContents.length) {
-                        log.error('missing object in destination',
+                        log.info('missing object in destination',
                             getReportObject(
                                 bucketdDstParams.bucket,
                                 srcContents[srcIdx],
@@ -114,7 +161,7 @@ function compareBuckets(params, log, cb) {
 
                 while (srcIdx < srcContents.length && dstIdx < dstContents.length) {
                     if (srcContents[srcIdx].key < dstContents[dstIdx].key) {
-                        log.error('missing object in destination',
+                        log.info('missing object in destination',
                             getReportObject(
                                 bucketdDstParams.bucket,
                                 srcContents[srcIdx],
@@ -127,7 +174,7 @@ function compareBuckets(params, log, cb) {
                     }
 
                     if (srcContents[srcIdx].key > dstContents[dstIdx].key) {
-                        log.error('missing object in source',
+                        log.info('missing object in source',
                             getReportObject(
                                 bucketdSrcParams.bucket,
                                 dstContents[dstIdx],
@@ -137,6 +184,22 @@ function compareBuckets(params, log, cb) {
                         ++statusObj.missingInSrcCount;
                         ++dstIdx;
                         continue;
+                    }
+
+                    const report = compareObjectsReport(
+                        bucketdSrcParams.bucket,
+                        srcContents[srcIdx],
+                        bucketdDstParams.bucket,
+                        dstContents[dstIdx],
+                        verbose
+                    );
+
+                    if (report) {
+                        if (report.error.length > 0) {
+                            log.info('object mismatch found', report);
+                        } else {
+                            log.info('objects match', report);
+                        }
                     }
 
                     ++statusObj.dstProcessedCount;
@@ -161,4 +224,5 @@ function compareBuckets(params, log, cb) {
 
 module.exports = {
     compareBuckets,
+    compareObjectsReport,
 };

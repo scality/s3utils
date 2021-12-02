@@ -2,7 +2,10 @@ const utils = require('../../../compareBuckets/utils');
 
 const listBucketMasterKeys = jest.spyOn(utils, 'listBucketMasterKeys');
 
-const { compareBuckets } = require('../../../compareBuckets/compareBuckets');
+const {
+    compareBuckets,
+    compareObjectsReport,
+} = require('../../../compareBuckets/compareBuckets');
 const DummyLogger = require('../../mocks/DummyLogger');
 
 const log = new DummyLogger();
@@ -235,6 +238,104 @@ describe('compareBuckets', () => {
             expect(status.missingInSrcCount).toEqual(0);
             expect(status.missingInDstCount).toEqual(4);
             return done();
+        });
+    });
+});
+
+describe('commpareObjectsReports', () => {
+    const mismatchedContentLength1 = JSON.stringify({
+        'versionId': '1',
+        'content-length': 100,
+        'content-md5': 'aaa',
+    });
+
+    const mismatchedContentLength2 = JSON.stringify({
+        'versionId': '1',
+        'content-length': 200,
+        'content-md5': 'bbb',
+    });
+
+    const mismatchedVersionId1 = JSON.stringify({
+        'versionId': '1',
+        'content-length': 100,
+        'content-md5': 'aaa',
+    });
+
+    const mismatchedVersionId2 = JSON.stringify({
+        'versionId': '2',
+        'content-length': 100,
+        'content-md5': 'aaa',
+    });
+
+    it('should return null if verbose is not set', () => {
+        const report = compareObjectsReport(
+            'sourceBucket',
+            { key: 'key1', value: mismatchedContentLength1 },
+            'destinationBucket',
+            { key: 'key1', value: mismatchedContentLength2 },
+            false
+        );
+
+        expect(report).toBeNull();
+    });
+
+    it('should return report if content-length does not match', () => {
+        const report = compareObjectsReport(
+            'sourceBucket',
+            { key: 'key1', value: mismatchedContentLength1 },
+            'destinationBucket',
+            { key: 'key1', value: mismatchedContentLength2 },
+            true
+        );
+
+        expect(report).toEqual({
+            sourceObject: {
+                bucket: 'sourceBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+            destinationObject: {
+                bucket: 'destinationBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 200,
+                contentMD5: 'bbb',
+            },
+            error: [
+                { msg: 'destination object size does not match source object' },
+            ],
+        });
+    });
+
+    it('should return report if version-id does not match', () => {
+        const report = compareObjectsReport(
+            'sourceBucket',
+            { key: 'key1', value: mismatchedVersionId1 },
+            'destinationBucket',
+            { key: 'key1', value: mismatchedVersionId2 },
+            true
+        );
+
+        expect(report).toEqual({
+            sourceObject: {
+                bucket: 'sourceBucket',
+                key: 'key1',
+                versionId: '1',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+            destinationObject: {
+                bucket: 'destinationBucket',
+                key: 'key1',
+                versionId: '2',
+                size: 100,
+                contentMD5: 'aaa',
+            },
+            error: [
+                { msg: 'destination object version-id does not match source object' },
+            ],
         });
     });
 });
