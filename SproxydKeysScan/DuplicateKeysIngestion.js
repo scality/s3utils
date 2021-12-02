@@ -1,9 +1,9 @@
 const { waterfall } = require('async');
 const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
+const { ProxyLoggerCreator } = require('./Logging');
 const { subscribers } = require('./SproxydKeysSubscribers');
 const { Logger } = require('werelogs');
-const log = new Logger('s3utils:DuplicateKeysIngestion');
 const { env } = require('./env');
 
 const {
@@ -12,7 +12,7 @@ const {
     LOOKBACK_WINDOW,
 } = env;
 
-
+const log = new ProxyLoggerCreator(new Logger('s3utils:DuplicateKeysIngestion'));
 /**
  * @class
  * @classdesc In order to send keys to DuplicateKeysWindow, we need to read the raft journals.
@@ -177,6 +177,7 @@ class RaftJournalReader {
                         log.error('json corrupted', {
                             begin: this.begin,
                             limit: this.limit,
+                            eventMessage: 'corruptedJSON',
                         });
                         return;
                     }
@@ -193,6 +194,7 @@ class RaftJournalReader {
         log.debug('processBatch succeeded', {
             begin: this.begin,
             limit: this.limit,
+            eventMessage: 'processBatchSuccess',
         });
         return cb(null, extractedKeys);
     }
@@ -209,14 +211,14 @@ class RaftJournalReader {
             try {
                 this.processor.insert(entry.objectKey, entry.sproxydKeys, entry.bucket);
             } catch (err) {
-                log.error('insert key failed in updateStatus', { err, entry });
+                log.error('insert key failed in updateStatus', { err, entry, eventMessage: 'insertKeyFailure' });
                 return cb(err);
             }
         }
 
         // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
         this.begin = Math.min(this.limit + this.begin, this.cseq + 1);
-        log.debug('updateStatus succeeded');
+        log.debug('updateStatus succeeded', { eventMessage: 'batchUpdateSuccess' });
         return cb(null, true);
     }
 
@@ -243,7 +245,9 @@ class RaftJournalReader {
             next => this.getBatch(
                 (err, res) => {
                     if (err) {
-                        log.error('in getBatch', { error: err.message });
+                        if ((!err instanceof RangeError)) {
+                            log.error('in getBatch', { error: err.message });
+                        }
                         next(err);
                     } else {
                         next(null, res);
@@ -286,7 +290,7 @@ class RaftJournalReader {
         context.runOnce((err, timeout) => {
             if (err) {
                 if (err instanceof RangeError) {
-                    log.debug(err);
+                    log.debug(err.message, { eventMessage: 'noNewRecords' });
                 } else {
                     log.error('Retrying in 5 seconds', { error: err });
                 }

@@ -1,11 +1,20 @@
 /* eslint-disable no-console */
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
-const { Logger } = require('werelogs');
+const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');
+const werelogs = require('werelogs');
 const { env } = require('./env');
 
-const log = new Logger('s3utils:SproxydKeysScan:run');
+const loggerConfig = {
+    logLevel: env.LOG_LEVEL,
+    dumpLevel: env.DUMP_LEVEL,
+};
 
+werelogs.configure(loggerConfig);
+const aggregator = new AggregateLogger(env.LOG_INTERVAL);
+aggregator.run();
+
+const log = new ProxyLoggerCreator(new werelogs.Logger('s3utils:SproxydKeysScan:run'));
 
 const USAGE = `
 This script continously polls the Raft Journal of a given Raft session id.
@@ -27,6 +36,9 @@ Mandatory environment variables:
 Optional environment variables:
     RAFT_LOG_BEGIN_SEQ: offset to begin scanning from. Leave this out if you wish to begin 
     at latest cseq - LOOKBACK_WINDOW
+    LOG_LEVEL: defaults to info
+    DUMP_LEVEL: defaults to error
+    LOG_INTERVAL: logs summary of events in the given interval - defaults to 5 minutes
 `;
 for (const [key, value] of Object.entries(env)) {
     if (!value) {
@@ -78,3 +90,6 @@ process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
+
+module.exports = { env };
+

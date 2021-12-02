@@ -1,9 +1,10 @@
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
-const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 const { Logger } = require('werelogs');
-const log = new Logger('s3utils:SproxydKeysSubscribers');
+const { ProxyLoggerCreator } = require('./Logging');
+const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 
+const log = new ProxyLoggerCreator(new Logger('s3utils:SproxydKeysSubscribers'));
 const subscribers = new MultiMap();
 
 /**
@@ -50,6 +51,7 @@ class DuplicateSproxydKeyFoundHandler {
                 log.error('an error occurred repairing object', {
                     objInfo,
                     error: { message: err.message },
+                    eventMessage: 'repairObjectFailure',
                 });
             }
         });
