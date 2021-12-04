@@ -12,7 +12,7 @@ const { jsutil, errors } = require('arsenal');
 const { Logger } = require('werelogs');
 
 const {
-    BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
+    OBJECT_REPAIR_BUCKETD_HOSTPORT, OBJECT_REPAIR_SPROXYD_HOSTPORT,
 } = process.env;
 
 const log = new Logger('s3utils:repairDuplicateVersions');
@@ -82,7 +82,7 @@ function httpRequest(method, url, reqBody, cb) {
 }
 
 function getSproxydAlias(cb) {
-    const url = `http://${SPROXYD_HOSTPORT}/.conf`;
+    const url = `http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/.conf`;
     httpRequest('GET', url, null, (err, res) => {
         if (err) {
             return cb(err);
@@ -134,7 +134,7 @@ function fetchObjectMetadata(objectUrl, cb) {
         return cb(new Error(`malformed object URL ${objectUrl}: must start with "s3://"`));
     }
     const bucketAndObject = objectUrl.slice(5);
-    const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucketAndObject}`;
+    const url = `http://${OBJECT_REPAIR_BUCKETD_HOSTPORT}/default/bucket/${bucketAndObject}`;
     return httpRequest('GET', url, null, (err, res) => {
         if (err) {
             return cb(err);
@@ -152,7 +152,7 @@ function putObjectMetadata(objectUrl, objMD, cb) {
         return cb(new Error(`malformed object URL ${objectUrl}: must start with "s3://"`));
     }
     const bucketAndObject = objectUrl.slice(5);
-    const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucketAndObject}`;
+    const url = `http://${OBJECT_REPAIR_BUCKETD_HOSTPORT}/default/bucket/${bucketAndObject}`;
     return httpRequest('POST', url, JSON.stringify(objMD), (err, res) => {
         if (err) {
             return cb(err);
@@ -190,9 +190,9 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
     });
     const newKey = genSproxydKey(sproxydKey);
     const sproxydSourceUrl =
-          new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
+          new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
     const sproxydDestUrl =
-          new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
+          new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
     const sourceReq = http.request({
         hostname: sproxydSourceUrl.hostname,
         port: sproxydSourceUrl.port,
@@ -200,14 +200,19 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
         method: 'GET',
         agent: httpAgent,
     }, sourceRes => {
+        const sourceLogData = {
+            objectUrl,
+            sproxydKey,
+            httpCode: sourceRes.statusCode,
+            sproxydSourceUrl,
+            sproxydDestUrl
+        };
+        if (sourceRes.statusCode === 404) {
+            log.info('object with sproxyd key deleted before repair', sourceLogData);
+            return cbOnce(errors.ObjNotFound);
+        }
         if (sourceRes.statusCode !== 200) {
-            log.error('sproxyd returned HTTP error code', {
-                objectUrl,
-                sproxydKey,
-                httpCode: sourceRes.statusCode,
-                sproxydSourceUrl,
-                sproxydDestUrl
-            });
+            log.error('sproxyd returned HTTP error code', sourceLogData);
             return sourceRes.resume().once('end', () => cbOnce(errors.InternalError));
         }
         const targetReq = http.request({
@@ -220,14 +225,19 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
                 'Content-Length': Number.parseInt(sourceRes.headers['content-length'], 10),
             },
         }, targetRes => {
+            const targetLogData = {
+                objectUrl,
+                sproxydKey: newKey,
+                httpCode: targetRes.statusCode,
+                sproxydSourceUrl,
+                sproxydDestUrl
+            };
+            if (targetRes.statusCode === 404) {
+                log.info('object with sproxyd key deleted before repair', targetLogData);
+                return cbOnce(errors.ObjNotFound);
+            }
             if (targetRes.statusCode !== 200) {
-                log.error('sproxyd returned HTTP error code', {
-                    objectUrl,
-                    sproxydKey: newKey,
-                    httpCode: targetRes.statusCode,
-                    sproxydSourceUrl,
-                    sproxydDestUrl
-                });
+                log.error('sproxyd returned HTTP error code', targetLogData);
                 return cbOnce(errors.InternalError);
             }
             targetRes.once('error', err => {

@@ -1,4 +1,4 @@
-const { BoundedMap, MultiMap } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
+const { BoundedMap, MultiMap } = require('../../../ObjectRepair/DuplicateKeysWindow');
 const { setupProcessor } = require('../../utils/setupProcessor');
 const randomize = require('randomatic');
 const range = require('lodash/range');
@@ -84,7 +84,7 @@ describe('DuplicateKeysWindow', () => {
             processor.insert(objectKey1, sproxydKeys);
             processor.insert(objectKey2, sproxydKeys);
 
-            expect(duplicateHandler._repairObject).toHaveBeenCalledTimes(windowSize);
+            expect(duplicateHandler.queue.push).toHaveBeenCalledTimes(windowSize);
             expect(processor.sproxydKeys.size).toEqual(windowSize);
         });
     });
