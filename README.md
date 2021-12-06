@@ -531,3 +531,127 @@ the cleanup to objects created or modified before Jan 9th 2021.
 ```
 docker run --net=host -ti zenko/s3utils:latest bash -c 'ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
 ```
+
+# Count number and total size of current and noncurrent versions in a bucket
+
+The bucketVersionsStats.js script counts the total number of objects
+and their cumulative size, and shows them separately for current and
+noncurrent versions.
+
+## Usage
+
+```
+    node bucketVersionsStats.js
+```
+
+## Mandatory environment variables
+
+* **ENDPOINT**: S3 endpoint
+
+* **ACCESS_KEY**: S3 account access key
+
+* **SECRET_KEY**: S3 account secret key
+
+* **BUCKET**: S3 bucket name
+
+## Optional environment variables:
+
+* **TARGET_PREFIX**: only process a specific prefix in the bucket
+
+* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+
+* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+
+* **KEY_MARKER**: start counting from a specific key
+
+* **VERSION_ID_MARKER**: start counting from a specific version ID
+
+## Output
+
+The output of the script consists of JSON log lines.
+
+The script logs a progress update, every 10 seconds by default, and a
+final summary at the end of execution with the total counts for the
+bucket.
+
+The total counts may be possibly limited by the **TARGET_PREFIX**,
+**KEY_MARKER** and **VERSION_ID_MARKER** optional environment variables.
+
+- **stats** contains the output statistics:
+
+  - **current** refers to current versions of objects
+
+  - **noncurrent** refers to non-current versions of objects
+
+  - **total** is the sum of **current** and **noncurrent**
+
+- in **stats.current** and **stats.noncurrent**:
+
+  - **count** is the number of objects pertaining to the section
+
+  - **size** is the cumulative size in bytes of the objects pertaining
+  to the section
+
+### Example Progress Update
+
+Note: the JSON output is prettified here for readability, but the
+script outputs this status on a single line.
+
+```
+{
+  "name": "s3utils::bucketVersionsStats",
+  "time": 1638823524419,
+  "bucket": "example-bucket",
+  "stats": {
+    "total": {
+      "count": 16000,
+      "size": 27205000
+    },
+    "current": {
+      "count": 14996,
+      "size": 26165000
+    },
+    "noncurrent": {
+      "count": 1004,
+      "size": 1040000
+    }
+  },
+  "keyMarker": "test-2021-12-06T20-09-39-712Z/1732",
+  "versionIdMarker": "3938333631313738363132353838393939393939524730303120203131302e353533312e3135373439",
+  "level": "info",
+  "message": "progress update",
+  "hostname": "lab-store-0",
+  "pid": 717
+}
+```
+
+### Example Final Summary
+
+Note: the JSON output is prettified here for readability, but the
+script outputs this status on a single line.
+
+```
+{
+  "name": "s3utils::bucketVersionsStats",
+  "time": 1638823531629,
+  "bucket": "example-bucket",
+  "stats": {
+    "total": {
+      "count": 54267,
+      "size": 65472000
+    },
+    "current": {
+      "count": 53263,
+      "size": 64432000
+    },
+    "noncurrent": {
+      "count": 1004,
+      "size": 1040000
+    }
+  },
+  "level": "info",
+  "message": "final summary",
+  "hostname": "lab-store-0",
+  "pid": 717
+}
+```
