@@ -84,7 +84,7 @@ describe('DuplicateKeysWindow', () => {
             processor.insert(objectKey1, sproxydKeys);
             processor.insert(objectKey2, sproxydKeys);
 
-            expect(duplicateHandler.queue.push).toHaveBeenCalledTimes(windowSize);
+            expect(duplicateHandler.queue.push).toHaveBeenCalledTimes(1);
             expect(processor.sproxydKeys.size).toEqual(windowSize);
         });
     });
