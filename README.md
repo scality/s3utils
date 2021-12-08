@@ -504,7 +504,7 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 
 ## Mandatory environment variables
 
-* **ENDPOINT**: S3 endpoint URL
+* **S3_ENDPOINT**: S3 endpoint URL
 
 * **ACCESS_KEY**: S3 account/user access key
 
@@ -518,18 +518,32 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 
 * **MAX_DELETES**: maximum number of keys to delete before exiting (default unlimited)
 
-* **KEY_MARKER**: key marker on which to start the listing
+* **MARKER**: marker from which to resume the cleanup, logged at the end
+of a previous invocation of the script, uses the format:
 
-* **VERSION_ID_MARKER**: version ID marker on which to start the listing
+  ```
+  MARKER := encodeURI(bucketName)
+    "|" encodeURI(key)
+    "|" encodeURI(versionId)
+  ```
 
 * **OLDER_THAN**: cleanup only objects which last modified date is
 older than this date, e.g. setting to "2021-01-09T00:00:00Z" limits
 the cleanup to objects created or modified before Jan 9th 2021.
 
+* **ONLY_DELETED**: if set to "1" or "true" or "yes", only remove
+otherwise eligible noncurrent versions if the object's current version
+is a delete marker (also removes the delete marker)
+
+* **HTTPS_CA_PATH**: path to a CA certificate bundle used to
+authentify the S3 endpoint
+
+* **HTTPS_NO_VERIFY**: set to 1 to disable S3 endpoint certificate check
+
 ## Example
 
 ```
-docker run --net=host -ti zenko/s3utils:latest bash -c 'ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
+docker run --net=host -ti zenko/s3utils:latest bash -c 'S3_ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
 ```
 
 # Count number and total size of current and noncurrent versions in a bucket
