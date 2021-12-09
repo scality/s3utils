@@ -1,4 +1,4 @@
-const { AggregateLogger, ProxyLoggerCreator } = require('../../../SproxydKeysScan/Logging');
+const { AggregateLogger, ProxyLoggerCreator } = require('../../../ObjectRepair/Logging');
 const { Logger } = require('werelogs');
 describe('SproxydKeysScan:Logging', () => {
     describe('AggregateLogger', () => {
@@ -7,6 +7,7 @@ describe('SproxydKeysScan:Logging', () => {
         beforeAll(() => {
             aggregateLogger = new AggregateLogger(10);
             aggregateLogger.log.debug = jest.fn(message => message);
+            aggregateLogger.log.warn = jest.fn(message => message);
         });
 
         afterAll(() => {
@@ -40,8 +41,8 @@ describe('SproxydKeysScan:Logging', () => {
 
             aggregateLogger.logInterval();
 
-            expect(aggregateLogger.log.info).toHaveBeenCalledTimes(1);
-            expect(aggregateLogger.log.info).toHaveBeenCalledWith('Summary update:', data);
+            expect(aggregateLogger.log.warn).toHaveBeenCalledTimes(1);
+            expect(aggregateLogger.log.warn).toHaveBeenCalledWith('Summary update:', data);
         });
     });
 

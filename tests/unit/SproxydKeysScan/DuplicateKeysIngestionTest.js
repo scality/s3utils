@@ -1,5 +1,5 @@
-const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIngestion');
-const { subscribers } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
+const { RaftJournalReader } = require('../../../ObjectRepair/DuplicateKeysIngestion');
+const { subscribers } = require('../../../ObjectRepair/SproxydKeysSubscribers');
 const fs = require('fs');
 
 function getMockResponse(mockStatusCode) {
