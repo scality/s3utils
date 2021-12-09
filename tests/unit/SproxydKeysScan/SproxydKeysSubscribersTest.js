@@ -24,7 +24,7 @@ describe('SproxydKeysSubscribers', () => {
                     .map(obj => duplicateHandler._getObjectURL(params.bucket, obj));
 
                 duplicateHandler.handle(params);
-                expect(duplicateHandler._repairObject).toHaveBeenCalledWith(
+                expect(duplicateHandler.queue.push).toHaveBeenCalledWith(
                       { objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything()
                 );
                 expect(processor.sproxydKeys.get(params.sproxydKey)).toEqual(newerVersion);

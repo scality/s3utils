@@ -3,8 +3,9 @@ const { repairObject } = require('../repairDuplicateVersionsSuite');
 const { Logger } = require('werelogs');
 const { ProxyLoggerCreator } = require('./Logging');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
+const { queue } = require('async');
 
-const log = new ProxyLoggerCreator(new Logger('s3utils:SproxydKeysSubscribers'));
+const log = new ProxyLoggerCreator(new Logger('ObjectRepair:SproxydKeysSubscribers'));
 const subscribers = new MultiMap();
 
 /**
@@ -15,6 +16,7 @@ class DuplicateSproxydKeyFoundHandler {
     constructor() {
         this._repairObject = repairObject;
         this._getObjectURL = getObjectURL;
+        this.queue = queue(this._repairObject, 1);
     }
 
     /**
@@ -46,13 +48,24 @@ class DuplicateSproxydKeyFoundHandler {
             objectUrl2,
         };
 
-        return this._repairObject(objInfo, err => {
+
+        this.queue.push(objInfo, err => {
             if (err) {
-                log.error('an error occurred repairing object', {
-                    objInfo,
-                    error: { message: err.message },
-                    eventMessage: 'repairObjectFailure',
-                });
+                if (err.code && err.code === 404) {
+                    log.info('object deleted before repair', {
+                        objInfo,
+                        error: { message: err.message },
+                        eventMessage: 'objectDeletedBeforeRepair',
+                    });
+                } else {
+                    log.error('an error occurred repairing object', {
+                        objInfo,
+                        error: { message: err.message },
+                        eventMessage: 'repairObjectFailure',
+                    });
+                }
+            } else {
+                log.info('object repaired', { objInfo, eventMessage: 'repairObjectSuccess' });
             }
         });
     }

@@ -1,6 +1,13 @@
 const werelogs = require('werelogs');
 const { env } = require('./env');
 
+const loggerConfig = {
+    level: env.OBJECT_REPAIR_LOG_LEVEL,
+    dump: env.OBJECT_REPAIR_DUMP_LEVEL,
+};
+
+werelogs.configure(loggerConfig);
+
 /**
  * @class
  * @classdesc - aggregates events in a map and logs them at an interval.
@@ -13,7 +20,7 @@ class AggregateLogger {
      * @param {number} logInterval - log summary statistics once every intervalSize seconds
      */
     constructor(logInterval) {
-        this.log = new werelogs.Logger('s3utils:SproxydKeysScan:AggregateLogger');
+        this.log = new werelogs.Logger('ObjectRepair:AggregateLogger');
         if (AggregateLogger._instance) {
             const message = 'AggregateLogger is a singleton and has been instatiated. This instantiation is ignored';
             AggregateLogger._instance.log.debug(message);
@@ -28,10 +35,11 @@ class AggregateLogger {
 
     /**
      * @param {string} event - increases frequency of event string by 1 in this.statistics.
+     * @param {number} count - (optional) number of event occurences
      * @returns {undefined}
      */
-    update(event) {
-        this.statistics.set(event, (this.statistics.get(event) || 0) + 1);
+    update(event, count) {
+        this.statistics.set(event, (this.statistics.get(event) || 0) + (count || 1));
     }
 
     /**
@@ -49,7 +57,7 @@ class AggregateLogger {
             endTime: currentTime.toISOString(),
             summary,
         };
-        this.log.info('Summary update:', data);
+        this.log.warn('Summary update:', data);
 
         // setup for next interval
         this.beginTime = currentTime;
