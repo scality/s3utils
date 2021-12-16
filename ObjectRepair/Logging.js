@@ -80,7 +80,7 @@ class ProxyLoggerCreator {
     */
     constructor(logger) {
         this.logger = logger;
-        this.aggregateLogger = new AggregateLogger(env.LOG_INTERVAL);
+        this.aggregateLogger = new AggregateLogger(env.OBJECT_REPAIR_LOG_INTERVAL);
         const context = this;
         const logLevels = new Set(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
         const handlers = {
