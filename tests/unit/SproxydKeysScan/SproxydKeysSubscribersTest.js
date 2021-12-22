@@ -34,7 +34,7 @@ describe('SproxydKeysSubscribers', () => {
 
                 expect(processor.sproxydKeys.get(params.sproxydKey)).toEqual(newerVersion);
             });
-            expect(duplicateHandler.visitedObjects.size).toEqual(1);
+            expect(duplicateHandler.visitedObjects.size).toEqual(100);
         });
     });
 });

@@ -35,7 +35,7 @@ class DuplicateSproxydKeyFoundHandler {
     handle(params) {
         let needsRepair = false;
         // if existing object has been visited, do not repair again
-        const obj = params.objectKey.split('\u0000')[0];
+        const obj = params.objectKey;
         if (this.visitedObjects.has(obj)) {
             log.info(`Object ${obj} is repaired or has been scheduled for repair`,
                 { eventMessage: 'objectAlreadyVisited' });
