@@ -290,7 +290,7 @@ class RaftJournalReader {
                 if (err instanceof RangeError) {
                     log.debug(err.message, { eventMessage: 'noNewRecords' });
                 } else {
-                    log.error('Retrying in 5 seconds', { error: err.message });
+                    log.error('Retrying in 5 seconds', { error: err });
                 }
             }
             setTimeout(() => context.run(), timeout);
