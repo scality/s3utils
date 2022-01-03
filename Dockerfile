@@ -1,7 +1,7 @@
 FROM node:10
 
 WORKDIR /usr/src/app
-ENV BALLOT_VERSION 1.0.1
+ENV BALLOT_VERSION 1.0.2
 
 # Keep the .git directory in order to properly report version
 COPY ./package.json .
