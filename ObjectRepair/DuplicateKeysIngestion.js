@@ -33,6 +33,10 @@ class RaftJournalReader {
             subscribers
         );
         this._httpRequest = httpRequest;
+        this._useHttps = (process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined &&
+                          process.env.OBJECT_REPAIR_TLS_KEY_PATH !== '' &&
+                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined &&
+                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '');
     }
 
      /**
@@ -40,7 +44,8 @@ class RaftJournalReader {
      * @returns {string} - Url string for given Raft sesssion ID
      */
     _getJournalUrl(sessionId) {
-        return `http://${env.OBJECT_REPAIR_BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
+        const protocol = this._useHttps ? 'https' : 'http';
+        return `${protocol}://${env.OBJECT_REPAIR_BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
     }
 
     /**

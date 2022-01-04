@@ -39,6 +39,9 @@ Optional environment variables:
     OBJECT_REPAIR_LOG_LEVEL: defaults to info
     OBJECT_REPAIR_DUMP_LEVEL: defaults to error
     OBJECT_REPAIR_LOG_INTERVAL: logs summary of events in the given interval - defaults to 5 minutes
+    OBJECT_REPAIR_TLS_KEY_PATH: path to TLS key file
+    OBJECT_REPAIR_TLS_CERT_PATH: path to TLS cert file
+    OBJECT_REPAIR_TLS_CA_PATH: path to TLS alternate CA file
 `;
 for (const [key, value] of Object.entries(env)) {
     if (!value) {
