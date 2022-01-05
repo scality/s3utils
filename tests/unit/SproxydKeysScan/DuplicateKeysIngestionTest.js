@@ -11,6 +11,22 @@ function getMockResponse(mockStatusCode) {
     return mockResponse;
 }
 
+function getEmptyRsMockResponse() {
+    const mockBody = JSON.stringify({
+        info: {
+            start: 1,
+            cseq: 1,
+            prune: 1,
+        },
+        log: [],
+    });
+    const mockResponse = {
+        body: mockBody,
+        statusCode: 200,
+    };
+    return mockResponse;
+}
+
 const mockHttpRequest = (err, res) => jest.fn((method, requestUrl, requestBody, callback) => callback(err, res));
 
 function setupJournalReader() {
@@ -96,7 +112,7 @@ describe('RaftJournalReader', () => {
             });
         });
 
-        test('should return error with a none-200 status code', () => {
+        test('should return error with a non-200 status code', () => {
             reader._httpRequest = mockHttpRequest(null, getMockResponse(500));
             reader.getBatch((err, body) => {
                 returnedError(err, body);
@@ -112,6 +128,14 @@ describe('RaftJournalReader', () => {
 
         test('should return error with null response', () => {
             reader._httpRequest = mockHttpRequest(null, null);
+            reader.getBatch((err, body) => {
+                returnedError(err, body);
+            });
+        });
+
+        // FIXME this special case should be taken care of once S3C-3928 is fixed
+        test('should return error with response containing empty log', () => {
+            reader._httpRequest = mockHttpRequest(null, getEmptyRsMockResponse());
             reader.getBatch((err, body) => {
                 returnedError(err, body);
             });

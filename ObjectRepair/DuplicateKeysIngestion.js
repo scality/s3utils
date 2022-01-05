@@ -130,6 +130,10 @@ class RaftJournalReader {
             }
 
             const body = JSON.parse(res.body);
+            // FIXME this special case should be taken care of once S3C-3928 is fixed
+            if (body.log.length === 0) {
+                return cb(new RangeError(`GET ${requestUrl} found no new records at ${this.begin}`));
+            }
             return cb(null, body);
         });
     }
