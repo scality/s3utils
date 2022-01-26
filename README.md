@@ -535,6 +535,11 @@ the cleanup to objects created or modified before Jan 9th 2021.
 otherwise eligible noncurrent versions if the object's current version
 is a delete marker (also removes the delete marker)
 
+* **DELETED_BEFORE**: cleanup only objects whose current version is a delete
+    marker older than this date, e.g. setting to "2021-01-09T00:00:00Z"
+    limits the cleanup to objects deleted before Jan 9th 2021.
+    Implies `ONLY_DELETED = true`
+
 * **HTTPS_CA_PATH**: path to a CA certificate bundle used to
 authentify the S3 endpoint
 

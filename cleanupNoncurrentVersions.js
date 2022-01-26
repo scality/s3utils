@@ -25,7 +25,9 @@ const MAX_LISTED = (process.env.MAX_LISTED &&
 const MARKER = process.env.MARKER;
 const OLDER_THAN = (process.env.OLDER_THAN ?
                     new Date(process.env.OLDER_THAN) : null);
-const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED);
+const DELETED_BEFORE = (process.env.DELETED_BEFORE ?
+    new Date(process.env.DELETED_BEFORE) : null);
+const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
 const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
 const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
 
@@ -67,6 +69,10 @@ Optional environment variables:
     otherwise eligible noncurrent versions if the object's current
     version is a delete marker (also removes the delete marker as
     usual)
+    DELETED_BEFORE: cleanup only objects whose current version is a delete
+    marker older than this date, e.g. setting to "2021-01-09T00:00:00Z"
+    limits the cleanup to objects deleted before Jan 9th 2021.
+    Implies ONLY_DELETED=true
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
@@ -98,6 +104,11 @@ if (!SECRET_KEY) {
 }
 if (OLDER_THAN && isNaN(OLDER_THAN.getTime())) {
     console.error('OLDER_THAN is an invalid date');
+    console.error(USAGE);
+    process.exit(1);
+}
+if (DELETED_BEFORE && isNaN(DELETED_BEFORE.getTime())) {
+    console.error('DELETED_BEFORE is an invalid date');
     console.error(USAGE);
     process.exit(1);
 }
@@ -136,6 +147,7 @@ log.info('Start deleting noncurrent versions and delete markers', {
     startKey: MARKER_KEY,
     startVersionId: MARKER_VERSION_ID,
     olderThan: (OLDER_THAN ? OLDER_THAN.toString() : 'N/A'),
+    deletedBefore: (DELETED_BEFORE ? DELETED_BEFORE.toString() : 'N/A'),
     onlyDeleted: ONLY_DELETED,
 });
 
@@ -224,6 +236,10 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
 
 function _lastModifiedIsEligible(lastModifiedString) {
     return !OLDER_THAN || (new Date(lastModifiedString) < OLDER_THAN);
+}
+
+function _deleteMarkerIsEligible(lastModifiedString) {
+    return !DELETED_BEFORE || (new Date(lastModifiedString) < DELETED_BEFORE);
 }
 
 let deleteQueue = [];
@@ -327,18 +343,27 @@ function _triggerDeletesOnEligibleObjects(bucket, versions, deleteMarkers,
                    deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key) {
                 ++matchingDeleteMarkerIndex;
             }
-            if (matchingDeleteMarkerIndex < deleteMarkers.length &&
-                deleteMarkers[matchingDeleteMarkerIndex].Key === version.Key &&
-                deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true) {
+            const isDeleted = matchingDeleteMarkerIndex < deleteMarkers.length
+                && deleteMarkers[matchingDeleteMarkerIndex].Key === version.Key
+                && deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true;
+
+            const isEligible = isDeleted && _deleteMarkerIsEligible(
+                deleteMarkers[matchingDeleteMarkerIndex].LastModified);
+
+            if (isEligible) {
                 // the version is shadowed by a current delete marker
                 // with the same object key, satisfying the
                 // ONLY_DELETED condition
+                // If DELETED_BEFORE is set the delete marker is also
+                // older than the given timestamp.
                 versionsToDelete.push({
                     Key: version.Key,
                     VersionId: version.VersionId,
                 });
-            } else {
+            } else if (!isDeleted) {
                 nSkippedNotDeleted += 1;
+            } else {
+                nSkippedTooRecent += 1;
             }
         } else {
             versionsToDelete.push({
@@ -384,15 +409,18 @@ function _triggerDeletesOnEligibleObjects(bucket, versions, deleteMarkers,
                 // if ONLY_DELETED option is set, make sure the delete
                 // marker to delete is shadowed by another current
                 // delete marker with the same object key
-                if (!ONLY_DELETED
-                    || (lastCurrentDeleteMarker
-                        && lastCurrentDeleteMarker.Key === deleteMarker.Key)) {
+                const isDeleted = lastCurrentDeleteMarker
+                    && lastCurrentDeleteMarker.Key === deleteMarker.Key;
+                const isEligible = isDeleted && _deleteMarkerIsEligible(lastCurrentDeleteMarker.LastModified);
+                if (!ONLY_DELETED || isEligible) {
                     versionsToDelete.push({
                         Key: deleteMarker.Key,
                         VersionId: deleteMarker.VersionId,
                     });
-                } else {
+                } else if (!isDeleted) {
                     nSkippedNotDeleted += 1;
+                } else {
+                    nSkippedTooRecent += 1;
                 }
             } else {
                 ret = {
