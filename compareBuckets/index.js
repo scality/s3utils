@@ -4,7 +4,7 @@
 
 const { Logger } = require('werelogs');
 
-const { compareBuckets } = require('./compareBuckets');
+const DiffManager = require('./compareBuckets');
 
 const DEFAULT_WORKERS = 100;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
@@ -91,6 +91,10 @@ const log = new Logger('s3utils:compareListings');
 const status = {
     srcProcessedCount: 0,
     dstProcessedCount: 0,
+    srcOplogProcessedPutCount: 0,
+    srcOplogProcessedDelCount: 0,
+    dstOplogProcessedPutCount: 0,
+    dstOplogProcessedDelCount: 0,
     missingInSrcCount: 0,
     missingInDstCount: 0,
     dstBucketInProgress: null,
@@ -105,11 +109,15 @@ function logProgress(message, status) {
             bucket: status.srcBucketInProgress,
             objectsMissingInDestination: status.missingInDstCount,
             objectsScanned: status.srcProcessedCount,
+            objectsPutProcessedInOplog: status.srcOplogProcessedPutCount,
+            objectsDelProcessedInOplog: status.srcOplogProcessedDelCount,
         },
         destination: {
             bucket: status.dstBucketInProgress,
             objectsMissingInSource: status.missingInSrcCount,
             objectsScanned: status.dstProcessedCount,
+            objectsPutProcessedInOplog: status.dstOplogProcessedPutCount,
+            objectsDelProcessedInOplog: status.dstOplogProcessedDelCount,
         },
         keyMarker: status.srcKeyMarker < status.dstKeyMarker ?
             status.srcKeyMarker : status.dstKeyMarker,
@@ -139,7 +147,8 @@ function main() {
         compareObjectSize: COMPARE_OBJECT_SIZE,
         statusObj: status,
     };
-    compareBuckets(params, log, err => {
+    const diffMgr = new DiffManager(params, log);
+    diffMgr.start(err => {
         if (err) {
             log.error('an error occurred during scan', {
                 error: { message: err.message },
@@ -148,9 +157,10 @@ function main() {
             process.exit(1);
         } else {
             logProgress('completed scan', status);
+            diffMgr.dump();
             process.exit(0);
         }
-    }, status);
+    });
 }
 
 main();

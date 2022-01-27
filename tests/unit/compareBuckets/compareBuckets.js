@@ -1,11 +1,9 @@
+const assert = require('assert');
 const utils = require('../../../compareBuckets/utils');
 
 const listBucketMasterKeys = jest.spyOn(utils, 'listBucketMasterKeys');
 
-const {
-    compareBuckets,
-    compareObjectsReport,
-} = require('../../../compareBuckets/compareBuckets');
+const DiffManager = require('../../../compareBuckets/compareBuckets');
 const DummyLogger = require('../../mocks/DummyLogger');
 
 const log = new DummyLogger();
@@ -62,7 +60,8 @@ describe('compareBuckets', () => {
         dstStack.push([false, '', []]);
         srcStack.push([false, '', []]);
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('');
             expect(status.dstKeyMarker).toEqual('');
@@ -80,7 +79,8 @@ describe('compareBuckets', () => {
         );
         dstStack.push([false, '', []]);
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('3');
             expect(status.dstKeyMarker).toEqual('');
@@ -98,7 +98,8 @@ describe('compareBuckets', () => {
             [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('');
             expect(status.dstKeyMarker).toEqual('3');
@@ -118,7 +119,8 @@ describe('compareBuckets', () => {
             [false, '6', [newEntry('4'), newEntry('5'), newEntry('6')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('3');
             expect(status.dstKeyMarker).toEqual('6');
@@ -143,7 +145,8 @@ describe('compareBuckets', () => {
             [true, '4', [newEntry('4')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('3');
             expect(status.dstKeyMarker).toEqual('6');
@@ -172,7 +175,8 @@ describe('compareBuckets', () => {
             [true, '2', [newEntry('0'), newEntry('1'), newEntry('2')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('9');
             expect(status.dstKeyMarker).toEqual('9');
@@ -201,7 +205,8 @@ describe('compareBuckets', () => {
             [true, '12', [newEntry('10'), newEntry('11'), newEntry('12')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('9');
             expect(status.dstKeyMarker).toEqual('19');
@@ -229,7 +234,8 @@ describe('compareBuckets', () => {
             [true, '0', [newEntry('0')]]
         );
 
-        compareBuckets(params, log, err => {
+        const diffMgr = new DiffManager(params, log);
+        diffMgr.compareBuckets(err => {
             expect(err).toBeNull();
             expect(status.srcKeyMarker).toEqual('9');
             expect(status.dstKeyMarker).toEqual('9');
@@ -262,7 +268,8 @@ describe('commpareObjectsReports', () => {
     });
 
     it('should return null if compare options are not set', () => {
-        const report = compareObjectsReport(
+        const diffMgr = new DiffManager({ statusObj: {} }, log);
+        const report = diffMgr.compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
@@ -274,7 +281,8 @@ describe('commpareObjectsReports', () => {
     });
 
     it('should return report if content-length does match', () => {
-        const report = compareObjectsReport(
+        const diffMgr = new DiffManager({ statusObj: {} }, log);
+        const report = diffMgr.compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
@@ -301,7 +309,8 @@ describe('commpareObjectsReports', () => {
     });
 
     it('should return report if content-length does not match', () => {
-        const report = compareObjectsReport(
+        const diffMgr = new DiffManager({ statusObj: {} }, log);
+        const report = diffMgr.compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
@@ -329,7 +338,8 @@ describe('commpareObjectsReports', () => {
     });
 
     it('should return report if version-id does not match', () => {
-        const report = compareObjectsReport(
+        const diffMgr = new DiffManager({ statusObj: {} }, log);
+        const report = diffMgr.compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
@@ -356,7 +366,8 @@ describe('commpareObjectsReports', () => {
     });
 
     it('should return report if version-id does not match', () => {
-        const report = compareObjectsReport(
+        const diffMgr = new DiffManager({ statusObj: {} }, log);
+        const report = diffMgr.compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
@@ -381,5 +392,135 @@ describe('commpareObjectsReports', () => {
             },
             error: 'destination object version-id does not match source object',
         });
+    });
+});
+
+describe('genericUpdate', () => {
+    const status = {
+        srcProcessedCount: 0,
+        dstProcessedCount: 0,
+        missingInSrcCount: 0,
+        missingInDstCount: 0,
+        dstBucketInProgress: null,
+        srcBucketInProgress: null,
+        srcKeyMarker: '',
+        dstKeyMarker: '',
+    };
+
+    const params = {
+        bucketdSrcParams: {
+            bucket: 'src',
+            marker: '',
+            hostPort: '',
+        },
+        bucketdDstParams: {
+            bucket: 'dst',
+            marker: '',
+            hostPort: '',
+        },
+        statusObj: status,
+    };
+
+    // for add events
+    const obj1 = {
+        key: 'obj1',
+        value: {
+            versionId: 'a4f22157b6ad554d0e35fd5a7bb2c560',
+            size: 46573,
+            md5: '2df22eba370784b0af011f06a633ce8a',
+        },
+    };
+
+    // for delete events
+    const _obj1 = {
+        key: 'obj1',
+        value: {
+            versionId: 'a4f22157b6ad554d0e35fd5a7bb2c560',
+            // size and md5 are note available in bucketd
+        },
+    };
+
+    it('a new object on source shall be added on target', () => {
+        const addQueue = [];
+        const deleteQueue = [];
+        const diffMgr = new DiffManager(params, log);
+        params.statusObj.missingInDstCount = 0;
+        params.statusObj.missingInSrcCount = 0;
+        addQueue.push(obj1);
+        diffMgr.genericUpdate(
+            diffMgr.IdxSrc,
+            diffMgr.IdxDst,
+            addQueue,
+            deleteQueue);
+        assert(diffMgr.state[diffMgr.IdxSrc].getSize() === 0);
+        assert(diffMgr.state[diffMgr.IdxDst].getSize() === 1);
+        assert(diffMgr.state[diffMgr.IdxDst].get(obj1.key).mismatch === diffMgr.MismatchNoExist);
+        assert(diffMgr.state[diffMgr.IdxDst].get(obj1.key).versionId === obj1.value.versionId);
+        assert(diffMgr.params.statusObj.missingInSrcCount === 0);
+        assert(diffMgr.params.statusObj.missingInDstCount === 1);
+    });
+
+    it('a missing object on target shall be removed if received identical in target', () => {
+        const addQueue = [];
+        const deleteQueue = [];
+        const diffMgr = new DiffManager(params, log);
+        diffMgr._add(
+            diffMgr.IdxDst,
+            obj1,
+            diffMgr.MismatchNoExist);
+        params.statusObj.missingInDstCount = 1;
+        params.statusObj.missingInSrcCount = 0;
+        addQueue.push(obj1);
+        diffMgr.genericUpdate(
+            diffMgr.IdxDst,
+            diffMgr.IdxSrc,
+            addQueue,
+            deleteQueue);
+        assert(diffMgr.state[diffMgr.IdxSrc].getSize() === 0);
+        assert(diffMgr.state[diffMgr.IdxDst].getSize() === 0);
+        assert(diffMgr.params.statusObj.missingInSrcCount === 0);
+        assert(diffMgr.params.statusObj.missingInDstCount === 0);
+    });
+
+    it('a delete in target oplog add it to source', () => {
+        const addQueue = [];
+        const deleteQueue = [];
+        const diffMgr = new DiffManager(params, log);
+        params.statusObj.missingInDstCount = 0;
+        params.statusObj.missingInSrcCount = 0;
+        deleteQueue.push(_obj1);
+        diffMgr.genericUpdate(
+            diffMgr.IdxDst,
+            diffMgr.IdxSrc,
+            addQueue,
+            deleteQueue);
+        assert(diffMgr.state[diffMgr.IdxSrc].getSize() === 0);
+        assert(diffMgr.state[diffMgr.IdxDst].getSize() === 1);
+        assert(diffMgr.state[diffMgr.IdxDst].get(_obj1.key).mismatch === diffMgr.MismatchNoExist);
+        assert(diffMgr.state[diffMgr.IdxDst].get(_obj1.key).versionId === _obj1.value.versionId);
+        assert(diffMgr.params.statusObj.missingInSrcCount === 0);
+        assert(diffMgr.params.statusObj.missingInDstCount === 1);
+    });
+
+    it('a missing object on source shall be removed if del received in target oplog', () => {
+        const addQueue = [];
+        const deleteQueue = [];
+        const diffMgr = new DiffManager(params, log);
+        diffMgr._add(
+            diffMgr.IdxSrc,
+            obj1,
+            diffMgr.MismatchNoExist);
+        params.statusObj.missingInDstCount = 0;
+        params.statusObj.missingInSrcCount = 1;
+        deleteQueue.push(_obj1);
+        diffMgr.genericUpdate(
+            diffMgr.IdxDst,
+            diffMgr.IdxSrc,
+            addQueue,
+            deleteQueue);
+        assert(diffMgr.state[diffMgr.IdxSrc].getSize() === 0);
+        assert(diffMgr.state[diffMgr.IdxDst].getSize() === 0);
+        assert(diffMgr.params.statusObj.missingInSrcCount === 0);
+        assert(diffMgr.params.statusObj.missingInDstCount === 0);
     });
 });
