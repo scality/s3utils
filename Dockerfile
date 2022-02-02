@@ -1,4 +1,4 @@
-FROM node:10
+FROM node:16
 
 WORKDIR /usr/src/app
 ENV MONGO_VER 3.6.8
