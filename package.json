@@ -45,6 +45,7 @@
     "eslint-config-airbnb": "^19.0.0",
     "eslint-config-scality": "github:scality/Guidelines#improvement/GDL-5-node-16-upgrade",
     "eslint-plugin-jest": "^23.6.0",
+    "eslint-plugin-import": "^2.20.1",
     "jest": "^23.6.0"
   }
 }
