@@ -8,20 +8,28 @@ const { doWhilst, eachSeries } = require('async');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
+
+function _parseBoolean(value) {
+    return ['1', 'true', 'yes'].includes((value || '').toLowerCase());
+}
+
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const { ACCESS_KEY } = process.env;
-const { SECRET_KEY } = process.env;
-const { S3_ENDPOINT } = process.env;
-const { TARGET_PREFIX } = process.env;
-const MAX_DELETES = (process.env.MAX_DELETES
-    && Number.parseInt(process.env.MAX_DELETES, 10));
-const MAX_LISTED = (process.env.MAX_LISTED
-    && Number.parseInt(process.env.MAX_LISTED, 10));
-const { MARKER } = process.env;
-const OLDER_THAN = (process.env.OLDER_THAN
-    ? new Date(process.env.OLDER_THAN) : null);
-const { HTTPS_CA_PATH } = process.env;
-const { HTTPS_NO_VERIFY } = process.env;
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const SECRET_KEY = process.env.SECRET_KEY;
+const S3_ENDPOINT = process.env.S3_ENDPOINT;
+const TARGET_PREFIX = process.env.TARGET_PREFIX;
+const MAX_DELETES = (process.env.MAX_DELETES &&
+    Number.parseInt(process.env.MAX_DELETES, 10));
+const MAX_LISTED = (process.env.MAX_LISTED &&
+    Number.parseInt(process.env.MAX_LISTED, 10));
+const MARKER = process.env.MARKER;
+const OLDER_THAN = (process.env.OLDER_THAN ?
+                    new Date(process.env.OLDER_THAN) : null);
+const DELETED_BEFORE = (process.env.DELETED_BEFORE ?
+    new Date(process.env.DELETED_BEFORE) : null);
+const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
+const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
+const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
@@ -51,12 +59,20 @@ Optional environment variables:
     (default unlimited)
     MARKER: marker from which to resume the cleanup, logged at the end
     of a previous invocation of the script, uses the format:
-    MARKER := encodeURI(bucketName)
-              "|" encodeURI(key)
-              "|" encodeURI(versionId)
+      MARKER := encodeURI(bucketName)
+                "|" encodeURI(key)
+                "|" encodeURI(versionId)
     OLDER_THAN: cleanup only objects which last modified date is older
     than this date, e.g. setting to "2021-01-09T00:00:00Z" limits the
     cleanup to objects created or modified before Jan 9th 2021.
+    ONLY_DELETED: if set to "1" or "true" or "yes", only remove
+    otherwise eligible noncurrent versions if the object's current
+    version is a delete marker (also removes the delete marker as
+    usual)
+    DELETED_BEFORE: cleanup only objects whose current version is a delete
+    marker older than this date, e.g. setting to "2021-01-09T00:00:00Z"
+    limits the cleanup to objects deleted before Jan 9th 2021.
+    Implies ONLY_DELETED=true
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
@@ -88,6 +104,11 @@ if (!SECRET_KEY) {
 }
 if (OLDER_THAN && Number.isNaN(OLDER_THAN.getTime())) {
     console.error('OLDER_THAN is an invalid date');
+    console.error(USAGE);
+    process.exit(1);
+}
+if (DELETED_BEFORE && isNaN(DELETED_BEFORE.getTime())) {
+    console.error('DELETED_BEFORE is an invalid date');
     console.error(USAGE);
     process.exit(1);
 }
@@ -126,6 +147,8 @@ log.info('Start deleting noncurrent versions and delete markers', {
     startKey: MARKER_KEY,
     startVersionId: MARKER_VERSION_ID,
     olderThan: (OLDER_THAN ? OLDER_THAN.toString() : 'N/A'),
+    deletedBefore: (DELETED_BEFORE ? DELETED_BEFORE.toString() : 'N/A'),
+    onlyDeleted: ONLY_DELETED,
 });
 
 let agent;
@@ -177,6 +200,7 @@ let nDeletesTriggered = 0;
 let nDeleted = 0;
 let nSkippedCurrent = 0;
 let nSkippedTooRecent = 0;
+let nSkippedNotDeleted = 0;
 let nErrors = 0;
 let bucketInProgress = null;
 let KeyMarker = null;
@@ -189,6 +213,7 @@ function _logProgress(message) {
         deleted: nDeleted,
         skippedCurrent: nSkippedCurrent,
         skippedTooRecent: nSkippedTooRecent,
+        skippedNotDeleted: nSkippedNotDeleted,
         errors: nErrors,
         bucket: bucketInProgress || null,
         keyMarker: KeyMarker || null,
@@ -213,6 +238,10 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
 
 function _lastModifiedIsEligible(lastModifiedString) {
     return !OLDER_THAN || (new Date(lastModifiedString) < OLDER_THAN);
+}
+
+function _deleteMarkerIsEligible(lastModifiedString) {
+    return !DELETED_BEFORE || (new Date(lastModifiedString) < DELETED_BEFORE);
 }
 
 let deleteQueue = [];
@@ -308,11 +337,43 @@ function _triggerDeletesOnEligibleObjects(
     cb,
 ) {
     const versionsToDelete = [];
+    let matchingDeleteMarkerIndex = 0;
     versions.forEach(version => {
         if (version.IsLatest !== false) {
             nSkippedCurrent += 1;
         } else if (!_lastModifiedIsEligible(version.LastModified)) {
             nSkippedTooRecent += 1;
+        } else if (ONLY_DELETED) {
+            // check that noncurrent versions candidate for deletion
+            // are shadowed by a current delete marker
+
+            // position to first delete marker with same or higher object key
+            while (matchingDeleteMarkerIndex < deleteMarkers.length &&
+                   deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key) {
+                ++matchingDeleteMarkerIndex;
+            }
+            const isDeleted = matchingDeleteMarkerIndex < deleteMarkers.length
+                && deleteMarkers[matchingDeleteMarkerIndex].Key === version.Key
+                && deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true;
+
+            const isEligible = isDeleted && _deleteMarkerIsEligible(
+                deleteMarkers[matchingDeleteMarkerIndex].LastModified);
+
+            if (isEligible) {
+                // the version is shadowed by a current delete marker
+                // with the same object key, satisfying the
+                // ONLY_DELETED condition
+                // If DELETED_BEFORE is set the delete marker is also
+                // older than the given timestamp.
+                versionsToDelete.push({
+                    Key: version.Key,
+                    VersionId: version.VersionId,
+                });
+            } else if (!isDeleted) {
+                nSkippedNotDeleted += 1;
+            } else {
+                nSkippedTooRecent += 1;
+            }
         } else {
             versionsToDelete.push({
                 Key: version.Key,
@@ -321,7 +382,11 @@ function _triggerDeletesOnEligibleObjects(
         }
     });
     let ret = null;
+    let lastCurrentDeleteMarker = null;
     deleteMarkers.forEach(deleteMarker => {
+        if (deleteMarker.IsLatest === true) {
+            lastCurrentDeleteMarker = deleteMarker;
+        }
         if (!_lastModifiedIsEligible(deleteMarker.LastModified)) {
             nSkippedTooRecent += 1;
         } else {
@@ -350,10 +415,22 @@ function _triggerDeletesOnEligibleObjects(
                     && (versions[versions.length - 1].Key
                         > deleteMarker.Key))
                 || endOfListing) {
-                versionsToDelete.push({
-                    Key: deleteMarker.Key,
-                    VersionId: deleteMarker.VersionId,
-                });
+                // if ONLY_DELETED option is set, make sure the delete
+                // marker to delete is shadowed by another current
+                // delete marker with the same object key
+                const isDeleted = lastCurrentDeleteMarker
+                    && lastCurrentDeleteMarker.Key === deleteMarker.Key;
+                const isEligible = isDeleted && _deleteMarkerIsEligible(lastCurrentDeleteMarker.LastModified);
+                if (!ONLY_DELETED || isEligible) {
+                    versionsToDelete.push({
+                        Key: deleteMarker.Key,
+                        VersionId: deleteMarker.VersionId,
+                    });
+                } else if (!isDeleted) {
+                    nSkippedNotDeleted += 1;
+                } else {
+                    nSkippedTooRecent += 1;
+                }
             } else {
                 ret = {
                     NextKeyMarker: deleteMarker.Key,

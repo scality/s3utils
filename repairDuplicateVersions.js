@@ -12,7 +12,7 @@ const {
 const log = new Logger('s3utils:repairDuplicateVersions');
 
 const {
-    BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
+    OBJECT_REPAIR_BUCKETD_HOSTPORT, OBJECT_REPAIR_SPROXYD_HOSTPORT,
 } = process.env;
 
 const USAGE = `
@@ -44,12 +44,12 @@ Mandatory environment variables:
     SPROXYD_HOSTPORT: ip:port of sproxyd endpoint
 `;
 
-if (!BUCKETD_HOSTPORT) {
+if (!OBJECT_REPAIR_BUCKETD_HOSTPORT) {
     console.error('ERROR: BUCKETD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);
 }
-if (!SPROXYD_HOSTPORT) {
+if (!OBJECT_REPAIR_SPROXYD_HOSTPORT) {
     console.error('ERROR: SPROXYD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);

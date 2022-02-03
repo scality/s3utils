@@ -1,7 +1,6 @@
 const { Logger } = require('werelogs');
 const { ProxyLoggerCreator } = require('./Logging');
-
-const log = new ProxyLoggerCreator(new Logger('s3utils:DuplicateKeysWindow'));
+const log = new ProxyLoggerCreator(new Logger('ObjectRepair:DuplicateKeysWindow'));
 
 /**
  * @class

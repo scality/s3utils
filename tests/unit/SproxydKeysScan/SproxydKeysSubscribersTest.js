@@ -10,7 +10,7 @@ describe('SproxydKeysSubscribers', () => {
         const version = () => `${randomize('0', 3)}.${randomize('0', 3)}`;
 
         test('the higher (older) version is always repaired and then the lower (newer) version is set in map', () => {
-            range(100).forEach(() => {
+            range(100).forEach(idx => {
                 const params = {
                     objectKey: key + version(),
                     existingObjectKey: key + version(),
@@ -24,9 +24,17 @@ describe('SproxydKeysSubscribers', () => {
                     .map(obj => duplicateHandler._getObjectURL(params.bucket, obj));
 
                 duplicateHandler.handle(params);
-                expect(duplicateHandler._repairObject).toHaveBeenCalledWith({ objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything());
+                if (idx === 0) {
+                    expect(duplicateHandler.queue.push).toHaveBeenCalledWith(
+                        { objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything()
+                  );
+                } else {
+                    expect(duplicateHandler.queue.push).not.toHaveBeenCalledWith();
+                }
+
                 expect(processor.sproxydKeys.get(params.sproxydKey)).toEqual(newerVersion);
             });
+            expect(duplicateHandler.visitedObjects.size).toEqual(100);
         });
     });
 });

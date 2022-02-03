@@ -2,17 +2,11 @@ const { waterfall } = require('async');
 const { Logger } = require('werelogs');
 const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
-const { ProxyLoggerCreator } = require('./Logging');
+const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');
 const { subscribers } = require('./SproxydKeysSubscribers');
 const { env } = require('./env');
 
-const {
-    BUCKETD_HOSTPORT,
-    DUPLICATE_KEYS_WINDOW_SIZE,
-    LOOKBACK_WINDOW,
-} = env;
-
-const log = new ProxyLoggerCreator(new Logger('s3utils:DuplicateKeysIngestion'));
+const log = new ProxyLoggerCreator(new Logger('ObjectRepair:DuplicateKeysIngestion'));
 /**
  * @class
  * @classdesc In order to send keys to DuplicateKeysWindow, we need to read the raft journals.
@@ -27,17 +21,22 @@ class RaftJournalReader {
      * @param {number} sessionId - Raft Session Id that the reader will poll from.
      */
     constructor(begin, limit, sessionId) {
-        this.lookBack = Number.parseInt(LOOKBACK_WINDOW, 10);
+        this.lookBack = Number.parseInt(env.OBJECT_REPAIR_LOOKBACK_WINDOW, 10);
+        this.aggregateLogger = new AggregateLogger(env.OBJECT_REPAIR_LOG_INTERVAL);
         this.begin = begin;
         this.cseq = null;
         this.limit = limit;
         this.sessionId = sessionId;
         this.url = this._getJournalUrl(sessionId);
         this.processor = new SproxydKeysProcessor(
-            DUPLICATE_KEYS_WINDOW_SIZE,
-            subscribers,
+            env.OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE,
+            subscribers
         );
         this._httpRequest = httpRequest;
+        this._useHttps = (process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined &&
+                          process.env.OBJECT_REPAIR_TLS_KEY_PATH !== '' &&
+                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined &&
+                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '');
     }
 
     /**
@@ -45,7 +44,8 @@ class RaftJournalReader {
      * @returns {string} - Url string for given Raft sesssion ID
      */
     _getJournalUrl(sessionId) {
-        return `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
+        const protocol = this._useHttps ? 'https' : 'http';
+        return `${protocol}://${env.OBJECT_REPAIR_BUCKETD_HOSTPORT}/_/raft_sessions/${sessionId}`;
     }
 
     /**
@@ -70,10 +70,12 @@ class RaftJournalReader {
         const requestUrl = `${this.url}/log?begin=1&limit=1&targetLeader=False`;
         return this._httpRequest('GET', requestUrl, null, (err, res) => {
             if (err) {
-                log.error('unable to fetch cseq', { err });
+                log.error('unable to fetch cseq', { err, requestUrl });
                 return cb(err);
             }
+
             const body = JSON.parse(res.body);
+
             this._setCseq(body);
 
             // make sure begin is at least 1 since Raft Journal logs are 1-indexed
@@ -133,6 +135,10 @@ class RaftJournalReader {
             }
 
             const body = JSON.parse(res.body);
+            // FIXME this special case should be taken care of once S3C-3928 is fixed
+            if (body.log.length === 0) {
+                return cb(new RangeError(`GET ${requestUrl} found no new records at ${this.begin}`));
+            }
             return cb(null, body);
         });
     }
@@ -215,10 +221,11 @@ class RaftJournalReader {
                 return cb(err);
             }
         }
-
+        const oldBegin = this.begin;
         // if we go over cseq, start at cseq + 1 while waiting for new raft journal entries
         this.begin = Math.min(this.limit + this.begin, this.cseq + 1);
-        log.debug('updateStatus succeeded', { eventMessage: 'batchUpdateSuccess' });
+        this.aggregateLogger.update('cseqProcessed', this.begin - oldBegin);
+        log.debug('updateStatus succeeded', { eventMessage: 'batchProcessed' });
         return cb(null, true);
     }
 
@@ -298,7 +305,7 @@ class RaftJournalReader {
                 if (err instanceof RangeError) {
                     log.debug(err.message, { eventMessage: 'noNewRecords' });
                 } else {
-                    log.error('Retrying in 5 seconds', { error: err });
+                    log.error('Retrying in 5 seconds', { error: err.message, offset: this.begin });
                 }
             }
             setTimeout(() => context.run(), timeout);

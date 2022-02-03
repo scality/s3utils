@@ -125,6 +125,7 @@ const status = {
     objectsErrors: 0,
     bucketInProgress: null,
     KeyMarker: '',
+    bucketsDeleted: 0
 };
 
 let remainingBuckets = (BUCKETS && BUCKETS.split(',')) || [];
@@ -358,6 +359,13 @@ function listBucketIter(bucket, cb) {
         if (err) {
             return cb(err);
         }
+
+        if (res.statusCode === 404) {
+            // the bucket was deleted during scan, so we continue to next bucket
+            status.bucketsDeleted += 1;
+            return cb(null, false);
+        }
+
         if (res.statusCode !== 200) {
             return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
         }
