@@ -1,6 +1,5 @@
-const { AggregateLogger, ProxyLoggerCreator } = require('../../../ObjectRepair/Logging');
 const { Logger } = require('werelogs');
-const { AggregateLogger, ProxyLoggerCreator } = require('../../../SproxydKeysScan/Logging');
+const { AggregateLogger, ProxyLoggerCreator } = require('../../../ObjectRepair/Logging');
 
 describe('SproxydKeysScan:Logging', () => {
     describe('AggregateLogger', () => {

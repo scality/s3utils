@@ -14,22 +14,22 @@ function _parseBoolean(value) {
 }
 
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const S3_ENDPOINT = process.env.S3_ENDPOINT;
-const TARGET_PREFIX = process.env.TARGET_PREFIX;
-const MAX_DELETES = (process.env.MAX_DELETES &&
-    Number.parseInt(process.env.MAX_DELETES, 10));
-const MAX_LISTED = (process.env.MAX_LISTED &&
-    Number.parseInt(process.env.MAX_LISTED, 10));
-const MARKER = process.env.MARKER;
-const OLDER_THAN = (process.env.OLDER_THAN ?
-                    new Date(process.env.OLDER_THAN) : null);
-const DELETED_BEFORE = (process.env.DELETED_BEFORE ?
-    new Date(process.env.DELETED_BEFORE) : null);
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { S3_ENDPOINT } = process.env;
+const { TARGET_PREFIX } = process.env;
+const MAX_DELETES = (process.env.MAX_DELETES
+    && Number.parseInt(process.env.MAX_DELETES, 10));
+const MAX_LISTED = (process.env.MAX_LISTED
+    && Number.parseInt(process.env.MAX_LISTED, 10));
+const { MARKER } = process.env;
+const OLDER_THAN = (process.env.OLDER_THAN
+    ? new Date(process.env.OLDER_THAN) : null);
+const DELETED_BEFORE = (process.env.DELETED_BEFORE
+    ? new Date(process.env.DELETED_BEFORE) : null);
 const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
-const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
-const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
+const { HTTPS_CA_PATH } = process.env;
+const { HTTPS_NO_VERIFY } = process.env;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
@@ -107,7 +107,7 @@ if (OLDER_THAN && Number.isNaN(OLDER_THAN.getTime())) {
     console.error(USAGE);
     process.exit(1);
 }
-if (DELETED_BEFORE && isNaN(DELETED_BEFORE.getTime())) {
+if (DELETED_BEFORE && Number.isNaN(DELETED_BEFORE.getTime())) {
     console.error('DELETED_BEFORE is an invalid date');
     console.error(USAGE);
     process.exit(1);
@@ -348,8 +348,8 @@ function _triggerDeletesOnEligibleObjects(
             // are shadowed by a current delete marker
 
             // position to first delete marker with same or higher object key
-            while (matchingDeleteMarkerIndex < deleteMarkers.length &&
-                   deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key) {
+            while (matchingDeleteMarkerIndex < deleteMarkers.length
+                   && deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key) {
                 ++matchingDeleteMarkerIndex;
             }
             const isDeleted = matchingDeleteMarkerIndex < deleteMarkers.length
@@ -357,7 +357,8 @@ function _triggerDeletesOnEligibleObjects(
                 && deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true;
 
             const isEligible = isDeleted && _deleteMarkerIsEligible(
-                deleteMarkers[matchingDeleteMarkerIndex].LastModified);
+                deleteMarkers[matchingDeleteMarkerIndex].LastModified,
+            );
 
             if (isEligible) {
                 // the version is shadowed by a current delete marker

@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
+const werelogs = require('werelogs');
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
 const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');
-const werelogs = require('werelogs');
 const { env } = require('./env');
 
 const loggerConfig = {
@@ -59,13 +59,13 @@ env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ = process.env.OBJECT_REPAIR_RAFT_LOG_BEGIN_
  */
 function runJournalReader() {
     if (env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ === undefined) {
-        log.info('OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ is not defined.' +
-        'Ingestion will start at latest cseq - OBJECT_REPAIR_LOOKBACK_WINDOW');
+        log.info('OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ is not defined.'
+        + 'Ingestion will start at latest cseq - OBJECT_REPAIR_LOOKBACK_WINDOW');
     }
     const reader = new RaftJournalReader(
         Number.parseInt(env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ, 10),
         Number.parseInt(env.OBJECT_REPAIR_RAFT_LOG_BATCH_SIZE, 10),
-        Number.parseInt(env.OBJECT_REPAIR_RAFT_SESSION_ID, 10)
+        Number.parseInt(env.OBJECT_REPAIR_RAFT_SESSION_ID, 10),
     );
     reader.run();
 }

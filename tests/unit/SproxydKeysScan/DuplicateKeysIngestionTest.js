@@ -1,6 +1,6 @@
+const fs = require('fs');
 const { RaftJournalReader } = require('../../../ObjectRepair/DuplicateKeysIngestion');
 const { subscribers } = require('../../../ObjectRepair/SproxydKeysSubscribers');
-const fs = require('fs');
 
 function getMockResponse(mockStatusCode) {
     const mockBody = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');

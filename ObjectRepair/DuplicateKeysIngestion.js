@@ -30,13 +30,13 @@ class RaftJournalReader {
         this.url = this._getJournalUrl(sessionId);
         this.processor = new SproxydKeysProcessor(
             env.OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE,
-            subscribers
+            subscribers,
         );
         this._httpRequest = httpRequest;
-        this._useHttps = (process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined &&
-                          process.env.OBJECT_REPAIR_TLS_KEY_PATH !== '' &&
-                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined &&
-                          process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '');
+        this._useHttps = (process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined
+                          && process.env.OBJECT_REPAIR_TLS_KEY_PATH !== ''
+                          && process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined
+                          && process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '');
     }
 
     /**

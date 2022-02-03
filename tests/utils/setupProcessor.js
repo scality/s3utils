@@ -1,6 +1,6 @@
+const async = require('async');
 const { MultiMap, SproxydKeysProcessor } = require('../../ObjectRepair/DuplicateKeysWindow');
 const { DuplicateSproxydKeyFoundHandler } = require('../../ObjectRepair/SproxydKeysSubscribers');
-const async = require('async');
 
 const setupProcessor = windowSize => {
     async.wrapASync = jest.fn().mockImplementation(fn => fn);

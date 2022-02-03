@@ -1,9 +1,10 @@
+const { queue } = require('async');
+const { Logger } = require('werelogs');
 const { MultiMap, BoundedMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
 const { ProxyLoggerCreator } = require('./Logging');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
-const { queue } = require('async');
-const { env } = require('./env.js');
+const { env } = require('./env');
 
 const log = new ProxyLoggerCreator(new Logger('ObjectRepair:SproxydKeysSubscribers'));
 const subscribers = new MultiMap();
@@ -36,8 +37,10 @@ class DuplicateSproxydKeyFoundHandler {
         // if existing object has been visited, do not repair again
         const obj = params.objectKey;
         if (this.visitedObjects.has(obj)) {
-            log.info(`Object ${obj} is repaired or has been scheduled for repair`,
-                { eventMessage: 'objectAlreadyVisited' });
+            log.info(
+                `Object ${obj} is repaired or has been scheduled for repair`,
+                { eventMessage: 'objectAlreadyVisited' },
+            );
         } else {
             this.visitedObjects.setAndUpdate(obj, true);
             needsRepair = true;

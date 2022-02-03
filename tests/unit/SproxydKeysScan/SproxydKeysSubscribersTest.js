@@ -25,9 +25,7 @@ describe('SproxydKeysSubscribers', () => {
 
                 duplicateHandler.handle(params);
                 if (idx === 0) {
-                    expect(duplicateHandler.queue.push).toHaveBeenCalledWith(
-                        { objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything()
-                  );
+                    expect(duplicateHandler.queue.push).toHaveBeenCalledWith({ objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything());
                 } else {
                     expect(duplicateHandler.queue.push).not.toHaveBeenCalledWith();
                 }

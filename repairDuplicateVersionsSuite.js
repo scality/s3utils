@@ -21,10 +21,10 @@ const {
     OBJECT_REPAIR_TLS_CA_PATH,
 } = process.env;
 
-const useHttps = (OBJECT_REPAIR_TLS_KEY_PATH !== undefined &&
-                  OBJECT_REPAIR_TLS_KEY_PATH !== '' &&
-                  OBJECT_REPAIR_TLS_CERT_PATH !== undefined &&
-                  OBJECT_REPAIR_TLS_CERT_PATH !== '');
+const useHttps = (OBJECT_REPAIR_TLS_KEY_PATH !== undefined
+                  && OBJECT_REPAIR_TLS_KEY_PATH !== ''
+                  && OBJECT_REPAIR_TLS_CERT_PATH !== undefined
+                  && OBJECT_REPAIR_TLS_CERT_PATH !== '');
 
 const log = new Logger('s3utils:repairDuplicateVersions');
 
@@ -32,18 +32,18 @@ const sproxydAgent = new http.Agent({
     keepAlive: true,
 });
 
-const bucketdAgent = useHttps ?
-      new https.Agent({
-          key: fs.readFileSync(OBJECT_REPAIR_TLS_KEY_PATH),
-          cert: fs.readFileSync(OBJECT_REPAIR_TLS_CERT_PATH),
-          ca: OBJECT_REPAIR_TLS_CA_PATH ?
-              [fs.readFileSync(OBJECT_REPAIR_TLS_CA_PATH)] :
-              undefined,
-          keepAlive: true,
-      }) :
-      new http.Agent({
-          keepAlive: true,
-      });
+const bucketdAgent = useHttps
+    ? new https.Agent({
+        key: fs.readFileSync(OBJECT_REPAIR_TLS_KEY_PATH),
+        cert: fs.readFileSync(OBJECT_REPAIR_TLS_CERT_PATH),
+        ca: OBJECT_REPAIR_TLS_CA_PATH
+            ? [fs.readFileSync(OBJECT_REPAIR_TLS_CA_PATH)]
+            : undefined,
+        keepAlive: true,
+    })
+    : new http.Agent({
+        keepAlive: true,
+    });
 
 let sproxydAlias;
 const objectsToRepair = [];
@@ -212,10 +212,8 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
         cb(err, newKey);
     });
     const newKey = genSproxydKey(sproxydKey);
-    const sproxydSourceUrl =
-          new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
-    const sproxydDestUrl =
-          new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
+    const sproxydSourceUrl = new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
+    const sproxydDestUrl = new URL(`http://${OBJECT_REPAIR_SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
     const sourceReq = http.request({
         hostname: sproxydSourceUrl.hostname,
         port: sproxydSourceUrl.port,
