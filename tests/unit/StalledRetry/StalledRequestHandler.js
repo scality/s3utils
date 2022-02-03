@@ -80,8 +80,7 @@ describe('StalledRequestHandler', () => {
         });
 
         test('should return error from queue', done => {
-            mockClient.retryFailedObjects.mockImplementation((param, cb) =>
-                cb(new Error('test client error')));
+            mockClient.retryFailedObjects.mockImplementation((param, cb) => cb(new Error('test client error')));
             mockSourceGetBatchResponses([
                 [null, generateRequestArray('bucket', 'key', 'loc-1')],
                 [null, generateRequestArray('bucket', 'key', 'loc-2')],
@@ -98,8 +97,7 @@ describe('StalledRequestHandler', () => {
         });
 
         test('should wait until queue is completed', done => {
-            mockClient.retryFailedObjects.mockImplementation((_, cb) =>
-                setTimeout(() => cb(), 500));
+            mockClient.retryFailedObjects.mockImplementation((_, cb) => setTimeout(() => cb(), 500));
             mockSource.getInfo.mockImplementation(() => ({ stalled: 1 }));
             mockSourceGetBatchResponses([
                 [null, generateRequestArray('bucket', 'key', 'loc-1')],
@@ -119,8 +117,7 @@ describe('StalledRequestHandler', () => {
         });
 
         test('should complete successfully', done => {
-            mockClient.retryFailedObjects.mockImplementation((_, cb) =>
-                setTimeout(() => cb(), 500));
+            mockClient.retryFailedObjects.mockImplementation((_, cb) => setTimeout(() => cb(), 500));
             mockSource.getInfo.mockImplementation(() => ({ stalled: 1 }));
             mockSourceGetBatchResponses([
                 [null, generateRequestArray('bucket', 'key', 'loc-1')],

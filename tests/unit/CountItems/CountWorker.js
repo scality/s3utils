@@ -185,9 +185,11 @@ describe('CountItems::CountWorker', () => {
         mongoMock.client.isConnected
             .mockImplementationOnce(() => tc.mock.isConnected);
         mongoMock._getIsTransient.mockImplementationOnce(
-            (_a, _b, cb) => cb(...tc.mock.getIsTransient));
+            (_a, _b, cb) => cb(...tc.mock.getIsTransient),
+        );
         mongoMock.getObjectMDStats.mockImplementationOnce(
-            (_a, _b, _c, _d, cb) => cb(...tc.mock.getObjectMDStats));
+            (_a, _b, _c, _d, cb) => cb(...tc.mock.getObjectMDStats),
+        );
         w.handleMessage(tc.incomingMessage);
         setTimeout(() => {
             expect(testSendFn).toHaveBeenCalledWith(e.message);

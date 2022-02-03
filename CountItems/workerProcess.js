@@ -1,7 +1,6 @@
 const werelogs = require('werelogs');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
-const { MongoClientInterface } =
-    require('arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 
 const CountWorker = require('./CountWorker');
 const { createMongoParams } = require('./utils');

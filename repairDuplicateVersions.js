@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 const async = require('async');
+const { Logger } = require('werelogs');
 const {
     repairObjects,
     readVerifyLog,
@@ -7,7 +8,6 @@ const {
     logProgress,
     checkStatus,
 } = require('./repairDuplicateVersionsSuite');
-const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils:repairDuplicateVersions');
 

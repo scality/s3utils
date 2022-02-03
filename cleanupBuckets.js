@@ -6,12 +6,12 @@ const { Logger } = require('werelogs');
 const log = new Logger('s3utils::emptyBucket');
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' +
-        'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide '
+        + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -87,7 +87,10 @@ function cleanupVersions(bucket, cb) {
     let VersionIdMarker = null;
     let KeyMarker = null;
     async.doWhilst(
-        done => _listObjectVersions(bucket, VersionIdMarker, KeyMarker,
+        done => _listObjectVersions(
+            bucket,
+            VersionIdMarker,
+            KeyMarker,
             (err, data) => {
                 if (err) {
                     return done(err);
@@ -96,16 +99,20 @@ function cleanupVersions(bucket, cb) {
                 KeyMarker = data.NextKeyMarker;
                 const keysToDelete = _getKeys(data.Versions);
                 const markersToDelete = _getKeys(data.DeleteMarkers);
-                return _deleteVersions(bucket,
-                    keysToDelete.concat(markersToDelete), done);
-            }),
+                return _deleteVersions(
+                    bucket,
+                    keysToDelete.concat(markersToDelete),
+                    done,
+                );
+            },
+        ),
         () => {
             if (VersionIdMarker || KeyMarker) {
                 return true;
             }
             return false;
         },
-        cb
+        cb,
     );
 }
 
@@ -117,12 +124,16 @@ function abortAllMultipartUploads(bucket, cb) {
         if (!res || !res.Uploads) {
             return cb();
         }
-        return async.mapLimit(res.Uploads, 10,
+        return async.mapLimit(
+            res.Uploads,
+            10,
             (item, done) => {
                 const { Key, UploadId } = item;
                 const params = { Bucket: bucket, Key, UploadId };
                 s3.abortMultipartUpload(params, done);
-            }, cb);
+            },
+            cb,
+        );
     });
 }
 

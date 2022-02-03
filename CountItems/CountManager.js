@@ -44,21 +44,20 @@ class CountManager {
         this.store.versions += results.versions;
         this.store.objects += results.objects;
         this.store.stalled += results.stalled;
-        if (results.dataManaged &&
-            results.dataManaged.locations &&
-            results.dataManaged.total) {
-            const locations = results.dataManaged.locations;
+        if (results.dataManaged
+            && results.dataManaged.locations
+            && results.dataManaged.total) {
+            const { locations } = results.dataManaged;
             this.store.dataManaged.total.curr += results.dataManaged.total.curr;
             this.store.dataManaged.total.prev += results.dataManaged.total.prev;
             Object.keys(locations).forEach(site => {
                 if (!this.store.dataManaged.byLocation[site]) {
-                    this.store.dataManaged.byLocation[site] =
-                        Object.assign({}, locations[site]);
+                    this.store.dataManaged.byLocation[site] = { ...locations[site] };
                 } else {
-                    this.store.dataManaged.byLocation[site].curr +=
-                        locations[site].curr;
-                    this.store.dataManaged.byLocation[site].prev +=
-                        locations[site].prev;
+                    this.store.dataManaged.byLocation[site].curr
+                        += locations[site].curr;
+                    this.store.dataManaged.byLocation[site].prev
+                        += locations[site].prev;
                 }
             });
         }
@@ -66,16 +65,25 @@ class CountManager {
 
     setup(callback) {
         async.series([
-            next => async.forEach(this.workers,
-                (worker, done) => worker.init(done), next),
-            next => async.forEach(this.workers,
-                (worker, done) => worker.setup(done), next),
+            next => async.forEach(
+                this.workers,
+                (worker, done) => worker.init(done),
+                next,
+            ),
+            next => async.forEach(
+                this.workers,
+                (worker, done) => worker.setup(done),
+                next,
+            ),
         ], callback);
     }
 
     teardown(callback) {
-        async.forEach(this.workers,
-            (worker, done) => worker.teardown(done), callback);
+        async.forEach(
+            this.workers,
+            (worker, done) => worker.teardown(done),
+            callback,
+        );
     }
 
     stop(callback) {

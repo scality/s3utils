@@ -17,8 +17,8 @@ class CountWorker {
     }
 
     clientSetup(callback) {
-        if (this.client.client &&
-            this.client.client.isConnected()) {
+        if (this.client.client
+            && this.client.client.isConnected()) {
             this.log.debug('mongoclient is connected...skipping setup');
             return callback();
         }
@@ -33,10 +33,8 @@ class CountWorker {
         const bucketName = bucketInfo.getName();
         this.log.debug(`${process.pid} handling ${bucketName}`);
         return async.waterfall([
-            next =>
-                this.client._getIsTransient(bucketInfo, this.log, next),
-            (isTransient, next) => this.client.getObjectMDStats(
-                bucketName, bucketInfo, isTransient, this.log, next),
+            next => this.client._getIsTransient(bucketInfo, this.log, next),
+            (isTransient, next) => this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),
         ], callback);
     }
 

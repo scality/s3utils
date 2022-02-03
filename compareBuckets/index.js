@@ -111,8 +111,8 @@ function logProgress(message, status) {
             objectsMissingInSource: status.missingInSrcCount,
             objectsScanned: status.dstProcessedCount,
         },
-        keyMarker: status.srcKeyMarker < status.dstKeyMarker ?
-            status.srcKeyMarker : status.dstKeyMarker,
+        keyMarker: status.srcKeyMarker < status.dstKeyMarker
+            ? status.srcKeyMarker : status.dstKeyMarker,
     });
 }
 

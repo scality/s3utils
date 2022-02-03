@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
+const werelogs = require('werelogs');
 const { RaftJournalReader } = require('./DuplicateKeysIngestion');
 const { getSproxydAlias } = require('../repairDuplicateVersionsSuite');
 const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');
-const werelogs = require('werelogs');
 const { env } = require('./env');
 
 const loggerConfig = {
@@ -61,7 +61,7 @@ function runJournalReader() {
     const reader = new RaftJournalReader(
         Number.parseInt(env.RAFT_LOG_BEGIN_SEQ, 10),
         Number.parseInt(env.RAFT_LOG_BATCH_SIZE, 10),
-        Number.parseInt(env.RAFT_SESSION_ID, 10)
+        Number.parseInt(env.RAFT_SESSION_ID, 10),
     );
     reader.run();
 }

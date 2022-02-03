@@ -8,19 +8,17 @@ const { doWhilst } = require('async');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::bucketVersionsStats');
-const ENDPOINT = process.env.ENDPOINT;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const BUCKET = process.env.BUCKET;
-const TARGET_PREFIX = process.env.TARGET_PREFIX;
-const LOG_PROGRESS_INTERVAL_MS =
-      Number.parseInt(process.env.LOG_PROGRESS_INTERVAL || 10, 10) * 1000;
-const LISTING_LIMIT =
-      Number.parseInt(process.env.LISTING_LIMIT || 1000, 10);
-const KEY_MARKER = process.env.KEY_MARKER;
-const VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
-const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
-const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
+const { ENDPOINT } = process.env;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { BUCKET } = process.env;
+const { TARGET_PREFIX } = process.env;
+const LOG_PROGRESS_INTERVAL_MS = Number.parseInt(process.env.LOG_PROGRESS_INTERVAL || 10, 10) * 1000;
+const LISTING_LIMIT = Number.parseInt(process.env.LISTING_LIMIT || 1000, 10);
+const { KEY_MARKER } = process.env;
+const { VERSION_ID_MARKER } = process.env;
+const { HTTPS_CA_PATH } = process.env;
+const { HTTPS_NO_VERIFY } = process.env;
 const AWS_SDK_REQUEST_RETRIES = 100;
 const AWS_SDK_REQUEST_INITIAL_DELAY_MS = 30;
 
@@ -106,7 +104,7 @@ const s3Options = {
         // retry with exponential backoff delay capped at 1mn max
         // between retries, and a little added jitter
         return Math.min(AWS_SDK_REQUEST_INITIAL_DELAY_MS
-                        * Math.pow(2, retryCount), 60000)
+                        * 2 ** retryCount, 60000)
             * (0.9 + Math.random() * 0.2);
     },
 };
@@ -127,12 +125,13 @@ let KeyMarker;
 let VersionIdMarker;
 
 function _logProgress(message) {
-    const loggedStats = Object.assign({
+    const loggedStats = {
         total: {
             count: stats.current.count + stats.noncurrent.count,
             size: stats.current.size + stats.noncurrent.size,
         },
-    }, stats);
+        ...stats,
+    };
     log.info(message, {
         bucket: BUCKET,
         prefix: TARGET_PREFIX,
@@ -142,8 +141,10 @@ function _logProgress(message) {
     });
 }
 
-const logProgressInterval = setInterval(() => _logProgress('progress update'),
-                                        LOG_PROGRESS_INTERVAL_MS);
+const logProgressInterval = setInterval(
+    () => _logProgress('progress update'),
+    LOG_PROGRESS_INTERVAL_MS,
+);
 
 function _listObjectVersions(bucket, KeyMarker, VersionIdMarker, cb) {
     return s3.listObjectVersions({
@@ -163,23 +164,22 @@ function listBucket(bucket, cb) {
         done => {
             KeyMarker = NextKeyMarker;
             VersionIdMarker = NextVersionIdMarker;
-            _listObjectVersions(
-                bucket, KeyMarker, VersionIdMarker, (err, data) => {
-                    if (err) {
-                        log.error('error listing object versions', {
-                            error: err,
-                        });
-                        return done(err);
-                    }
-                    for (const version of data.Versions) {
-                        const statObj = version.IsLatest ? stats.current : stats.noncurrent;
-                        statObj.count += 1;
-                        statObj.size += version.Size || 0;
-                    }
-                    NextKeyMarker = data.NextKeyMarker;
-                    NextVersionIdMarker = data.NextVersionIdMarker;
-                    return done();
-                });
+            _listObjectVersions(bucket, KeyMarker, VersionIdMarker, (err, data) => {
+                if (err) {
+                    log.error('error listing object versions', {
+                        error: err,
+                    });
+                    return done(err);
+                }
+                for (const version of data.Versions) {
+                    const statObj = version.IsLatest ? stats.current : stats.noncurrent;
+                    statObj.count += 1;
+                    statObj.size += version.Size || 0;
+                }
+                NextKeyMarker = data.NextKeyMarker;
+                NextVersionIdMarker = data.NextVersionIdMarker;
+                return done();
+            });
         },
         () => {
             if (NextKeyMarker || NextVersionIdMarker) {
@@ -189,7 +189,8 @@ function listBucket(bucket, cb) {
             VersionIdMarker = undefined;
             return false;
         },
-        cb);
+        cb,
+    );
 }
 
 function shutdown(exitCode) {

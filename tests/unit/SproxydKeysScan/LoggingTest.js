@@ -1,5 +1,6 @@
-const { AggregateLogger, ProxyLoggerCreator } = require('../../../SproxydKeysScan/Logging');
 const { Logger } = require('werelogs');
+const { AggregateLogger, ProxyLoggerCreator } = require('../../../SproxydKeysScan/Logging');
+
 describe('SproxydKeysScan:Logging', () => {
     describe('AggregateLogger', () => {
         let aggregateLogger = null;
@@ -14,7 +15,7 @@ describe('SproxydKeysScan:Logging', () => {
             jest.clearAllMocks();
         });
         test('it is a singleton', () => {
-            const debug = aggregateLogger.log.debug;
+            const { debug } = aggregateLogger.log;
             expect(AggregateLogger.hasOwnProperty('_instance')).toBe(true);
             const anotherAggregateLogger = new AggregateLogger(10);
             expect(debug).toHaveBeenCalled();

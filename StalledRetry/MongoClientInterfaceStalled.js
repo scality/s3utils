@@ -25,10 +25,12 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
         };
         return c.aggregate([
             { $project: reducedFields },
-            { $match: {
-                '_id.id': { $regex: /\0/ },
-                '_id.status': { $eq: 'PENDING' },
-            } },
+            {
+                $match: {
+                    '_id.id': { $regex: /\0/ },
+                    '_id.status': { $eq: 'PENDING' },
+                },
+            },
         ]);
     }
 
@@ -52,14 +54,14 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                     bucketName,
                     cmpDate,
                     this._getStalledObjectsByBucket(bucketName),
-                    this.logger
+                    this.logger,
                 );
 
                 return reqHandler.handleRequests(wrapper, (err, results) => {
                     if (err) {
                         this.logger.error(
                             'encountered error while processing requests',
-                            { method: 'queueStalledObjects', error: err }
+                            { method: 'queueStalledObjects', error: err },
                         );
                         return next(err);
                     }

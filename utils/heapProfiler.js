@@ -22,8 +22,8 @@ function writeSnapshot(filename) {
 }
 
 module.exports = (dir, interval) => {
-    if (process.env.ENABLE_HEAP_PROFILER &&
-        process.env.ENABLE_HEAP_PROFILER !== '0') {
+    if (process.env.ENABLE_HEAP_PROFILER
+        && process.env.ENABLE_HEAP_PROFILER !== '0') {
         if (!fs.existsSync(dir)) {
             try {
                 fs.mkdirSync(dir, { recursive: true });

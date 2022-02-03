@@ -32,12 +32,12 @@ function httpRequest(method, url, cb) {
         });
         res.once('error', err => cbOnce(new Error(
             'error reading response from HTTP request '
-                + `to ${url}: ${err.message}`
+                + `to ${url}: ${err.message}`,
         )));
         return undefined;
     });
     req.once('error', err => cbOnce(new Error(
-        `error sending HTTP request to ${url}: ${err.message}`
+        `error sending HTTP request to ${url}: ${err.message}`,
     )));
     req.end();
 }
@@ -68,7 +68,9 @@ function getBucketdURL(hostPort, params) {
 }
 
 function listBucketMasterKeys(params, cb) {
-    const { bucket, marker, hostPort, maxKeys } = params;
+    const {
+        bucket, marker, hostPort, maxKeys,
+    } = params;
     const url = getBucketdURL(hostPort, {
         Bucket: bucket,
         MaxKeys: maxKeys,

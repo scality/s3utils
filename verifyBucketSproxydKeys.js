@@ -170,8 +170,10 @@ function logProgress(message) {
     });
 }
 
-setInterval(() => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000);
+setInterval(
+    () => logProgress('progress update'),
+    LOG_PROGRESS_INTERVAL * 1000
+);
 
 
 function httpRequest(method, url, cb) {
@@ -283,8 +285,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
         return cb();
     };
 
-    const dupInfo = findDuplicateSproxydKeys.insertVersion(
-        objectUrl, locations.map(loc => loc.key));
+    const dupInfo = findDuplicateSproxydKeys.insertVersion(objectUrl, locations.map(loc => loc.key));
     if (dupInfo) {
         log.error('duplicate sproxyd key found', {
             objectUrl,
@@ -413,13 +414,15 @@ function listBucketIter(bucket, cb) {
 function listBucket(bucket, cb) {
     status.bucketInProgress = bucket;
 
-    findDuplicateSproxydKeys =
-        new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
 
     logProgress('start scanning bucket');
     async.doWhilst(
-        done => async.retry({ times: 100, interval: 5000 },
-            _done => listBucketIter(bucket, _done), done),
+        done => async.retry(
+            { times: 100, interval: 5000 },
+            _done => listBucketIter(bucket, _done),
+            done
+        ),
         IsTruncated => IsTruncated,
         err => {
             status.bucketInProgress = null;
@@ -430,8 +433,7 @@ function listBucket(bucket, cb) {
 }
 
 function consumeStdin(cb) {
-    findDuplicateSproxydKeys =
-        new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
 
     const itemStream = process.stdin.pipe(jsonStream.parse());
     let nParallel = 0;

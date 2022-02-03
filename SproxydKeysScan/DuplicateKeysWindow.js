@@ -1,5 +1,6 @@
 const { Logger } = require('werelogs');
 const { ProxyLoggerCreator } = require('./Logging');
+
 const log = new ProxyLoggerCreator(new Logger('s3utils:DuplicateKeysWindow'));
 
 /**
@@ -67,7 +68,7 @@ class MultiMap extends Map {
  * and handle any needed repairs in near real-time
  */
 class SproxydKeysProcessor {
-     /**
+    /**
      * @constructor
      * @param { number } windowSize - maximum number of sproxyd keys to track
      * @param { MultiMap } subscribers - Map of events to handlers that listen for and respond to SproxydKeys events
@@ -77,6 +78,7 @@ class SproxydKeysProcessor {
         this.sproxydKeys = new BoundedMap(windowSize);
         this.subscribers = subscribers;
     }
+
     /**
      * If a duplicate Sproxyd key is found, a handler is called to generate new keys.
      * @param {string} sproxydKey - sproxyd Key.
@@ -123,6 +125,6 @@ class SproxydKeysProcessor {
             this.checkDuplicate(sproxydKey, objectKey, bucket);
         }
     }
- }
+}
 
 module.exports = { SproxydKeysProcessor, MultiMap, BoundedMap };

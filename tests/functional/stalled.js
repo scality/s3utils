@@ -22,7 +22,7 @@ const loggerConfig = {
 werelogs.configure(loggerConfig);
 
 const logger = new werelogs.Logger('StalledRetry::Test::Functional');
-const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const { MONGODB_REPLICASET } = process.env;
 const dbName = 'stalledRetryTest';
 
 function wrapperFactory(bucketName, cmpDate, cursor, log) {
@@ -33,7 +33,7 @@ function wrapperFactory(bucketName, cmpDate, cursor, log) {
             log,
             cmpDate,
             bucketName,
-        }
+        },
     );
 }
 
@@ -56,7 +56,7 @@ function handlerFactory(client, log) {
             batchSize: 10,
             concurrentRequests: 5,
             log,
-        }
+        },
     );
 }
 
@@ -104,7 +104,8 @@ function createCompletedObject(objName) {
             storageType: '',
             dataStoreVersionId: '',
             isNFS: null,
-        }).getValue();
+        })
+        .getValue();
 }
 
 function populateMongo(client, callback) {
@@ -153,7 +154,7 @@ function populateMongo(client, callback) {
                                 createStalledObject(objName, lastModified),
                                 { versionId: null, versioning: true },
                                 logger,
-                                done
+                                done,
                             );
                         },
                         done => {
@@ -167,7 +168,7 @@ function populateMongo(client, callback) {
                                 createStalledObject(objName, lastModified),
                                 { versionId: null, versioning: true },
                                 logger,
-                                done
+                                done,
                             );
                         },
                         done => {
@@ -180,7 +181,7 @@ function populateMongo(client, callback) {
                                 createStalledObject(objName, lastModified),
                                 { versionId: null, versioning: true },
                                 logger,
-                                done
+                                done,
                             );
                         },
                         done => {
@@ -191,7 +192,7 @@ function populateMongo(client, callback) {
                                 createCompletedObject(objName),
                                 { versionId: null, versioning: true },
                                 logger,
-                                done
+                                done,
                             );
                         },
                     ], done);

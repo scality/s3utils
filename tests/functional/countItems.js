@@ -1,8 +1,7 @@
 const cluster = require('cluster');
 const async = require('async');
 const werelogs = require('werelogs');
-const { MongoClientInterface } =
-    require('arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 const { BucketInfo, ObjectMD } = require('arsenal').models;
 
 const CountMaster = require('../../CountItems/CountMaster');
@@ -11,7 +10,7 @@ const { createMongoParams } = require('../../CountItems/utils');
 const createWorkers = require('../../CountItems/utils/createWorkers');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
-const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const { MONGODB_REPLICASET } = process.env;
 const dbName = 'countItemsTest';
 
 const expectedResults = {
@@ -105,7 +104,10 @@ function populateMongo(client, callback) {
                             {
                                 versionId: null,
                                 versioning: true,
-                            }, logger, done);
+                            },
+                            logger,
+                            done,
+                        );
                     }, done);
                 }, next),
             ], done);
@@ -119,7 +121,7 @@ describe('CountItems', () => {
     let client;
 
     beforeAll(done => {
-        process.env = Object.assign({}, oldEnv);
+        process.env = oldEnv;
         process.env.MONGODB_DATABASE = dbName;
 
         const opts = {
@@ -175,5 +177,6 @@ describe('CountItems', () => {
                     return next();
                 }),
             ], () => countMaster.stop(null, done));
-        });
+        },
+    );
 });

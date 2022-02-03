@@ -153,7 +153,8 @@ describe('CountItems::CountManager', () => {
         }, 100);
     });
 
-    test('should remove/queue worker for each count task',
+    test(
+        'should remove/queue worker for each count task',
         done => {
             const workers = createWorkers(1);
             const m = new CountManager({
@@ -178,5 +179,6 @@ describe('CountItems::CountManager', () => {
                 expect(m.q.running()).toEqual(1);
                 workers[0].callbacks[0]();
             }, 100);
-        });
+        },
+    );
 });

@@ -1,4 +1,4 @@
-const MongoError = require('mongodb').MongoError;
+const { MongoError } = require('mongodb');
 const { encode } = require('arsenal').versioning.VersionID;
 const { once } = require('arsenal').jsutil;
 
@@ -23,13 +23,13 @@ class StalledEntry {
 }
 
 function objectToEntries(bucketName, cmpDate, data) {
-    if (!data || typeof data !== 'object' ||
-        !data.value || typeof data.value !== 'object') {
+    if (!data || typeof data !== 'object'
+        || !data.value || typeof data.value !== 'object') {
         return [];
     }
 
     const time = data.value['last-modified'] || null;
-    if (isNaN(Date.parse(time))) {
+    if (Number.isNaN(Date.parse(time))) {
         return [];
     }
 
@@ -47,7 +47,7 @@ function objectToEntries(bucketName, cmpDate, data) {
             data._id.key,
             encode(data._id.versionId),
             storageClass,
-            true
+            true,
         );
     });
 }
@@ -80,7 +80,8 @@ class RateLimitingCursor {
             const entries = objectToEntries(
                 this.bucketName,
                 this.cmpDate,
-                data) || [];
+                data,
+            ) || [];
 
             if (entries.length === 0) {
                 return;
@@ -110,8 +111,8 @@ class RateLimitingCursor {
             });
 
             if (
-                err instanceof MongoError &&
-                err.errorLabels.includes('TransientTransactionError')
+                err instanceof MongoError
+                && err.errorLabels.includes('TransientTransactionError')
             ) {
                 this.log.info('transient error, continue reading from cursor');
                 return;
@@ -219,8 +220,6 @@ class RateLimitingCursor {
         if (this.cursorEnd) {
             this._cleanUp();
         }
-
-        return;
     }
 }
 

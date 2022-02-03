@@ -1,11 +1,13 @@
-const { waterfall, doWhilst, eachLimit, retry } = require('async');
+const {
+    waterfall, doWhilst, eachLimit, retry,
+} = require('async');
 const http = require('http');
 const { Producer } = require('node-rdkafka');
 const { scheduleJob } = require('node-schedule');
 
 const { errors } = require('arsenal');
 const VID_SEP = require('arsenal').versioning.VersioningConstants
-      .VersionId.Separator;
+    .VersionId.Separator;
 const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
@@ -36,8 +38,8 @@ if (!SECRET_KEY) {
     throw new Error('SECRET_KEY not defined');
 }
 if (!SITE_NAME) {
-    throw new Error('missing SITE_NAME environment variable, must be set to' +
-                    ' the value of "site" property in the CRR configuration');
+    throw new Error('missing SITE_NAME environment variable, must be set to'
+                    + ' the value of "site" property in the CRR configuration');
 }
 if (!KAFKA_HOSTS) {
     throw new Error('KAFKA_HOSTS not defined');
@@ -102,14 +104,14 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
         }),
         (mdRes, next) => {
             const objMD = JSON.parse(mdRes.Body);
-            if (!objMD.replicationInfo ||
-                objMD.replicationInfo.status !== 'FAILED') {
+            if (!objMD.replicationInfo
+                || objMD.replicationInfo.status !== 'FAILED') {
                 log.info('skipping object: not FAILED', {
                     bucket,
                     key,
                     versionId,
-                    status: objMD.replicationInfo ?
-                        objMD.replicationInfo.status : 'NEW',
+                    status: objMD.replicationInfo
+                        ? objMD.replicationInfo.status : 'NEW',
                 });
                 ++counters.skipped;
                 return next();
@@ -134,10 +136,11 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
                     producer.produce(
                         KAFKA_TOPIC,
                         null, // partition
-                        new Buffer(entry), // value
+                        Buffer.from(entry), // value
                         `${bucket}/${key}`, // key (for keyed partitioning)
                         Date.now(), // timestamp
-                        null);
+                        null,
+                    );
                     log.info('requeued object version for replication', {
                         bucket,
                         key,
@@ -156,8 +159,10 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
                 }
             }, err => {
                 if (err) {
-                    log.error('give up producing entry to kafka after retries',
-                              { bucket, key, error: err.message });
+                    log.error(
+                        'give up producing entry to kafka after retries',
+                        { bucket, key, error: err.message },
+                    );
                     ++counters.errors;
                 }
                 next(err);
@@ -165,8 +170,10 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
         },
     ], err => {
         if (err) {
-            log.error('error in _requeueObject waterfall',
-                      { error: err.message });
+            log.error(
+                'error in _requeueObject waterfall',
+                { error: err.message },
+            );
         }
         return cb();
     });
@@ -181,7 +188,7 @@ function _requeueAll() {
         skipped: 0,
         errors: 0,
     };
-    let marker = undefined;
+    let marker;
     requeueInProgress = true;
     doWhilst(
         batchDone => {
@@ -217,10 +224,11 @@ function _requeueAll() {
                     }
                     marker = result.NextMarker;
                     return eachLimit(
-                        result.Versions, 10,
-                        (version, objDone) => _requeueObject(
-                            version.Bucket, version.Key, version.VersionId, counters, objDone),
-                        () => batchDone(null, result.IsTruncated));
+                        result.Versions,
+                        10,
+                        (version, objDone) => _requeueObject(version.Bucket, version.Key, version.VersionId, counters, objDone),
+                        () => batchDone(null, result.IsTruncated),
+                    );
                 });
             });
             failedReq.on('error', err => {
@@ -240,7 +248,8 @@ function _requeueAll() {
             } else {
                 log.info('completed requeuing task', counters);
             }
-        });
+        },
+    );
 }
 
 let cronJob = null;
@@ -260,7 +269,7 @@ producer.on('event.error', error => {
     // implementation there's no way to access the original
     // error code, so we match the message instead).
     if (!['broker transport failure',
-          'all broker connections are down']
+        'all broker connections are down']
         .includes(error.message)) {
         log.error('error with producer', {
             error: error.message,

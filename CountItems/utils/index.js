@@ -2,8 +2,10 @@ const fs = require('fs');
 
 function getIsLocationTransientCb(log, locationConfigFile) {
     if (!fs.existsSync(locationConfigFile)) {
-        log.info('location conf file missing, falling back to PENSIEVE coll',
-            { filename: locationConfigFile });
+        log.info(
+            'location conf file missing, falling back to PENSIEVE coll',
+            { filename: locationConfigFile },
+        );
         return null;
     }
 
@@ -24,8 +26,7 @@ function getIsLocationTransientCb(log, locationConfigFile) {
 function createMongoParams(log, customParams) {
     const replicaSetHosts = process.env.MONGODB_REPLICASET;
     const database = process.env.MONGODB_DATABASE || 'metadata';
-    const locationConfigFile =
-        process.env.LOCATION_CONFIG_FILE || 'conf/locationConfig.json';
+    const locationConfigFile = process.env.LOCATION_CONFIG_FILE || 'conf/locationConfig.json';
 
     const params = {
         replicaSetHosts,
@@ -38,8 +39,8 @@ function createMongoParams(log, customParams) {
         logger: log,
     };
 
-    if (process.env.MONGODB_AUTH_USERNAME &&
-        process.env.MONGODB_AUTH_PASSWORD) {
+    if (process.env.MONGODB_AUTH_USERNAME
+        && process.env.MONGODB_AUTH_PASSWORD) {
         params.authCredentials = {
             username: process.env.MONGODB_AUTH_USERNAME,
             password: process.env.MONGODB_AUTH_PASSWORD,

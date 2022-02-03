@@ -1,7 +1,6 @@
 const getObjectURL = require('../../VerifyBucketSproxydKeys/getObjectURL');
 const getBucketdURL = require('../../VerifyBucketSproxydKeys/getBucketdURL');
-const FindDuplicateSproxydKeys =
-      require('../../VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
+const FindDuplicateSproxydKeys = require('../../VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
 
 describe('verifyBucketSproxydKeys', () => {
     test('getObjectURL', () => {
@@ -50,11 +49,20 @@ describe('verifyBucketSproxydKeys', () => {
             .toEqual({ objectId: 'obj4', key: 'k4' });
 
         expect(finder.sproxydKeys)
-            .toEqual({ k1: 'obj6', k5: 'obj8', k6: 'obj8',
-                       k7: 'obj8', k8: 'obj8' });
+            .toEqual({
+                k1: 'obj6',
+                k5: 'obj8',
+                k6: 'obj8',
+                k7: 'obj8',
+                k8: 'obj8',
+            });
         expect(finder.versionsWindow)
-            .toEqual({ 4: ['k1'], 5: ['k1'], 6: ['k2'],
-                       7: ['k5', 'k6', 'k4', 'k7', 'k8'] });
+            .toEqual({
+                4: ['k1'],
+                5: ['k1'],
+                6: ['k2'],
+                7: ['k5', 'k6', 'k4', 'k7', 'k8'],
+            });
 
         // skipVersion() updates the window...
         expect(finder.skipVersion()).toEqual(null);

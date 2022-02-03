@@ -3,19 +3,20 @@ const AWS = require('aws-sdk');
 const http = require('http');
 
 const { Logger } = require('werelogs');
+
 const log = new Logger('s3utils:listFailedObjects');
 /* eslint-disable no-console */
 
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 const LISTING_LIMIT = 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.error('No buckets given as input! Please provide ' +
-        'a comma-separated list of buckets');
+    log.error('No buckets given as input! Please provide '
+        + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -72,26 +73,30 @@ function listBucket(bucket, cb) {
     let KeyMarker = null;
     log.info('listing failed objects from bucket', { bucket });
     async.doWhilst(
-        done => _listObjectVersions(bucketName, VersionIdMarker, KeyMarker,
+        done => _listObjectVersions(
+            bucketName,
+            VersionIdMarker,
+            KeyMarker,
             (err, data) => {
                 if (err) {
-                    log.error('error occured while listing', {
-                        error: err, bucketName });
+                    log.error('error occured while listing', { error: err, bucketName });
                     return done(err);
                 }
                 const keys = _getKeys(data.Versions);
                 return async.mapLimit(keys, 10, (k, next) => {
                     const { Key, VersionId } = k;
-                    s3.headObject({ Bucket: bucketName, Key, VersionId },
+                    s3.headObject(
+                        { Bucket: bucketName, Key, VersionId },
                         (err, res) => {
                             if (err) {
                                 return next(err);
                             }
                             if (res.ReplicationStatus === 'FAILED') {
-                                console.log(Object.assign({ Key }, res));
+                                console.log({ Key, ...res });
                             }
                             return next();
-                        });
+                        },
+                    );
                 }, err => {
                     if (err) {
                         return done(err);
@@ -100,26 +105,31 @@ function listBucket(bucket, cb) {
                     KeyMarker = data.NextKeyMarker;
                     return done();
                 });
-            }),
+            },
+        ),
         () => {
             if (!VersionIdMarker || !KeyMarker) {
-                log.debug('completed listing failed objects for bucket',
-                    { bucket });
+                log.debug(
+                    'completed listing failed objects for bucket',
+                    { bucket },
+                );
                 return false;
             }
             return true;
         },
-        cb
+        cb,
     );
 }
 
-async.mapSeries(BUCKETS, (bucket, done) => listBucket(bucket, done),
+async.mapSeries(
+    BUCKETS,
+    (bucket, done) => listBucket(bucket, done),
     err => {
         if (err) {
             log.error('error occured while listing failed objects', {
                 error: err,
             });
         }
-    }
+    },
 );
 /* eslint-enable no-console */

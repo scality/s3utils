@@ -28,7 +28,7 @@ function generateRequestObject(bucket, objectKey, storageClass) {
         objectKey,
         encode(testVersion),
         storageClassName,
-        true
+        true,
     );
 }
 

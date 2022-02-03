@@ -1,9 +1,9 @@
 const { waterfall } = require('async');
+const { Logger } = require('werelogs');
 const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 const { ProxyLoggerCreator } = require('./Logging');
 const { subscribers } = require('./SproxydKeysSubscribers');
-const { Logger } = require('werelogs');
 const { env } = require('./env');
 
 const {
@@ -35,12 +35,12 @@ class RaftJournalReader {
         this.url = this._getJournalUrl(sessionId);
         this.processor = new SproxydKeysProcessor(
             DUPLICATE_KEYS_WINDOW_SIZE,
-            subscribers
+            subscribers,
         );
         this._httpRequest = httpRequest;
     }
 
-     /**
+    /**
      * @param {string} sessionId - Raft session ID
      * @returns {string} - Url string for given Raft sesssion ID
      */
@@ -241,19 +241,22 @@ class RaftJournalReader {
                     } else {
                         next(null);
                     }
-                }),
+                },
+            ),
             next => this.getBatch(
                 (err, res) => {
                     if (err) {
-                        if ((!err instanceof RangeError)) {
+                        if (!(err instanceof RangeError)) {
                             log.error('in getBatch', { error: err.message });
                         }
                         next(err);
                     } else {
                         next(null, res);
                     }
-                }),
-            (body, next) => this.processBatch(body,
+                },
+            ),
+            (body, next) => this.processBatch(
+                body,
                 (err, extractedKeys) => {
                     if (err) {
                         log.error('in processBatch', { error: err.message });
@@ -261,8 +264,10 @@ class RaftJournalReader {
                     } else {
                         next(null, extractedKeys);
                     }
-                }),
-            (extractedKeys, next) => this.updateStatus(extractedKeys,
+                },
+            ),
+            (extractedKeys, next) => this.updateStatus(
+                extractedKeys,
                 (err, res) => {
                     if (err) {
                         log.error('in updateStatus', { error: err.message });
@@ -270,7 +275,8 @@ class RaftJournalReader {
                     } else {
                         next(null, res);
                     }
-                }),
+                },
+            ),
         ], err => {
             if (err) {
                 cb(err, 5000);

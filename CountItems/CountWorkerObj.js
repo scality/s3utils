@@ -128,16 +128,14 @@ class CountWorkerObj {
     }
 
     kill() {
-        if (this._worker.process &&
-            typeof this._worker.process.kill === 'function') {
+        if (this._worker.process
+            && typeof this._worker.process.kill === 'function') {
             this._worker.process.kill();
             return;
         }
         if (typeof this._worker.kill === 'function') {
             this._worker.kill();
-            return;
         }
-        return;
     }
 }
 

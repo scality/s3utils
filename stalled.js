@@ -16,18 +16,17 @@ const {
 
 const { parseEnvInt } = require('./utils');
 
-const ENDPOINT = process.env.ENDPOINT;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const MONGODB_REPLICASET = process.env.MONGODB_REPLICASET;
+const { ENDPOINT } = process.env;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { MONGODB_REPLICASET } = process.env;
 const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'metadata';
 const DRY_RUN = process.env.DRY_RUN && process.env.DRY_RUN !== 'false';
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
 const QUEUE_LIMIT = parseEnvInt(process.env.QUEUE_LIMIT, 1000);
 const CONCURRENT_REQUESTS = parseEnvInt(process.env.CONCURRENT_REQUESTS, 5);
-const EXPIRED_BY_HOUR =
-    Math.max(parseEnvInt(process.env.EXPIRED_BY_HOUR, 1), 1);
+const EXPIRED_BY_HOUR = Math.max(parseEnvInt(process.env.EXPIRED_BY_HOUR, 1), 1);
 
 assert(BATCH_SIZE <= QUEUE_LIMIT);
 
@@ -44,9 +43,8 @@ if (!MONGODB_REPLICASET) {
     throw new Error('MONGODB_REPLICASET not defined');
 }
 
-const HEAP_PROFILER_INTERVAL_MS =
-    parseEnvInt(process.env.HEAP_PROFILER_INTERVAL_MS, 10 * 60 * 1000);
-const HEAP_PROFILER_PATH = process.env.HEAP_PROFILER_PATH;
+const HEAP_PROFILER_INTERVAL_MS = parseEnvInt(process.env.HEAP_PROFILER_INTERVAL_MS, 10 * 60 * 1000);
+const { HEAP_PROFILER_PATH } = process.env;
 require('./utils/heapProfiler')(HEAP_PROFILER_PATH, HEAP_PROFILER_INTERVAL_MS);
 
 const log = new Logger('S3Utils::Stalled');
@@ -59,7 +57,7 @@ function wrapperFactory(bucketName, cmpDate, cursor, log) {
             queueLimit: QUEUE_LIMIT,
             cmpDate,
             bucketName,
-        }
+        },
     );
 }
 
@@ -83,7 +81,7 @@ function handlerFactory(log) {
             batchSize: BATCH_SIZE,
             concurrentRequests: CONCURRENT_REQUESTS,
             log,
-        }
+        },
     );
 }
 

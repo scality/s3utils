@@ -1,7 +1,7 @@
 jest.mock('node-uuid', () => require('../../mocks/uuid'));
 
-const Subprocess = require('../../mocks/subprocess');
 const uuid = require('node-uuid');
+const Subprocess = require('../../mocks/subprocess');
 
 const CountWorkerObj = require('../../../CountItems/CountWorkerObj');
 

@@ -1,6 +1,6 @@
+const { Logger } = require('werelogs');
 const { MultiMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
-const { Logger } = require('werelogs');
 const { ProxyLoggerCreator } = require('./Logging');
 const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
 
@@ -30,16 +30,14 @@ class DuplicateSproxydKeyFoundHandler {
     handle(params) {
         // The largest string is last (which is the older version).
         // Older version is chosen to repair.
-        const [newerVersionKey, olderVersionKey] =
-            [params.objectKey, params.existingObjectKey]
+        const [newerVersionKey, olderVersionKey] = [params.objectKey, params.existingObjectKey]
             .sort();
 
         // remove older version, insert newer version into sproxyd key map
         params.context.sproxydKeys.set(params.sproxydKey, newerVersionKey);
 
-        const [objectUrl, objectUrl2] =
-        [olderVersionKey, newerVersionKey]
-                .map(objectKey => this._getObjectURL(params.bucket, objectKey));
+        const [objectUrl, objectUrl2] = [olderVersionKey, newerVersionKey]
+            .map(objectKey => this._getObjectURL(params.bucket, objectKey));
 
         const objInfo = {
             objectUrl,

@@ -9,19 +9,19 @@ const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const S3_ENDPOINT = process.env.S3_ENDPOINT;
-const TARGET_PREFIX = process.env.TARGET_PREFIX;
-const MAX_DELETES = (process.env.MAX_DELETES &&
-    Number.parseInt(process.env.MAX_DELETES, 10));
-const MAX_LISTED = (process.env.MAX_LISTED &&
-    Number.parseInt(process.env.MAX_LISTED, 10));
-const MARKER = process.env.MARKER;
-const OLDER_THAN = (process.env.OLDER_THAN ?
-                    new Date(process.env.OLDER_THAN) : null);
-const HTTPS_CA_PATH = process.env.HTTPS_CA_PATH;
-const HTTPS_NO_VERIFY = process.env.HTTPS_NO_VERIFY;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { S3_ENDPOINT } = process.env;
+const { TARGET_PREFIX } = process.env;
+const MAX_DELETES = (process.env.MAX_DELETES
+    && Number.parseInt(process.env.MAX_DELETES, 10));
+const MAX_LISTED = (process.env.MAX_LISTED
+    && Number.parseInt(process.env.MAX_LISTED, 10));
+const { MARKER } = process.env;
+const OLDER_THAN = (process.env.OLDER_THAN
+    ? new Date(process.env.OLDER_THAN) : null);
+const { HTTPS_CA_PATH } = process.env;
+const { HTTPS_NO_VERIFY } = process.env;
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
@@ -65,8 +65,8 @@ Optional environment variables:
 // We accept console statements for usage purpose
 /* eslint-disable no-console */
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide ' +
-                  'a comma-separated list of buckets');
+    console.error('No buckets given as input, please provide '
+                  + 'a comma-separated list of buckets');
     console.error(USAGE);
     process.exit(1);
 }
@@ -86,15 +86,15 @@ if (!SECRET_KEY) {
     console.error(USAGE);
     process.exit(1);
 }
-if (OLDER_THAN && isNaN(OLDER_THAN.getTime())) {
+if (OLDER_THAN && Number.isNaN(OLDER_THAN.getTime())) {
     console.error('OLDER_THAN is an invalid date');
     console.error(USAGE);
     process.exit(1);
 }
 
 function _encodeMarker(bucket, key, versionId) {
-    return `${encodeURI(bucket)}` +
-        `|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
+    return `${encodeURI(bucket)}`
+        + `|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
 }
 
 function _parseMarker(marker) {
@@ -166,7 +166,7 @@ const s3Options = {
         // retry with exponential backoff delay capped at 1mn max
         // between retries, and a little added jitter
         return Math.min(AWS_SDK_REQUEST_INITIAL_DELAY_MS
-                        * Math.pow(2, retryCount), 60000)
+                        * 2 ** retryCount, 60000)
             * (0.9 + Math.random() * 0.2);
     },
 };
@@ -196,8 +196,10 @@ function _logProgress(message) {
     });
 }
 
-const logProgressInterval = setInterval(() => _logProgress('progress update'),
-                                        LOG_PROGRESS_INTERVAL_MS);
+const logProgressInterval = setInterval(
+    () => _logProgress('progress update'),
+    LOG_PROGRESS_INTERVAL_MS,
+);
 
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     return s3.listObjectVersions({
@@ -235,7 +237,8 @@ function _doBatchDelete(bucket) {
                     bucket,
                     key: v.Key,
                     versionId: v.VersionId,
-                }));
+                }),
+            );
         } else {
             nDeleted += batchDeleteObjects.length;
             batchDeleteObjects.forEach(v => log.info('object deleted', {
@@ -266,7 +269,8 @@ function _triggerDeletes(bucket, versionsToDelete, cb) {
     deleteQueue = deleteQueue.concat(versionsToDelete);
     if (nDeletesTriggered > MAX_DELETES) {
         deleteQueue.splice(
-            deleteQueue.length - (nDeletesTriggered - MAX_DELETES));
+            deleteQueue.length - (nDeletesTriggered - MAX_DELETES),
+        );
         nDeletesTriggered = MAX_DELETES;
     }
     if (deleteQueue.length > 0) {
@@ -292,12 +296,17 @@ function decVersionId(versionId) {
     if (!versionId) {
         return versionId;
     }
-    return versionId.slice(0, versionId.length - 1) +
-        String.fromCharCode(versionId.charCodeAt(versionId.length - 1) - 1);
+    return versionId.slice(0, versionId.length - 1)
+        + String.fromCharCode(versionId.charCodeAt(versionId.length - 1) - 1);
 }
 
-function _triggerDeletesOnEligibleObjects(bucket, versions, deleteMarkers,
-                                          endOfListing, cb) {
+function _triggerDeletesOnEligibleObjects(
+    bucket,
+    versions,
+    deleteMarkers,
+    endOfListing,
+    cb,
+) {
     const versionsToDelete = [];
     versions.forEach(version => {
         if (version.IsLatest !== false) {
@@ -380,8 +389,8 @@ function triggerDeletesOnBucket(bucketName, cb) {
         MARKER_BUCKET = undefined;
         MARKER_KEY = undefined;
         MARKER_VERSION_ID = undefined;
-        log.info(`resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} ` +
-                 `VersionIdMarker=${NextVersionIdMarker}`);
+        log.info(`resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} `
+                 + `VersionIdMarker=${NextVersionIdMarker}`);
     }
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
@@ -389,33 +398,35 @@ function triggerDeletesOnBucket(bucketName, cb) {
         done => {
             KeyMarker = NextKeyMarker;
             VersionIdMarker = NextVersionIdMarker;
-            _listObjectVersions(
-                bucket, VersionIdMarker, KeyMarker, (err, data) => {
-                    if (err) {
-                        log.error('error listing object versions', {
-                            error: err,
-                        });
-                        return done(err);
-                    }
-                    nListed += data.Versions.length + data.DeleteMarkers.length;
-                    const ret = _triggerDeletesOnEligibleObjects(
-                        bucket, data.Versions, data.DeleteMarkers,
-                        !data.IsTruncated,
-                        err => {
-                            if (err) {
-                                return done(err);
-                            }
-                            if (ret) {
-                                NextKeyMarker = ret.NextKeyMarker;
-                                NextVersionIdMarker = ret.NextVersionIdMarker;
-                            } else {
-                                NextKeyMarker = data.NextKeyMarker;
-                                NextVersionIdMarker = data.NextVersionIdMarker;
-                            }
-                            return done();
-                        });
-                    return undefined;
-                });
+            _listObjectVersions(bucket, VersionIdMarker, KeyMarker, (err, data) => {
+                if (err) {
+                    log.error('error listing object versions', {
+                        error: err,
+                    });
+                    return done(err);
+                }
+                nListed += data.Versions.length + data.DeleteMarkers.length;
+                const ret = _triggerDeletesOnEligibleObjects(
+                    bucket,
+                    data.Versions,
+                    data.DeleteMarkers,
+                    !data.IsTruncated,
+                    err => {
+                        if (err) {
+                            return done(err);
+                        }
+                        if (ret) {
+                            NextKeyMarker = ret.NextKeyMarker;
+                            NextVersionIdMarker = ret.NextVersionIdMarker;
+                        } else {
+                            NextKeyMarker = data.NextKeyMarker;
+                            NextVersionIdMarker = data.NextVersionIdMarker;
+                        }
+                        return done();
+                    },
+                );
+                return undefined;
+            });
         },
         () => {
             if (nDeletesTriggered >= MAX_DELETES || nListed >= MAX_LISTED) {
@@ -440,14 +451,12 @@ function triggerDeletesOnBucket(bucketName, cb) {
             return _waitForDeletesCompletion(() => {
                 if (nDeletesTriggered >= MAX_DELETES || nListed >= MAX_LISTED) {
                     _logProgress('final summary');
-                    const marker = _encodeMarker(
-                        bucket, KeyMarker, VersionIdMarker);
-                    const message =
-                        'reached ' +
-                        `${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} ` +
-                        'count limit, resuming from this point can be ' +
-                        'achieved by re-running the script with the same ' +
-                        'bucket list and the following environment variable '
+                    const marker = _encodeMarker(bucket, KeyMarker, VersionIdMarker);
+                    const message = 'reached '
+                        + `${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} `
+                        + 'count limit, resuming from this point can be '
+                        + 'achieved by re-running the script with the same '
+                        + 'bucket list and the following environment variable '
                         + `set: MARKER='${marker}'`;
                     log.info(message);
                     process.exit(0);
@@ -455,7 +464,8 @@ function triggerDeletesOnBucket(bucketName, cb) {
                 log.info(`completed task for bucket: ${bucket}`);
                 return cb();
             });
-        });
+        },
+    );
 }
 
 // trigger the calls to list objects and delete noncurrent versions

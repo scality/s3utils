@@ -1,7 +1,7 @@
-const { BoundedMap, MultiMap } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
-const { setupProcessor } = require('../../utils/setupProcessor');
 const randomize = require('randomatic');
 const range = require('lodash/range');
+const { BoundedMap, MultiMap } = require('../../../SproxydKeysScan/DuplicateKeysWindow');
+const { setupProcessor } = require('../../utils/setupProcessor');
 
 describe('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {

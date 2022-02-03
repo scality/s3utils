@@ -92,7 +92,8 @@ function compareBuckets(params, log, cb) {
                         return process.nextTick(_done);
                     }
 
-                    return listBucketMasterKeys(bucketdSrcParams,
+                    return listBucketMasterKeys(
+                        bucketdSrcParams,
                         (err, isTruncated, marker, contents) => {
                             if (err) {
                                 return _done(err);
@@ -103,14 +104,16 @@ function compareBuckets(params, log, cb) {
                             bucketdSrcParams.marker = marker;
                             statusObj.srcKeyMarker = marker;
                             return _done();
-                        });
+                        }
+                    );
                 },
                 dst: _done => {
                     if (dstDone || dstContents.length > 0) {
                         return process.nextTick(_done);
                     }
 
-                    return listBucketMasterKeys(bucketdDstParams,
+                    return listBucketMasterKeys(
+                        bucketdDstParams,
                         (err, isTruncated, marker, contents) => {
                             if (err) {
                                 return _done(err);
@@ -121,7 +124,8 @@ function compareBuckets(params, log, cb) {
                             bucketdDstParams.marker = marker;
                             statusObj.dstKeyMarker = marker;
                             return _done();
-                        });
+                        }
+                    );
                 },
             }, err => {
                 if (err) {
@@ -133,12 +137,14 @@ function compareBuckets(params, log, cb) {
 
                 if (srcDone && srcContents.length === 0) {
                     while (dstIdx < dstContents.length) {
-                        log.info('missing object in source',
+                        log.info(
+                            'missing object in source',
                             getReportObject(
                                 bucketdSrcParams.bucket,
                                 dstContents[dstIdx],
                                 verbose
-                            ));
+                            )
+                        );
                         ++statusObj.dstProcessedCount;
                         ++statusObj.missingInSrcCount;
                         ++dstIdx;
@@ -147,12 +153,14 @@ function compareBuckets(params, log, cb) {
 
                 if (dstDone && dstContents.length === 0) {
                     while (srcIdx < srcContents.length) {
-                        log.info('missing object in destination',
+                        log.info(
+                            'missing object in destination',
                             getReportObject(
                                 bucketdDstParams.bucket,
                                 srcContents[srcIdx],
                                 verbose
-                            ));
+                            )
+                        );
                         ++statusObj.srcProcessedCount;
                         ++statusObj.missingInDstCount;
                         ++srcIdx;
@@ -161,12 +169,14 @@ function compareBuckets(params, log, cb) {
 
                 while (srcIdx < srcContents.length && dstIdx < dstContents.length) {
                     if (srcContents[srcIdx].key < dstContents[dstIdx].key) {
-                        log.info('missing object in destination',
+                        log.info(
+                            'missing object in destination',
                             getReportObject(
                                 bucketdDstParams.bucket,
                                 srcContents[srcIdx],
                                 verbose
-                            ));
+                            )
+                        );
                         ++statusObj.srcProcessedCount;
                         ++statusObj.missingInDstCount;
                         ++srcIdx;
@@ -174,12 +184,14 @@ function compareBuckets(params, log, cb) {
                     }
 
                     if (srcContents[srcIdx].key > dstContents[dstIdx].key) {
-                        log.info('missing object in source',
+                        log.info(
+                            'missing object in source',
                             getReportObject(
                                 bucketdSrcParams.bucket,
                                 dstContents[dstIdx],
                                 verbose
-                            ));
+                            )
+                        );
                         ++statusObj.dstProcessedCount;
                         ++statusObj.missingInSrcCount;
                         ++dstIdx;

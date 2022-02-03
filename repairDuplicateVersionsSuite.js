@@ -35,9 +35,7 @@ const status = {
 };
 
 function logProgress(message) {
-    log.info(message, Object.assign({}, status, {
-        objectsToRepair: objectsToRepair.length,
-    }));
+    log.info(message, { ...status, objectsToRepair: objectsToRepair.length, });
 }
 
 function checkStatus(property) {
@@ -174,9 +172,9 @@ function genSproxydKey(fromKey) {
 
     const rand = crypto.randomBytes(11);
     return [rand.slice(0, 8).toString('hex').toUpperCase(),
-            fromKey.slice(16, 32),
-            rand.slice(8, 11).toString('hex').toUpperCase(),
-            fromKey.slice(38, 40)].join('');
+        fromKey.slice(16, 32),
+        rand.slice(8, 11).toString('hex').toUpperCase(),
+        fromKey.slice(38, 40)].join('');
 }
 
 function copySproxydKey(objectUrl, sproxydKey, cb) {
@@ -189,10 +187,8 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
         cb(err, newKey);
     });
     const newKey = genSproxydKey(sproxydKey);
-    const sproxydSourceUrl =
-          new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
-    const sproxydDestUrl =
-          new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
+    const sproxydSourceUrl = new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`);
+    const sproxydDestUrl = new URL(`http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${newKey}`);
     const sourceReq = http.request({
         hostname: sproxydSourceUrl.hostname,
         port: sproxydSourceUrl.port,
@@ -239,8 +235,8 @@ function copySproxydKey(objectUrl, sproxydKey, cb) {
                 return cbOnce(errors.InternalError);
             });
             return targetRes.resume().once('end', () => {
-                status.sproxydBytesCopied +=
-                    Number.parseInt(sourceRes.headers['content-length'], 10);
+                status.sproxydBytesCopied
+                    += Number.parseInt(sourceRes.headers['content-length'], 10);
                 cbOnce(null, newKey);
             });
         });

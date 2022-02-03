@@ -67,9 +67,11 @@ class StalledRequestHandler {
     }
 
     _waitForCompletion(cb) {
-        async.whilst(() =>
-            (!this.killed && this.isInProgress()),
-        done => setTimeout(done, 1000), cb);
+        async.whilst(
+            () => (!this.killed && this.isInProgress()),
+            done => setTimeout(done, 1000),
+            cb,
+        );
     }
 
     handleRequests(source, cb) {
@@ -103,7 +105,8 @@ class StalledRequestHandler {
                 }
 
                 return cb(null);
-            });
+            },
+        );
 
         return async.times(
             this.concurrentRequests,
@@ -131,7 +134,7 @@ class StalledRequestHandler {
 
                     return onceCB(null, result);
                 });
-            }
+            },
         );
     }
 }

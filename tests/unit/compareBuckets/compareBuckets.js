@@ -76,7 +76,7 @@ describe('compareBuckets', () => {
 
     it('should complete successfully with only source listings', done => {
         srcStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]
+            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
         );
         dstStack.push([false, '', []]);
 
@@ -95,7 +95,7 @@ describe('compareBuckets', () => {
     it('should complete successfully with only destination listings', done => {
         srcStack.push([false, '', []]);
         dstStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]
+            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
         );
 
         compareBuckets(params, log, err => {
@@ -112,10 +112,10 @@ describe('compareBuckets', () => {
 
     it('should successfully perform compare (single listing call)', done => {
         srcStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]
+            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
         );
         dstStack.push(
-            [false, '6', [newEntry('4'), newEntry('5'), newEntry('6')]]
+            [false, '6', [newEntry('4'), newEntry('5'), newEntry('6')]],
         );
 
         compareBuckets(params, log, err => {
@@ -134,13 +134,13 @@ describe('compareBuckets', () => {
         srcStack.push(
             [false, '3', [newEntry('3')]],
             [true, '2', [newEntry('2')]],
-            [true, '1', [newEntry('1')]]
+            [true, '1', [newEntry('1')]],
         );
 
         dstStack.push(
             [false, '6', [newEntry('6')]],
             [true, '5', [newEntry('5')]],
-            [true, '4', [newEntry('4')]]
+            [true, '4', [newEntry('4')]],
         );
 
         compareBuckets(params, log, err => {
@@ -161,7 +161,7 @@ describe('compareBuckets', () => {
             [true, '7', [newEntry('6'), newEntry('7')]],
             [true, '5', [newEntry('3'), newEntry('4'), newEntry('5')]],
             [true, '2', [newEntry('1'), newEntry('2')]],
-            [true, '0', [newEntry('0')]]
+            [true, '0', [newEntry('0')]],
         );
 
         dstStack.push(
@@ -169,7 +169,7 @@ describe('compareBuckets', () => {
             [true, '7', [newEntry('6'), newEntry('7')]],
             [true, '5', [newEntry('5')]],
             [true, '4', [newEntry('3'), newEntry('4')]],
-            [true, '2', [newEntry('0'), newEntry('1'), newEntry('2')]]
+            [true, '2', [newEntry('0'), newEntry('1'), newEntry('2')]],
         );
 
         compareBuckets(params, log, err => {
@@ -190,7 +190,7 @@ describe('compareBuckets', () => {
             [true, '7', [newEntry('6'), newEntry('7')]],
             [true, '5', [newEntry('3'), newEntry('4'), newEntry('5')]],
             [true, '2', [newEntry('1'), newEntry('2')]],
-            [true, '0', [newEntry('0')]]
+            [true, '0', [newEntry('0')]],
         );
 
         dstStack.push(
@@ -198,7 +198,7 @@ describe('compareBuckets', () => {
             [true, '17', [newEntry('16'), newEntry('17')]],
             [true, '15', [newEntry('15')]],
             [true, '14', [newEntry('13'), newEntry('14')]],
-            [true, '12', [newEntry('10'), newEntry('11'), newEntry('12')]]
+            [true, '12', [newEntry('10'), newEntry('11'), newEntry('12')]],
         );
 
         compareBuckets(params, log, err => {
@@ -219,14 +219,14 @@ describe('compareBuckets', () => {
             [true, '7', [newEntry('6'), newEntry('7')]],
             [true, '5', [newEntry('3'), newEntry('4'), newEntry('5')]],
             [true, '2', [newEntry('1'), newEntry('2')]],
-            [true, '0', [newEntry('0')]]
+            [true, '0', [newEntry('0')]],
         );
 
         dstStack.push(
             [false, '9', [newEntry('8'), newEntry('9')]],
             [true, '6', [newEntry('6')]],
             [true, '1', [newEntry('1'), newEntry('2')]],
-            [true, '0', [newEntry('0')]]
+            [true, '0', [newEntry('0')]],
         );
 
         compareBuckets(params, log, err => {
@@ -267,7 +267,7 @@ describe('commpareObjectsReports', () => {
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
             { key: 'key1', value: objectMDVersion1Size200 },
-            {}
+            {},
         );
 
         expect(report).toBeNull();
@@ -279,7 +279,7 @@ describe('commpareObjectsReports', () => {
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
-            { compareObjectSize: true }
+            { compareObjectSize: true },
         );
 
         expect(report).toEqual({
@@ -306,7 +306,7 @@ describe('commpareObjectsReports', () => {
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
             { key: 'key1', value: objectMDVersion1Size200 },
-            { compareObjectSize: true }
+            { compareObjectSize: true },
         );
 
         expect(report).toEqual({
@@ -334,7 +334,7 @@ describe('commpareObjectsReports', () => {
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
-            { compareVersionId: true }
+            { compareVersionId: true },
         );
 
         expect(report).toEqual({
@@ -361,7 +361,7 @@ describe('commpareObjectsReports', () => {
             { key: 'key1', value: objectMDVersion1Size100 },
             'destinationBucket',
             { key: 'key1', value: objectMDVersion2Size100 },
-            { compareVersionId: true }
+            { compareVersionId: true },
         );
 
         expect(report).toEqual({

@@ -1,6 +1,6 @@
+const fs = require('fs');
 const { RaftJournalReader } = require('../../../SproxydKeysScan/DuplicateKeysIngestion');
 const { subscribers } = require('../../../SproxydKeysScan/SproxydKeysSubscribers');
-const fs = require('fs');
 
 function getMockResponse(mockStatusCode) {
     const mockBody = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
@@ -74,7 +74,7 @@ describe('RaftJournalReader', () => {
                 'GET',
                 expect.anything(),
                 null,
-                expect.anything()
+                expect.anything(),
             );
             expect(err).not.toBe(null);
             expect(body).toBe(undefined);
@@ -88,7 +88,7 @@ describe('RaftJournalReader', () => {
                     'GET',
                     expect.anything(),
                     null,
-                    expect.anything()
+                    expect.anything(),
                 );
                 expect(err).toBe(null);
                 expect(body).not.toBe(null);
@@ -159,7 +159,7 @@ describe('RaftJournalReader', () => {
         reader.getBatch((err, body) => {
             reader.processBatch(body, (err, extractedKeys) => {
                 const oldBegin = reader.begin;
-                const insert = reader.processor.insert;
+                const { insert } = reader.processor;
 
                 reader.updateStatus(extractedKeys, () => {
                     test('updates sproxydKeysMap with processed keys', () => {
@@ -168,13 +168,13 @@ describe('RaftJournalReader', () => {
                         expect(insert).toHaveBeenCalledWith(
                             expect.anything(),
                             expect.anything(),
-                            'source-bucket'
+                            'source-bucket',
                         );
                     });
 
                     test('updates begin property in RaftJournalReader instance', () => {
                         const newBegin = reader.begin;
-                        const limit = reader.limit;
+                        const { limit } = reader;
                         expect(newBegin).toEqual(Math.min(reader.cseq + 1, oldBegin + limit));
                     });
                 });

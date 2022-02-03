@@ -1,16 +1,17 @@
-const metadataClient = require('./metadataClient');
 const { errors, versioning } = require('arsenal');
+const metadataClient = require('./metadataClient');
+
 const versionIdUtils = versioning.VersionID;
 
 function _processVersions(list) {
     /* eslint-disable no-param-reassign */
-    list.NextVersionIdMarker = list.NextVersionIdMarker ?
-        versionIdUtils.encode(list.NextVersionIdMarker)
+    list.NextVersionIdMarker = list.NextVersionIdMarker
+        ? versionIdUtils.encode(list.NextVersionIdMarker)
         : list.NextVersionIdMarker;
 
     list.Versions.forEach(v => {
-        v.VersionId = v.VersionId ?
-            versionIdUtils.encode(v.VersionId) : v.VersionId;
+        v.VersionId = v.VersionId
+            ? versionIdUtils.encode(v.VersionId) : v.VersionId;
     });
     /* eslint-enable no-param-reassign */
     return list;
@@ -29,19 +30,25 @@ function listObjectVersions(params, log, cb) {
         method: 'metadataUtils.listObjectVersions',
         listingParams,
     });
-    return metadataClient.listObject(bucketName, listingParams, log,
+    return metadataClient.listObject(
+        bucketName,
+        listingParams,
+        log,
         (err, list) => {
             if (err) {
                 return cb(err);
             }
             return cb(null, _processVersions(list));
-        });
+        },
+    );
 }
 
 function _formatConfig(config) {
     const { role, destination, rules } = config;
     const Rules = rules.map(rule => {
-        const { prefix, enabled, storageClass, id } = rule;
+        const {
+            prefix, enabled, storageClass, id,
+        } = rule;
         return {
             ID: id,
             Prefix: prefix,
@@ -84,8 +91,13 @@ function _getNullVersion(objMD, bucketName, objectKey, log, cb) {
     if (objMD.nullVersionId) {
         log.debug('null version exists, get the null version');
         options.versionId = objMD.nullVersionId;
-        return metadataClient.getObjectMD(bucketName, objectKey,
-            options, log, cb);
+        return metadataClient.getObjectMD(
+            bucketName,
+            objectKey,
+            options,
+            log,
+            cb,
+        );
     }
     return process.nextTick(() => cb());
 }
@@ -109,22 +121,32 @@ function getMetadata(params, log, cb) {
     const mdParams = {
         versionId,
     };
-    return metadataClient.getObjectMD(Bucket, Key, mdParams, log,
+    return metadataClient.getObjectMD(
+        Bucket,
+        Key,
+        mdParams,
+        log,
         (err, data) => {
             if (err) {
                 return cb(err);
             }
             if (data && versionId === 'null') {
-                return _getNullVersion(data, Bucket, Key, log,
+                return _getNullVersion(
+                    data,
+                    Bucket,
+                    Key,
+                    log,
                     (err, nullVer) => {
                         if (err) {
                             return cb(err);
                         }
                         return cb(null, nullVer);
-                    });
+                    },
+                );
             }
             return cb(null, data);
-        });
+        },
+    );
 }
 
 function putMetadata(params, log, cb) {

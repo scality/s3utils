@@ -1,7 +1,6 @@
 const werelogs = require('werelogs');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
-const { MongoClientInterface } =
-    require('arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 
 const CountMaster = require('./CountMaster');
 const CountManager = require('./CountManager');
@@ -16,14 +15,12 @@ const loggerConfig = {
 werelogs.configure(loggerConfig);
 const log = new werelogs.Logger('S3Utils::CountItems::Master');
 
-const numWorkers =
-    process.env.NUM_WORKERS && !Number.isNaN(process.env.NUM_WORKERS)
+const numWorkers = process.env.NUM_WORKERS && !Number.isNaN(process.env.NUM_WORKERS)
     ? Number.parseInt(process.env.NUM_WORKERS, 10)
     : 4;
 
-const concurrentCursors =
-    (process.env.CONCURRENT_CURSORS &&
-    !Number.isNaN(process.env.CONCURRENT_CURSORS))
+const concurrentCursors = (process.env.CONCURRENT_CURSORS
+    && !Number.isNaN(process.env.CONCURRENT_CURSORS))
     ? Number.parseInt(process.env.CONCURRENT_CURSORS, 10)
     : 5;
 

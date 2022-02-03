@@ -48,19 +48,19 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         writeItemsTo(mockCursor, [
             generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2'
+                'us-east-1,us-east-2',
             ),
             generateObjectMD(
                 'testobject-1',
                 generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2'
+                'us-east-1,us-east-2',
             ),
         ]);
 
@@ -83,14 +83,14 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         writeItemsTo(mockCursor, [
             generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, +24),
-                'us-east-1,us-east-2'
+                'us-east-1,us-east-2',
             ),
         ]);
 
@@ -113,14 +113,14 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         writeItemsTo(mockCursor, [
             generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2'
+                'us-east-1,us-east-2',
             ),
         ]);
 
@@ -143,7 +143,7 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         mockCursor.emit('error', new Error('test error'));
@@ -164,14 +164,14 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         writeItemsTo(mockCursor, [
             generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2'
+                'us-east-1,us-east-2',
             ),
         ]);
         mockCursor.end();
@@ -194,7 +194,7 @@ describe('RateLimitingCursor', () => {
                 bucketName: 'test-bucket',
                 cmpDate,
                 log,
-            }
+            },
         );
 
         mockCursor.end();
@@ -216,7 +216,7 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             wrapper.getBatch(1, () => {});
@@ -235,7 +235,7 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             wrapper.getBatch(5, (err, batch) => {
@@ -250,12 +250,12 @@ describe('RateLimitingCursor', () => {
                     generateObjectMD(
                         'testobject-0',
                         generateModifiedDateString(cmpDate, -24),
-                        'us-east-1,us-east-2,us-east-3'
+                        'us-east-1,us-east-2,us-east-3',
                     ),
                     generateObjectMD(
                         'testobject-1',
                         generateModifiedDateString(cmpDate, -24),
-                        'us-east-1,us-east-2,us-east-3'
+                        'us-east-1,us-east-2,us-east-3',
                     ),
                 ]);
             }, 100);
@@ -269,14 +269,14 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             writeItemsTo(mockCursor, [
                 generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
-                    'us-east-1'
+                    'us-east-1',
                 ),
             ]);
             mockCursor.end();
@@ -300,7 +300,7 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             wrapper.getBatch(1, (err, batch) => {
@@ -322,19 +322,19 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             writeItemsTo(mockCursor, [
                 generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2,us-east-3'
+                    'us-east-1,us-east-2,us-east-3',
                 ),
                 generateObjectMD(
                     'testobject-1',
                     generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2,us-east-3'
+                    'us-east-1,us-east-2,us-east-3',
                 ),
             ]);
 
@@ -368,7 +368,7 @@ describe('RateLimitingCursor', () => {
                     bucketName: 'test-bucket',
                     cmpDate,
                     log,
-                }
+                },
             );
 
             mockCursor.pause();
@@ -376,12 +376,12 @@ describe('RateLimitingCursor', () => {
                 generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2,us-east-3'
+                    'us-east-1,us-east-2,us-east-3',
                 ),
                 generateObjectMD(
                     'testobject-1',
                     generateModifiedDateString(cmpDate, -24),
-                    'us-east-1,us-east-2,us-east-3'
+                    'us-east-1,us-east-2,us-east-3',
                 ),
             ]);
 

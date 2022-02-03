@@ -36,21 +36,21 @@ Optional environment variables:
 `;
 
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
-const ENDPOINT = process.env.ENDPOINT;
+const { ACCESS_KEY } = process.env;
+const { SECRET_KEY } = process.env;
+const { ENDPOINT } = process.env;
 
-const TARGET_PREFIX = process.env.TARGET_PREFIX;
+const { TARGET_PREFIX } = process.env;
 const WORKERS = (
     process.env.WORKERS
         && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
 
-const KEY_MARKER = process.env.KEY_MARKER;
-const VERSION_ID_MARKER = process.env.VERSION_ID_MARKER;
+const { KEY_MARKER } = process.env;
+const { VERSION_ID_MARKER } = process.env;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide ' +
-                  'a comma-separated list of buckets on the command line');
+    console.error('No buckets given as input, please provide '
+                  + 'a comma-separated list of buckets on the command line');
     console.error(USAGE);
     process.exit(1);
 }
@@ -117,11 +117,15 @@ function logProgress(message) {
     });
 }
 
-const progressInterval = setInterval(() => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000);
+const progressInterval = setInterval(
+    () => logProgress('progress update'),
+    LOG_PROGRESS_INTERVAL * 1000,
+);
 
 const taskQueue = async.queue((task, done) => {
-    const { bucket, beginBucket, keyMarker, versionIdMarker } = task;
+    const {
+        bucket, beginBucket, keyMarker, versionIdMarker,
+    } = task;
     let bucketDone = false;
 
     status.keyMarker = keyMarker;
@@ -164,7 +168,9 @@ const taskQueue = async.queue((task, done) => {
         }, (err, data) => {
             if (err) {
                 log.error('error listing object versions', {
-                    bucket, keyMarker, versionIdMarker,
+                    bucket,
+                    keyMarker,
+                    versionIdMarker,
                     error: err.message,
                 });
                 bucketDone = true;

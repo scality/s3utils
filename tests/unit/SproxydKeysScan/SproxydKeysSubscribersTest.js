@@ -1,6 +1,6 @@
-const { setupProcessor } = require('../../utils/setupProcessor');
 const randomize = require('randomatic');
 const range = require('lodash/range');
+const { setupProcessor } = require('../../utils/setupProcessor');
 
 describe('SproxydKeysSubscribers', () => {
     describe('DuplicateSproxydKeyFoundHandler', () => {
@@ -24,9 +24,7 @@ describe('SproxydKeysSubscribers', () => {
                     .map(obj => duplicateHandler._getObjectURL(params.bucket, obj));
 
                 duplicateHandler.handle(params);
-                expect(duplicateHandler._repairObject).toHaveBeenCalledWith(
-                      { objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything()
-                );
+                expect(duplicateHandler._repairObject).toHaveBeenCalledWith({ objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything());
                 expect(processor.sproxydKeys.get(params.sproxydKey)).toEqual(newerVersion);
             });
         });
