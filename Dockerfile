@@ -6,14 +6,14 @@ ENV BALLOT_VERSION 1.0.3
 # Keep the .git directory in order to properly report version
 COPY ./package.json .
 
-RUN apt-get update \
-    && apt-get install -y jq python python-setuptools git build-essential --no-install-recommends \
-    && npm install && \
+RUN apt-get update && \
+    apt-get install -y jq python3 python3-setuptools python3-pip git build-essential --no-install-recommends && \
     SUPERVISORURL="https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz" && \
     SUPERVISORTARFILE="supervisor-4.2.2.tar.gz" && \
     wget $SUPERVISORURL && \
-    easy_install ./$SUPERVISORTARFILE && \
-    rm -v ./$SUPERVISORTARFILE
+    pip3 install ./$SUPERVISORTARFILE && \
+    rm -v ./$SUPERVISORTARFILE && \
+    npm install
 
 COPY ./ ./
 
