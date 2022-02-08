@@ -458,9 +458,9 @@ arrify@^1.0.1:
   resolved "https://registry.yarnpkg.com/arrify/-/arrify-1.0.1.tgz#898508da2226f380df904728456849c1501a4b0d"
   integrity sha1-iYUI2iIm84DfkEcoRWhJwVAaSw0=
 
-"arsenal@github:scality/arsenal#w/8.1/feature/ARSN-21/UpgradeToNode16":
-  version "8.1.22"
-  resolved "https://codeload.github.com/scality/arsenal/tar.gz/1e334924f92cdc6b15d2a8a59a1da3b2287b98f9"
+"arsenal@github:scality/arsenal#8.1.27":
+  version "8.1.27"
+  resolved "https://codeload.github.com/scality/arsenal/tar.gz/3c9ab1bb99c2b3134882e7d8ad12573a073188f4"
   dependencies:
     "@hapi/joi" "^15.1.0"
     JSONStream "^1.0.0"
@@ -476,7 +476,7 @@ arrify@^1.0.1:
     debug "~4.1.0"
     diskusage "^1.1.1"
     fcntl "github:scality/node-fcntl#0.2.0"
-    hdclient scality/hdclient#489db2106570b9ea41bdacdf56131324d0db6a58
+    hdclient scality/hdclient#1.1.0
     https-proxy-agent "^2.2.0"
     ioredis "4.9.5"
     ipaddr.js "1.9.1"
@@ -488,7 +488,7 @@ arrify@^1.0.1:
     simple-glob "^0.2.0"
     socket.io "~2.3.0"
     socket.io-client "~2.3.0"
-    sproxydclient "github:scality/sproxydclient#8.0.2"
+    sproxydclient "github:scality/sproxydclient#8.0.3"
     utf8 "3.0.0"
     uuid "^3.0.1"
     werelogs scality/werelogs#8.1.0
@@ -530,7 +530,7 @@ async@^2.1.4, async@^2.5.0, async@^2.6.1:
   dependencies:
     lodash "^4.17.10"
 
-async@^3.1.0:
+async@^3.2.0:
   version "3.2.3"
   resolved "https://registry.yarnpkg.com/async/-/async-3.2.3.tgz#ac53dafd3f4720ee9e8a160628f18ea91df196c9"
   integrity sha512-spZRyzKL5l5BZQrr/6m/SqFdBN0q3OCI0f9rjfBzCMBIP4p75P620rR3gTmaksNOhmzgdxcaxdNfMy6anrbM0g==
@@ -1212,12 +1212,10 @@ combined-stream@~1.0.6:
   dependencies:
     delayed-stream "~1.0.0"
 
-commander@1.3.2:
-  version "1.3.2"
-  resolved "https://registry.yarnpkg.com/commander/-/commander-1.3.2.tgz#8a8f30ec670a6fdd64af52f1914b907d79ead5b5"
-  integrity sha1-io8w7GcKb91kr1LxkUuQfXnq1bU=
-  dependencies:
-    keypress "0.1.x"
+commander@5.0.0:
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-5.0.0.tgz#dbf1909b49e5044f8fdaf0adc809f0c0722bdfd0"
+  integrity sha512-JrDGPAKjMGSP1G0DUoaceEJ3DZgAfr/q6X7FVk4+U5KxUSKviYGM2k6zWkfyyBHy5rAtzgYJFa1ro2O9PtoxwQ==
 
 commander@~2.17.1:
   version "2.17.1"
@@ -1604,10 +1602,10 @@ engine.io@~3.4.0:
     engine.io-parser "~2.2.0"
     ws "^7.1.2"
 
-entities@~2.1.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/entities/-/entities-2.1.0.tgz#992d3129cf7df6870b96c57858c249a120f8b8b5"
-  integrity sha512-hCx1oky9PFrJ611mf0ifBLBRW8lUUVRlFolb5gWRfIELabBlbp9xZvrqZLZAs+NxFnbfQoeGd8wDkygjg7U85w==
+entities@~2.0.0:
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/entities/-/entities-2.0.3.tgz#5c487e5742ab93c15abb5da22759b8590ec03b7f"
+  integrity sha512-MyoZ0jgnLvB2X3Lg5HqpFmn1kybDiIfEQmKzTb5apr51Rb+T3KdmMiqa70T+bhGnyv7bQ6WMj2QMHpGMmlrUYQ==
 
 env-paths@^2.2.0:
   version "2.2.1"
@@ -1741,12 +1739,12 @@ eslint-config-airbnb@^19.0.0:
     object.assign "^4.1.2"
     object.entries "^1.1.5"
 
-"eslint-config-scality@github:scality/Guidelines#improvement/GDL-5-node-16-upgrade":
-  version "1.1.0"
-  resolved "https://codeload.github.com/scality/Guidelines/tar.gz/38fd7471de623a37d78d75f7a3954dfa9e11c185"
+"eslint-config-scality@github:scality/Guidelines#8.2.0":
+  version "8.2.0"
+  resolved "https://codeload.github.com/scality/Guidelines/tar.gz/8147a6bedad7ba8c09e4bed06e6526dfb170c9a6"
   dependencies:
-    commander "1.3.2"
-    markdownlint "^0.25.1"
+    commander "5.0.0"
+    markdownlint "^0.19.0"
 
 eslint-import-resolver-node@^0.3.6:
   version "0.3.6"
@@ -2524,9 +2522,9 @@ hash-base@^3.0.0:
     readable-stream "^3.6.0"
     safe-buffer "^5.2.0"
 
-hdclient@scality/hdclient#489db2106570b9ea41bdacdf56131324d0db6a58:
-  version "0.1.0"
-  resolved "https://codeload.github.com/scality/hdclient/tar.gz/489db2106570b9ea41bdacdf56131324d0db6a58"
+hdclient@scality/hdclient#1.1.0:
+  version "1.1.0"
+  resolved "https://codeload.github.com/scality/hdclient/tar.gz/dd6d952e39ca89133019bafbb33eef6c418689f8"
   dependencies:
     werelogs scality/werelogs#GA7.2.0.5
 
@@ -3657,11 +3655,6 @@ jsprim@^1.2.2:
     json-schema "0.2.3"
     verror "1.10.0"
 
-keypress@0.1.x:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/keypress/-/keypress-0.1.0.tgz#4a3188d4291b66b4f65edb99f806aa9ae293592a"
-  integrity sha1-SjGI1CkbZrT2XtuZ+AaqmuKTWSo=
-
 kind-of@^3.0.2, kind-of@^3.0.3, kind-of@^3.2.0:
   version "3.2.2"
   resolved "https://registry.yarnpkg.com/kind-of/-/kind-of-3.2.2.tgz#31ea21a734bab9bbb0f32466d893aea51e4a3c64"
@@ -3842,10 +3835,10 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-linkify-it@^3.0.1:
-  version "3.0.3"
-  resolved "https://registry.yarnpkg.com/linkify-it/-/linkify-it-3.0.3.tgz#a98baf44ce45a550efb4d49c769d07524cc2fa2e"
-  integrity sha512-ynTsyrFSdE5oZ/O9GEf00kPngmOfVwazR5GKDq6EYfhlpFug3J2zybX56a2PRRpc9P+FuSoGNAwjlbDs9jJBPQ==
+linkify-it@^2.0.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/linkify-it/-/linkify-it-2.2.0.tgz#e3b54697e78bf915c70a38acd78fd09e0058b1cf"
+  integrity sha512-GnAl/knGn+i1U/wjBz3akz2stz+HrHLsxMwHQGofCDfPvlf+gDKN58UtfmUquTY4/MXeE2x7k19KQmeoZi94Iw==
   dependencies:
     uc.micro "^1.0.1"
 
@@ -4006,23 +3999,23 @@ map-visit@^1.0.0:
   dependencies:
     object-visit "^1.0.0"
 
-markdown-it@12.3.2:
-  version "12.3.2"
-  resolved "https://registry.yarnpkg.com/markdown-it/-/markdown-it-12.3.2.tgz#bf92ac92283fe983fe4de8ff8abfb5ad72cd0c90"
-  integrity sha512-TchMembfxfNVpHkbtriWltGWc+m3xszaRD0CZup7GFFhzIgQqxIfn3eGj1yZpfuflzPvfkt611B2Q/Bsk1YnGg==
+markdown-it@10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/markdown-it/-/markdown-it-10.0.0.tgz#abfc64f141b1722d663402044e43927f1f50a8dc"
+  integrity sha512-YWOP1j7UbDNz+TumYP1kpwnP0aEa711cJjrAQrzd0UXlbJfc5aAq0F/PZHjiioqDC1NKgvIMX+o+9Bk7yuM2dg==
   dependencies:
-    argparse "^2.0.1"
-    entities "~2.1.0"
-    linkify-it "^3.0.1"
+    argparse "^1.0.7"
+    entities "~2.0.0"
+    linkify-it "^2.0.0"
     mdurl "^1.0.1"
     uc.micro "^1.0.5"
 
-markdownlint@^0.25.1:
-  version "0.25.1"
-  resolved "https://registry.yarnpkg.com/markdownlint/-/markdownlint-0.25.1.tgz#df04536607ebeeda5ccd5e4f38138823ed623788"
-  integrity sha512-AG7UkLzNa1fxiOv5B+owPsPhtM4D6DoODhsJgiaNg1xowXovrYgOnLqAgOOFQpWOlHFVQUzjMY5ypNNTeov92g==
+markdownlint@^0.19.0:
+  version "0.19.0"
+  resolved "https://registry.yarnpkg.com/markdownlint/-/markdownlint-0.19.0.tgz#a692c7b5c077874d4ee8b74e188d6c464ccce81e"
+  integrity sha512-+MsWOnYVUH4klcKM7iRx5cno9FQMDAb6FC6mWlZkeXPwIaK6Z5Vd9VkXkykPidRqmLHU2wI+MNyfUMnUCBw3pQ==
   dependencies:
-    markdown-it "12.3.2"
+    markdown-it "10.0.0"
 
 math-random@^1.0.1:
   version "1.0.1"
@@ -5749,11 +5742,11 @@ sprintf-js@~1.0.2:
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
   integrity sha1-BOaSb2YolTVPPdAVIDYzuFcpfiw=
 
-"sproxydclient@github:scality/sproxydclient#8.0.2":
-  version "8.0.2"
-  resolved "https://codeload.github.com/scality/sproxydclient/tar.gz/e45c547833f03b1fa0409e0499433dcb386442f5"
+"sproxydclient@github:scality/sproxydclient#8.0.3":
+  version "8.0.3"
+  resolved "https://codeload.github.com/scality/sproxydclient/tar.gz/1377ae00e2fd6fff322bc604648abe8971f8a800"
   dependencies:
-    async "^3.1.0"
+    async "^3.2.0"
     werelogs scality/werelogs#8.1.0
 
 sshpk@^1.7.0:
@@ -6614,8 +6607,8 @@ yeast@0.1.2:
   resolved "https://registry.yarnpkg.com/yeast/-/yeast-0.1.2.tgz#008e06d8094320c372dbc2f8ed76a0ca6c8ac419"
   integrity sha1-AI4G2AlDIMNy28L47XagymyKxBk=
 
-zenkoclient@scality/zenkoclient#feature/ZENKO-3863/UpgradeToNode16:
-  version "1.0.0"
-  resolved "https://codeload.github.com/scality/zenkoclient/tar.gz/6eb81a66d8e9757511ed65faccbf8e62add94c80"
+zenkoclient@scality/zenkoclient#1.1.0:
+  version "1.1.0"
+  resolved "https://codeload.github.com/scality/zenkoclient/tar.gz/465630af1bd781f630ddf2e2a06e33b997c6c8d7"
   dependencies:
     aws-sdk "^2.333.0"
