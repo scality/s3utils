@@ -296,6 +296,12 @@ function checkSproxydKeys(objectUrl, locations, cb) {
         dupKey = true;
     }
     if (NO_MISSING_KEY_CHECK) {
+        if (VERBOSE) {
+            locations.forEach(loc => log.info('sproxyd key', {
+                objectUrl,
+                sproxydKey: loc.key,
+            }));
+        }
         return process.nextTick(onComplete);
     }
     return async.eachSeries(locations, (loc, locDone) => {
