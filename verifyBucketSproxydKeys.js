@@ -7,7 +7,7 @@ const async = require('async');
 const { URL } = require('url');
 const jsonStream = require('JSONStream');
 
-const { jsutil } = require('arsenal');
+const { jsutil, versioning } = require('arsenal');
 const { Logger } = require('werelogs');
 
 const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
@@ -373,6 +373,9 @@ function listBucketIter(bucket, cb) {
         const { Contents, IsTruncated } = resp;
 
         return async.eachLimit(Contents, WORKERS, (item, itemDone) => {
+            if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
+                return itemDone();
+            }
             const vidSepPos = item.key.lastIndexOf('\0');
             const objectUrl = getObjectURL(bucket, item.key);
 
