@@ -23,19 +23,34 @@ function getIsLocationTransientCb(log, locationConfigFile) {
     };
 }
 
+function getMongoDbConfig(log, configFile) {
+    let config;
+    try {
+        const data = fs.readFileSync(configFile, { encoding: 'utf-8' });
+        config = JSON.parse(data).mongodb;
+    } catch (err) {
+        log.info(`could not parse config file: ${err.message}`);
+        config = {
+            database: 'metadata',
+            replicaSet: 'rs0',
+            replicationGroupId: 'RG001',
+            shardCollections: false,
+        };
+    }
+    return config;
+}
+
 function createMongoParams(log, customParams) {
-    const replicaSetHosts = process.env.MONGODB_REPLICASET;
-    const database = process.env.MONGODB_DATABASE || 'metadata';
     const locationConfigFile = process.env.LOCATION_CONFIG_FILE || 'conf/locationConfig.json';
+    const config = getMongoDbConfig(log, process.env.CONFIG_FILE || 'conf/config.json');
 
     const params = {
-        replicaSetHosts,
-        database,
+        ...config,
+        database: process.env.MONGODB_DATABASE || config.database,
+        replicaSetHosts: process.env.MONGODB_REPLICASET || config.replicaSetHosts,
         isLocationTransient: getIsLocationTransientCb(log, locationConfigFile),
         writeConcern: 'majority',
-        replicaSet: 'rs0',
         readPreference: 'secondaryPreferred',
-        replicationGroupId: 'RG001',
         logger: log,
     };
 
