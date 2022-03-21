@@ -24,10 +24,11 @@ ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
 
 ## This section duplicates S3C Federation Dockerfile, this needs to be refactored
-# Create the "scality" user with associated env variables
+# Rename the "node" user to "scality" and setup associated env variables
 # for augmented images to use.
+RUN usermod --login scality --home /home/scality --move-home node && \
+    groupmod --new-name scality node
 ENV USER="scality"
-RUN useradd -ms /bin/bash scality
 ENV HOME_DIR="/home/${USER}"
 
 # Create common Directories and matching env variables
