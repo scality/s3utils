@@ -400,17 +400,22 @@ function listBucketIter(bucket, cb) {
                 }
             }
 
-            if (MPU_ONLY && md['content-md5'].indexOf('-') === -1) {
-                // not an MPU object
-                status.objectsSkipped += 1;
-                findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
+            if (md['content-md5'].indexOf('-') !== undefined) {
+                // not an "unreal" object, lacking content-md5
+                if (MPU_ONLY && md['content-md5'].indexOf('-') === -1) {
+                    // not an MPU object
+                    status.objectsSkipped += 1;
+                    findDuplicateSproxydKeys.skipVersion();
+                    return itemDone();
+                }
             }
-            if (md['content-length'] === 0) {
-                // empty object
-                status.objectsScanned += 1;
-                findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
+            if (md['content-length'] !== undefined) {
+                if (md['content-length'] === 0) {
+                    // empty object
+                    status.objectsScanned += 1;
+                    findDuplicateSproxydKeys.skipVersion();
+                    return itemDone();
+                }
             }
             // big MPUs may not have their location in the listing
             // result, we need to fetch the locations array from
