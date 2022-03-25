@@ -400,18 +400,28 @@ function listBucketIter(bucket, cb) {
                 }
             }
 
-            if (MPU_ONLY && md['content-md5'].indexOf('-') === -1) {
+            if (md.isPHD) {
+                // object is a Place Holder Delete (PHD)
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+
+            const isMPU = md['content-md5'] && md['content-md5'].indexOf('-') === -1;
+
+            if (MPU_ONLY && !isMPU) {
                 // not an MPU object
                 status.objectsSkipped += 1;
                 findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
+
             if (md['content-length'] === 0) {
                 // empty object
                 status.objectsScanned += 1;
                 findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
+
             // big MPUs may not have their location in the listing
             // result, we need to fetch the locations array from
             // bucketd explicitly in this case
