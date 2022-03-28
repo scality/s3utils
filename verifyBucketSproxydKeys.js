@@ -408,11 +408,13 @@ function listBucketIter(bucket, cb) {
                     return itemDone();
                 }
             }
-            if (md['content-length'] === 0) {
-                // empty object
-                status.objectsScanned += 1;
-                findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
+            if (md['content-length'] !== undefined) {
+                if (md['content-length'] === 0) {
+                    // empty object
+                    status.objectsScanned += 1;
+                    findDuplicateSproxydKeys.skipVersion();
+                    return itemDone();
+                }
             }
             // big MPUs may not have their location in the listing
             // result, we need to fetch the locations array from
