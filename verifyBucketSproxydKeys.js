@@ -406,9 +406,9 @@ function listBucketIter(bucket, cb) {
                 return itemDone();
             }
 
-            const isMPU = md['content-md5'] && md['content-md5'].indexOf('-') === -1;
+            const isNotMPU = md['content-md5'] && md['content-md5'].indexOf('-') === -1;
 
-            if (MPU_ONLY && !isMPU) {
+            if (MPU_ONLY && isNotMPU) {
                 // not an MPU object
                 status.objectsSkipped += 1;
                 findDuplicateSproxydKeys.skipVersion();
