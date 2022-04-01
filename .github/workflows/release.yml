@@ -36,9 +36,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: Release ${{ github.event.inputs.tag }}
           tag_name: ${{ github.event.inputs.tag }}
-          release_name: Release ${{ github.event.inputs.tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
 
       - name: Build and push
         uses: docker/build-push-action@v2
