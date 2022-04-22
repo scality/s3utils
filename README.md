@@ -278,7 +278,7 @@ node verifyBucketSproxydKeys.js
 * or:
 
   * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
-  * Example : BUCKETS=4,5,6
+  * Example : `docker run --net=host -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' -e 'RAFT_SESSIONS=1' registry.scality.com/s3utils/s3utils:1.12.5 node verifyBucketSproxydKeys.js`
 
 * or:
 
@@ -287,7 +287,7 @@ node verifyBucketSproxydKeys.js
     objects, each of the form:
     `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
     **note**: if `\u0000objectversion` is not present, it checks the master key
-  * Example : cat raft_session_1_output.txt | docker run -i --net=host --rm -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' -e 'KEYS_FROM_STDIN=1' registry.scality.com/s3utils/s3utils:1.12.5 node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
+  * Example : `cat raft_session_1_output.txt | docker run -i --net=host --rm -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' -e 'KEYS_FROM_STDIN=1' registry.scality.com/s3utils/s3utils:1.12.5 node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt`
 
 ## Optional environment variables:
 
