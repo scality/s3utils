@@ -273,10 +273,12 @@ node verifyBucketSproxydKeys.js
 * One of:
 
   * **BUCKETS**: comma-separated list of buckets to scan
+  * Example : BUCKETS=bucket1,bucket2,bucket3
 
 * or:
 
   * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
+  * Example : BUCKETS=4,5,6
 
 * or:
 
@@ -285,6 +287,7 @@ node verifyBucketSproxydKeys.js
     objects, each of the form:
     `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
     **note**: if `\u0000objectversion` is not present, it checks the master key
+  * Usage : KEYS_FROM_STDIN=1
 
 ## Optional environment variables:
 
