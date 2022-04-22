@@ -278,7 +278,13 @@ node verifyBucketSproxydKeys.js
 * or:
 
   * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
-  * Example : `docker run --net=host -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' -e 'RAFT_SESSIONS=1' registry.scality.com/s3utils/s3utils:1.12.5 node verifyBucketSproxydKeys.js`
+  * Example : ```docker run \
+   --net=host \
+   -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+   -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
+   -e 'RAFT_SESSIONS=1' \
+   registry.scality.com/s3utils/s3utils:1.12.5 \
+   node verifyBucketSproxydKeys.js```
 
 * or:
 
