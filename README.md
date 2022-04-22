@@ -273,7 +273,7 @@ node verifyBucketSproxydKeys.js
 * One of:
 
   * **BUCKETS**: comma-separated list of buckets to scan
-  * Example : BUCKETS=bucket1,bucket2,bucket3
+  * Example : `BUCKETS=bucket1,bucket2,bucket3`
 
 * or:
 
