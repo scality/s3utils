@@ -13,14 +13,18 @@ const { Logger } = require('werelogs');
 const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
 const getBucketdURL = require('./VerifyBucketSproxydKeys/getBucketdURL');
 const FindDuplicateSproxydKeys = require('./VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
+const BlockDigestsStream = require('./CompareRaftMembers/BlockDigestsStream');
+const BlockDigestsStorage = require('./CompareRaftMembers/BlockDigestsStorage');
 
 const DEFAULT_WORKERS = 100;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
 const DEFAULT_LISTING_LIMIT = 1000;
+const DEFAULT_LISTING_DIGESTS_BLOCK_SIZE = 1000;
 
 const {
     BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
     BUCKETS, RAFT_SESSIONS, KEYS_FROM_STDIN, FROM_URL,
+    LISTING_DIGESTS_OUTPUT_DIR,
 } = process.env;
 
 const WORKERS = (
@@ -48,6 +52,10 @@ const NO_MISSING_KEY_CHECK = process.env.NO_MISSING_KEY_CHECK === '1';
 // catch all cases.
 const DUPLICATE_KEYS_WINDOW_SIZE = 10000;
 
+const LISTING_DIGESTS_BLOCK_SIZE = (
+    process.env.LISTING_DIGESTS_BLOCK_SIZE
+        && Number.parseInt(process.env.LISTING_DIGESTS_BLOCK_SIZE, 10))
+      || DEFAULT_LISTING_DIGESTS_BLOCK_SIZE;
 
 const USAGE = `
 verifyBucketSproxydKeys.js
@@ -59,6 +67,11 @@ This script verifies that :
 
 It can help to identify objects affected by the S3C-1959 bug (1), or
 either of S3C-2731 or S3C-3778 (2).
+
+The script can also be used to generate block digests from the listing
+results as seen by the leader, for the purpose of finding
+discrepancies between raft members, that can be caused by bugs like
+S3C-5739.
 
 Usage:
     node verifyBucketSproxydKeys.js
@@ -86,6 +99,8 @@ Optional environment variables:
     NO_MISSING_KEY_CHECK: do not check for existence of sproxyd keys,
     for a performance benefit - other checks like duplicate keys are
     still done
+    LISTING_DIGESTS_OUTPUT_DIR: output listing digests into the specified directory (in the LevelDB format)
+    LISTING_DIGESTS_BLOCK_SIZE: number of keys in each listing digest block (default ${DEFAULT_LISTING_DIGESTS_BLOCK_SIZE})
 `;
 
 if (!BUCKETS && !RAFT_SESSIONS && !KEYS_FROM_STDIN) {
@@ -137,6 +152,15 @@ let lastMasterVersionId;
 
 // helper to detect duplicate sproxyd keys
 let findDuplicateSproxydKeys;
+
+// digests stream, to create block digests from a stream of key/value pairs
+let digestsStream;
+let levelStream;
+if (LISTING_DIGESTS_OUTPUT_DIR) {
+    digestsStream = new BlockDigestsStream({ blockSize: LISTING_DIGESTS_BLOCK_SIZE });
+    levelStream = new BlockDigestsStorage({ levelPath: LISTING_DIGESTS_OUTPUT_DIR });
+    digestsStream.pipe(levelStream);
+}
 
 function setupFromUrl(fromUrl) {
     if (!fromUrl.startsWith('s3://')) {
@@ -351,7 +375,7 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
             status.objectsErrors += 1;
             return cb();
         }
-        return checkSproxydKeys(objectUrl, locations, cb);
+        return checkSproxydKeys(objectUrl, locations, () => cb(locations));
     });
 }
 
@@ -378,7 +402,7 @@ function listBucketIter(bucket, cb) {
         const resp = JSON.parse(res.body);
         const { Contents, IsTruncated } = resp;
 
-        return async.eachLimit(Contents, WORKERS, (item, itemDone) => {
+        return async.mapLimit(Contents, WORKERS, (item, itemDone) => {
             if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
                 return itemDone();
             }
@@ -419,21 +443,48 @@ function listBucketIter(bucket, cb) {
                 // empty object
                 status.objectsScanned += 1;
                 findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
+                // empty objects should be included in the digest,
+                // hence returning their metadata to the map results
+                return itemDone(null, item);
             }
 
             // big MPUs may not have their location in the listing
             // result, we need to fetch the locations array from
             // bucketd explicitly in this case
             if (md.location) {
-                return checkSproxydKeys(objectUrl, md.location, itemDone);
+                return checkSproxydKeys(objectUrl, md.location, () => itemDone(null, item));
             }
-            return fetchAndCheckObject(bucket, item.key, itemDone);
-        }, () => {
+            return fetchAndCheckObject(bucket, item.key, location => {
+                if (location && digestsStream) {
+                    // thanks to preservation of JS object attribute
+                    // order, we can attach the locations array and
+                    // reconstruct the metadata blob to match what is
+                    // stored in the DB on disk. This is needed for
+                    // the block digests to have a chance to match.
+                    const fullMdBlob = JSON.stringify(Object.assign(md, { location }));
+                    itemDone(null, { key: item.key, value: fullMdBlob });
+                } else {
+                    // if there was an error fetching locations, just ignore the entry
+                    itemDone();
+                }
+            });
+        }, (_, items) => {
             if (IsTruncated) {
                 status.KeyMarker = Contents[Contents.length - 1].key;
             }
-            cb(null, IsTruncated);
+            if (digestsStream) {
+                items.forEach(item => {
+                    if (item) {
+                        const { key, value } = item;
+                        digestsStream.write({ key: `${bucket}/${key}`, value });
+                    }
+                });
+            }
+            if (digestsStream && digestsStream.writableNeedDrain) {
+                digestsStream.once('drain', () => cb(null, IsTruncated));
+            } else {
+                cb(null, IsTruncated);
+            }
         });
     });
 }
@@ -454,6 +505,10 @@ function listBucket(bucket, cb) {
         err => {
             status.bucketInProgress = null;
             status.KeyMarker = '';
+            if (digestsStream) {
+                // flush the digests stream to output the last bucket block
+                digestsStream.flush();
+            }
             cb(err);
         }
     );
@@ -522,6 +577,14 @@ function main() {
             }
             return async.eachSeries(remainingBuckets, listBucket, done);
         },
+        done => {
+            if (digestsStream) {
+                digestsStream.end();
+                levelStream.on('finish', done);
+            } else {
+                done();
+            }
+        },
     ], err => {
         if (err) {
             log.error('an error occurred during scan', {
@@ -547,8 +610,10 @@ function main() {
 
 main();
 
-
 function stop() {
+    if (digestsStream) {
+        digestsStream.destroy();
+    }
     log.info('stopping execution');
     logProgress('last status');
     process.exit(0);
