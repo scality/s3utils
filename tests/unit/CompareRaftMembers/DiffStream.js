@@ -49,7 +49,334 @@ class MockBucketStream extends stream.Readable {
     }
 }
 
+class MockDigestsStream extends stream.Readable {
+    constructor(digestsToStream) {
+        super({ objectMode: true });
+        this.digestsToStream = digestsToStream;
+    }
+
+    _read() {
+        setTimeout(() => {
+            if (this.digestsToStream.length > 0) {
+                this.push(this.digestsToStream.shift());
+            } else {
+                this.push(null);
+            }
+        }, 5);
+    }
+}
+
+class MockDigestsDB {
+    constructor(storedDigests) {
+        this.storedDigests = storedDigests;
+    }
+
+    createReadStream(params) {
+        const { gte, lt } = params || {};
+        return new MockDigestsStream(
+            this.storedDigests.filter(
+                digestEntry => (!gte || digestEntry.key >= gte)
+                    && (!lt || digestEntry.key < lt),
+            ),
+        );
+    }
+}
+
 describe('DiffStream', () => {
+    describe('DiffStream._getDigestBlockForItem', () => {
+        [
+            {
+                desc: 'with no digests DB',
+                storedDigests: null,
+                dbKeys: [
+                    {
+                        key: 'bucket/key1',
+                        expectedDigestBlock: null,
+                    },
+                    {
+                        key: 'bucket/key2',
+                        expectedDigestBlock: null,
+                    },
+                ],
+            },
+            {
+                desc: 'with an empty digests DB',
+                storedDigests: [],
+                dbKeys: [
+                    {
+                        key: 'bucket/key1',
+                        expectedDigestBlock: null,
+                    },
+                    {
+                        key: 'bucket/key2',
+                        expectedDigestBlock: null,
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing a single block for the first DB key',
+                storedDigests: [
+                    { key: 'bucket/key1', value: '{"size":1,"digest":"somedigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key1',
+                            digest: 'somedigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key2',
+                        expectedDigestBlock: null,
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing three blocks for three DB keys',
+                storedDigests: [
+                    { key: 'bucket/key1', value: '{"size":1,"digest":"firstdigest"}' },
+                    { key: 'bucket/key2', value: '{"size":1,"digest":"seconddigest"}' },
+                    { key: 'bucket/key3', value: '{"size":1,"digest":"thirddigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key1',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key2',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key2',
+                            digest: 'seconddigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key3',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key3',
+                            digest: 'thirddigest',
+                        },
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing three blocks for only two disjoint DB keys',
+                storedDigests: [
+                    { key: 'bucket/key1', value: '{"size":1,"digest":"firstdigest"}' },
+                    { key: 'bucket/key2', value: '{"size":1,"digest":"seconddigest"}' },
+                    { key: 'bucket/key3', value: '{"size":1,"digest":"thirddigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key1',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key3',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket/key3',
+                            digest: 'thirddigest',
+                        },
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing two blocks, each matching two DB keys',
+                storedDigests: [
+                    { key: 'bucket/key1-2', value: '{"size":2,"digest":"firstdigest"}' },
+                    { key: 'bucket/key2-2', value: '{"size":2,"digest":"seconddigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket/key1-1',
+                        expectedDigestBlock: {
+                            size: 2,
+                            lastKey: 'bucket/key1-2',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key1-2',
+                        expectedDigestBlock: {
+                            size: 2,
+                            lastKey: 'bucket/key1-2',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key2-1',
+                        expectedDigestBlock: {
+                            size: 2,
+                            lastKey: 'bucket/key2-2',
+                            digest: 'seconddigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key2-2',
+                        expectedDigestBlock: {
+                            size: 2,
+                            lastKey: 'bucket/key2-2',
+                            digest: 'seconddigest',
+                        },
+                    },
+                    {
+                        key: 'bucket/key3',
+                        expectedDigestBlock: null,
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing three blocks for three DB keys of different buckets',
+                storedDigests: [
+                    { key: 'bucket1/key1', value: '{"size":1,"digest":"firstdigest"}' },
+                    { key: 'bucket2/key1', value: '{"size":1,"digest":"seconddigest"}' },
+                    { key: 'bucket3/key1', value: '{"size":1,"digest":"thirddigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket1/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket1/key1',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    {
+                        key: 'bucket2/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket2/key1',
+                            digest: 'seconddigest',
+                        },
+                    },
+                    {
+                        key: 'bucket3/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket3/key1',
+                            digest: 'thirddigest',
+                        },
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing two blocks for three DB keys of different buckets',
+                storedDigests: [
+                    { key: 'bucket1/key1', value: '{"size":1,"digest":"firstdigest"}' },
+                    { key: 'bucket3/key1', value: '{"size":1,"digest":"seconddigest"}' },
+                ],
+                dbKeys: [
+                    {
+                        key: 'bucket1/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket1/key1',
+                            digest: 'firstdigest',
+                        },
+                    },
+                    // this bucket in-between does not have any associated digest
+                    {
+                        key: 'bucket2/key1',
+                        expectedDigestBlock: null,
+                    },
+                    {
+                        key: 'bucket3/key1',
+                        expectedDigestBlock: {
+                            size: 1,
+                            lastKey: 'bucket3/key1',
+                            digest: 'seconddigest',
+                        },
+                    },
+                ],
+            },
+            {
+                desc: 'with a digests DB containing three blocks for two buckets of ~1000 keys',
+                storedDigests: [
+                    { key: 'bucket1/key0999', value: '{"size":1000,"digest":"digest1"}' },
+                    { key: 'bucket1/key1099', value: '{"size":100,"digest":"digest2"}' },
+                    { key: 'bucket2/key0999', value: '{"size":1000,"digest":"digest3"}' },
+                ],
+                get dbKeys() {
+                    const keys = [];
+                    for (let i = 0; i < 1000; ++i) {
+                        keys.push({
+                            key: `bucket1/key${`0000${i}`.slice(-4)}`,
+                            expectedDigestBlock: {
+                                size: 1000,
+                                lastKey: 'bucket1/key0999',
+                                digest: 'digest1',
+                            },
+                        });
+                    }
+                    for (let i = 1000; i < 1100; ++i) {
+                        keys.push({
+                            key: `bucket1/key${`0000${i}`.slice(-4)}`,
+                            expectedDigestBlock: {
+                                size: 100,
+                                lastKey: 'bucket1/key1099',
+                                digest: 'digest2',
+                            },
+                        });
+                    }
+                    for (let i = 0; i < 1000; ++i) {
+                        keys.push({
+                            key: `bucket2/key${`0000${i}`.slice(-4)}`,
+                            expectedDigestBlock: {
+                                size: 1000,
+                                lastKey: 'bucket2/key0999',
+                                digest: 'digest3',
+                            },
+                        });
+                    }
+                    keys.push({
+                        key: 'bucket2/key1234',
+                        expectedDigestBlock: null,
+                    });
+                    return keys;
+                },
+            },
+        ].forEach(testCase => {
+            test(testCase.desc, done => {
+                let digestsDb;
+                if (testCase.storedDigests) {
+                    digestsDb = new MockDigestsDB(testCase.storedDigests);
+                } else {
+                    digestsDb = null;
+                }
+                const diffStream = new DiffStream({
+                    bucketdHost: 'dummy-host',
+                    bucketdPort: 4242,
+                    digestsDb,
+                    maxBufferSize: 2000,
+                    BucketStreamClass: MockBucketStream,
+                });
+                async.eachSeries(testCase.dbKeys, (item, itemDone) => {
+                    const itemInfo = diffStream._parseItem(item);
+                    diffStream._getDigestBlockForItem(itemInfo, digestBlock => {
+                        expect(digestBlock).toEqual(item.expectedDigestBlock);
+                        itemDone();
+                    });
+                }, err => {
+                    expect(err).toBeFalsy();
+                    diffStream.cleanup(done);
+                });
+            });
+        });
+    });
+
     describe('should output differences between a stream of { key, value } items and bucketd', () => {
         beforeEach(() => {
             MOCK_BUCKET_STREAM_REQUESTS_MADE = [];
