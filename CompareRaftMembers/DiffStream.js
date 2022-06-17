@@ -1,6 +1,7 @@
 const stream = require('stream');
 
 const BucketStream = require('./BucketStream');
+const BlockDigestsStream = require('./BlockDigestsStream');
 
 /**
  * Output differences between the input stream, consisting of
@@ -52,6 +53,8 @@ class DiffStream extends stream.Transform {
         this.currentDbDigestBlock = null;
         this.currentDbDigestBlockWaitCallback = null;
         this.noMoreDigestsForCurrentBucket = false;
+
+        this.computedDigestsStream = null;
     }
 
     cleanup(callback) {
@@ -72,6 +75,8 @@ class DiffStream extends stream.Transform {
     }
 
     _flush(callback) {
+        // FIXME see related comment in _processItem() about the check
+        // on whether the input buffer is not empty
         if (this.inputBuffer.length > 0) {
             this._compareInputBufferWithBucketd(null, callback);
         } else {
@@ -110,9 +115,24 @@ class DiffStream extends stream.Transform {
      */
     _processItem(itemInfo, digestBlock, callback) {
         const { bucketName } = itemInfo;
+        // FIXME: checking that the input buffer is not empty is a
+        // workaround: a better way would be to have a flag in the
+        // digest blocks from the database that tells if it was the
+        // final block of the bucket stream, so if the computed digest
+        // matches, we know whether we should check on bucketd for
+        // extra entries or if we are guaranteed that this is the last
+        // block and there is no more entry in the bucket to check
+        // for on bucketd.
+        //
+        // In the current situation, we avoid doing extra requests on
+        // bucketd by checking the input buffer length first, but we
+        // may miss extra entries in the bucket as seen by bucketd if
+        // the digests database is incomplete. It should be acceptable
+        // for the purpose of integrity checking.
 
         const isNewBucket = (this.inputBufferBucket && bucketName !== this.inputBufferBucket);
-        if (isNewBucket || this.inputBuffer.length === this.maxBufferSize) {
+        if ((isNewBucket && this.inputBuffer.length > 0)
+            || this.inputBuffer.length === this.maxBufferSize) {
             const lastObjectKey = isNewBucket
                 ? null
                 : this.inputBuffer[this.inputBuffer.length - 1].objectKey;
@@ -241,8 +261,62 @@ class DiffStream extends stream.Transform {
     _ingestItem(itemInfo, digestBlock, callback) {
         const { fullKey } = itemInfo;
         this.inputBuffer.push(itemInfo);
-        // TODO compute block digests and compare with digestBlock
+        if (digestBlock) {
+            if (fullKey === digestBlock.lastKey) {
+                return this._compareInputBufferDigest(digestBlock, callback);
+            }
+        } else {
+            if (this.computedDigestsStream) {
+                this.computedDigestsStream.destroy();
+                this.computedDigestsStream = null;
+            }
+        }
         return callback();
+    }
+
+    /**
+     * Compare the current input buffer from the input database stream
+     * with a digest block read from the digests database, and trigger
+     * bucketd requests to compare keys if the digests mismatch.
+     *
+     * The function computes the digest from the input buffer and
+     * compares it against the provided "digestBlock" read from the
+     * digests database.
+     *
+     * @param {object} digestBlock - digest read from the digests database
+
+     * @param {function} callback - called with no argument when done
+     * with the comparison
+     * @return {undefined}
+     */
+    _compareInputBufferDigest(digestBlock, callback) {
+        if (!this.computedDigestsStream) {
+            this.computedDigestsStream = new BlockDigestsStream({ blockSize: 0 });
+        }
+        for (let i = 0; i < this.inputBuffer.length; ++i) {
+            const itemToIngest = this.inputBuffer[i];
+            this.computedDigestsStream.write({
+                key: itemToIngest.fullKey,
+                value: itemToIngest.value,
+            });
+        }
+        this.computedDigestsStream.flush();
+        const computedDigest = this.computedDigestsStream.read();
+        if (digestBlock.digest === computedDigest.digest) {
+            // digests match: just update the current marker
+            this.currentMarker = this.inputBuffer[this.inputBuffer.length - 1].objectKey;
+            this.inputBuffer = [];
+            return callback();
+        }
+        // on a mismatch, we need to check the input buffer
+        // immediately in order to re-align the checks with the next
+        // digest block
+        const slashIndex = digestBlock.lastKey.indexOf('/');
+        const marker = digestBlock.lastKey.slice(slashIndex + 1);
+        return this._compareInputBufferWithBucketd(marker, () => {
+            this.currentMarker = marker;
+            callback();
+        });
     }
 
     /**

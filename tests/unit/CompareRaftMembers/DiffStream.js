@@ -394,6 +394,11 @@ describe('DiffStream', () => {
                         storedDigests: null,
                         expectedBucketStreamRequests: [],
                     },
+                    {
+                        desc: 'with an empty digests DB',
+                        storedDigests: [],
+                        expectedBucketStreamRequests: [],
+                    },
                 ],
             },
             {
@@ -416,6 +421,28 @@ describe('DiffStream', () => {
                                 lastKey: null,
                             },
                         ],
+                    },
+                    {
+                        desc: 'with an empty digests DB',
+                        storedDigests: [],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one entry',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key1',
+                                value: '{"size":1,"digest":"c6c83082863070bc04b3fbbb034014c3"}',
+                            },
+                        ],
+                        // since the digest matches, there should be no request made to bucketd
+                        expectedBucketStreamRequests: [],
                     },
                 ],
             },
@@ -441,6 +468,23 @@ describe('DiffStream', () => {
                     {
                         desc: 'with no digests DB',
                         storedDigests: null,
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one entry',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key2',
+                                value: '{"size":1,"digest":"5d2eb06ef5307070ec00700775a35d49"}',
+                            },
+                        ],
+                        // since the digest mismatches, there should be a request made to bucketd
                         expectedBucketStreamRequests: [
                             {
                                 bucketName: 'bucket',
@@ -477,6 +521,23 @@ describe('DiffStream', () => {
                             },
                         ],
                     },
+                    {
+                        desc: 'with a digests DB containing one entry',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key1',
+                                value: '{"size":1,"digest":"a7e0ed5621515647ac4f11d77bf21b9f"}',
+                            },
+                        ],
+                        // since the digest mismatches, there should be a request made to bucketd
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: 'key1',
+                            },
+                        ],
+                    },
                 ],
             },
             {
@@ -498,6 +559,23 @@ describe('DiffStream', () => {
                     {
                         desc: 'with no digests DB',
                         storedDigests: null,
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one entry',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key2',
+                                value: '{"size":2,"digest":"0462f41eb9f7ddfda1c1254c8af2da0c"}',
+                            },
+                        ],
+                        // since the digest mismatches, there should be a request made to bucketd
                         expectedBucketStreamRequests: [
                             {
                                 bucketName: 'bucket',
@@ -551,6 +629,17 @@ describe('DiffStream', () => {
                             },
                         ],
                     },
+                    {
+                        desc: 'with an empty digests DB',
+                        storedDigests: [],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
                 ],
             },
             {
@@ -580,6 +669,60 @@ describe('DiffStream', () => {
                                 lastKey: null,
                             },
                         ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for the first bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket1/key1',
+                                value: '{"size":1,"digest":"0c477b7abf5ce8b5037a796fc15437f3"}',
+                            },
+                        ],
+                        // digest matches for the entire contents of
+                        // bucket1, so there should only be one
+                        // request for bucket2
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket2',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for the second bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket2/key1',
+                                value: '{"size":1,"digest":"cae7de298351bcbfb45f725e5e9a57ed"}',
+                            },
+                        ],
+                        // digest matches for the entire contents of
+                        // bucket2, so there should only be one
+                        // request for bucket1
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket1',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for each bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket1/key1',
+                                value: '{"size":1,"digest":"0c477b7abf5ce8b5037a796fc15437f3"}',
+                            },
+                            {
+                                key: 'bucket2/key1',
+                                value: '{"size":1,"digest":"cae7de298351bcbfb45f725e5e9a57ed"}',
+                            },
+                        ],
+                        // digests match for both buckets, so there
+                        // should be no request to bucketd
+                        expectedBucketStreamRequests: [],
                     },
                 ],
             },
@@ -617,6 +760,73 @@ describe('DiffStream', () => {
                                 bucketName: 'bucket2',
                                 marker: null,
                                 lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for the first bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket1/key1',
+                                value: '{"size":1,"digest":"e22f7360f9fddb0e4a20ed3257023b78"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket1',
+                                marker: null,
+                                lastKey: 'key1',
+                            },
+                            {
+                                bucketName: 'bucket2',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for the second bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket2/key1',
+                                value: '{"size":1,"digest":"8a8d4413233f2a0e453da726993bec53"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket1',
+                                marker: null,
+                                lastKey: null,
+                            },
+                            {
+                                bucketName: 'bucket2',
+                                marker: null,
+                                lastKey: 'key1',
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing one block for each bucket',
+                        storedDigests: [
+                            {
+                                key: 'bucket1/key1',
+                                value: '{"size":1,"digest":"e22f7360f9fddb0e4a20ed3257023b78"}',
+                            },
+                            {
+                                key: 'bucket2/key1',
+                                value: '{"size":1,"digest":"8a8d4413233f2a0e453da726993bec53"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket1',
+                                marker: null,
+                                lastKey: 'key1',
+                            },
+                            {
+                                bucketName: 'bucket2',
+                                marker: null,
+                                lastKey: 'key1',
                             },
                         ],
                     },
@@ -668,6 +878,62 @@ describe('DiffStream', () => {
                                 lastKey: null,
                             },
                         ],
+                    },
+                    {
+                        desc: 'with a digests DB containing two blocks for the first 3667 items',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key-001888',
+                                value: '{"size":1889,"digest":"f662a8604d84b2251f9ea2929f7fa9d0"}',
+                            },
+                            {
+                                key: 'bucket/key-003666',
+                                value: '{"size":1778,"digest":"8cc9f6d9efc0187e1a7df7f0d1941ae0"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: 'key-003666',
+                                lastKey: 'key-005666',
+                            },
+                            {
+                                bucketName: 'bucket',
+                                marker: 'key-005666',
+                                lastKey: 'key-007666',
+                            },
+                            {
+                                bucketName: 'bucket',
+                                marker: 'key-007666',
+                                lastKey: null,
+                            },
+                        ],
+                    },
+                    {
+                        desc: 'with a digests DB containing five blocks for all items',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key-001888',
+                                value: '{"size":1889,"digest":"f662a8604d84b2251f9ea2929f7fa9d0"}',
+                            },
+                            {
+                                key: 'bucket/key-003666',
+                                value: '{"size":1778,"digest":"8cc9f6d9efc0187e1a7df7f0d1941ae0"}',
+                            },
+                            {
+                                key: 'bucket/key-005222',
+                                value: '{"size":1556,"digest":"8d0fbbd126f9e53edfb8ea7e7b2ca603"}',
+                            },
+                            {
+                                key: 'bucket/key-006888',
+                                value: '{"size":1666,"digest":"35d9bbb203d2c5a5e577470f894fbcc6"}',
+                            },
+                            {
+                                key: 'bucket/key-007776',
+                                value: '{"size":888,"digest":"5b8a595a3c99cad23e8c3bb08c0c7cec"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [],
                     },
                 ],
             },
@@ -791,6 +1057,43 @@ describe('DiffStream', () => {
                             },
                         ],
                     },
+                    {
+                        desc: 'with a digests DB containing five blocks for all items',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key-001888',
+                                value: '{"size":1889,"digest":"f662a8604d84b2251f9ea2929f7fa9d0"}',
+                            },
+                            {
+                                key: 'bucket/key-003666',
+                                value: '{"size":1778,"digest":"8cc9f6d9efc0187e1a7df7f0d1941ae0"}',
+                            },
+                            {
+                                key: 'bucket/key-005222',
+                                value: '{"size":1555,"digest":"bf5ed7af3f33013326e521a14ab37de2"}',
+                            },
+                            {
+                                key: 'bucket/key-006888',
+                                value: '{"size":1666,"digest":"35d9bbb203d2c5a5e577470f894fbcc6"}',
+                            },
+                            {
+                                key: 'bucket/key-007776',
+                                value: '{"size":888,"digest":"5b8a595a3c99cad23e8c3bb08c0c7cec"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: 'key-001888',
+                                lastKey: 'key-003666',
+                            },
+                            {
+                                bucketName: 'bucket',
+                                marker: 'key-003666',
+                                lastKey: 'key-005222',
+                            },
+                        ],
+                    },
                 ],
             },
             {
@@ -832,6 +1135,38 @@ describe('DiffStream', () => {
                             },
                         ],
                     },
+                    {
+                        desc: 'with a digests DB containing five blocks for all items',
+                        storedDigests: [
+                            {
+                                key: 'bucket/key-001888',
+                                value: '{"size":1889,"digest":"f662a8604d84b2251f9ea2929f7fa9d0"}',
+                            },
+                            {
+                                key: 'bucket/key-003666',
+                                value: '{"size":1778,"digest":"8cc9f6d9efc0187e1a7df7f0d1941ae0"}',
+                            },
+                            {
+                                key: 'bucket/key-005222',
+                                value: '{"size":1556,"digest":"8d0fbbd126f9e53edfb8ea7e7b2ca603"}',
+                            },
+                            {
+                                key: 'bucket/key-006888',
+                                value: '{"size":1666,"digest":"35d9bbb203d2c5a5e577470f894fbcc6"}',
+                            },
+                            {
+                                key: 'bucket/key-007776',
+                                value: '{"size":888,"digest":"5b8a595a3c99cad23e8c3bb08c0c7cec"}',
+                            },
+                        ],
+                        expectedBucketStreamRequests: [
+                            {
+                                bucketName: 'bucket',
+                                marker: null,
+                                lastKey: null,
+                            },
+                        ],
+                    },
                 ],
             },
         ].forEach(testCase => {
@@ -840,10 +1175,17 @@ describe('DiffStream', () => {
                 test(`${testCase.desc} yielding ${expectedOutput.length} diff entries, ${withDigests.desc}`, done => {
                     MOCK_BUCKET_STREAM_FULL_LISTING = testCase.bucketdContents;
                     const { dbContents } = testCase;
+                    let digestsDb;
+                    if (withDigests.storedDigests) {
+                        digestsDb = new MockDigestsDB(withDigests.storedDigests);
+                    } else {
+                        digestsDb = null;
+                    }
                     const output = [];
                     const diffStream = new DiffStream({
                         bucketdHost: 'dummy-host',
                         bucketdPort: 4242,
+                        digestsDb,
                         maxBufferSize: 2000,
                         BucketStreamClass: MockBucketStream,
                     });
