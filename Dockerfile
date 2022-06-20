@@ -1,4 +1,4 @@
-FROM node:16
+FROM node:16.15.1-bullseye
 
 WORKDIR /usr/src/app
 ENV BALLOT_VERSION 1.0.3
