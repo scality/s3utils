@@ -1,10 +1,7 @@
-FROM node:16.15.1-bullseye-slim
+# Use separate builder to retrieve & build node modules
+FROM node:16.15.1-bullseye-slim AS builder
 
 WORKDIR /usr/src/app
-ENV BALLOT_VERSION 1.0.3
-
-# Keep the .git directory in order to properly report version
-COPY ./package.json .
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -14,17 +11,28 @@ RUN apt-get update && \
         python3 \
         python3-pip \
         python3-setuptools \
-        wget \
-    && \
-    SUPERVISORURL="https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz" && \
-    SUPERVISORTARFILE="supervisor-4.2.2.tar.gz" && \
-    wget $SUPERVISORURL && \
-    pip3 install ./$SUPERVISORTARFILE && \
-    rm -v ./$SUPERVISORTARFILE && \
-    npm install
+        wget
 
+ENV SUPERVISOR_VERSION 0.7.3
+RUN wget https://github.com/ochinchina/supervisord/releases/download/v${SUPERVISOR_VERSION}/supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz && \
+    tar xzf supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz --strip-component=1 supervisord_${SUPERVISOR_VERSION}_Linux_64-bit/supervisord && \
+    rm supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz
+
+COPY ./package.json .
+RUN npm install
+
+################################################################################
+FROM node:16.15.1-bullseye-slim
+
+WORKDIR /usr/src/app
+
+# Keep the .git directory in order to properly report version
 COPY ./ ./
+COPY --from=builder /usr/src/app/node_modules ./node_modules/
 
+COPY --from=builder /usr/src/app/supervisord /usr/local/bin/
+
+ENV BALLOT_VERSION 1.0.3
 ADD https://github.com/scality/ballot/releases/download/v${BALLOT_VERSION}/ballot-v${BALLOT_VERSION}-linux-amd64 /usr/src/app/ballot
 RUN chmod +x /usr/src/app/ballot
 
