@@ -19,7 +19,7 @@ RUN wget https://github.com/ochinchina/supervisord/releases/download/v${SUPERVIS
     rm supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz
 
 COPY ./package.json .
-RUN npm install
+RUN yarn install --prod
 
 ################################################################################
 FROM node:16.15.1-bullseye-slim
