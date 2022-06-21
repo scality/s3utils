@@ -11,8 +11,8 @@ RUN apt-get update && \
         python3 \
         ssh
 
-COPY ./package.json .
-RUN npm install
+COPY ./package.json ./yarn.lock ./
+RUN yarn install --production
 
 ################################################################################
 FROM node:16.15.1-slim
