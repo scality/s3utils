@@ -8,10 +8,17 @@ WORKDIR /usr/src/app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
+        ca-certificates \
         git \
         jq \
         python3 \
-        ssh
+        ssh \
+        wget
+
+ENV SUPERVISOR_VERSION 0.7.3
+RUN wget https://github.com/ochinchina/supervisord/releases/download/v${SUPERVISOR_VERSION}/supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz && \
+    tar xzf supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz --strip-component=1 supervisord_${SUPERVISOR_VERSION}_Linux_64-bit/supervisord && \
+    rm supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz
 
 COPY ./package.json ./yarn.lock ./
 RUN yarn install --production
@@ -23,15 +30,7 @@ WORKDIR /usr/src/app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        jq \
-        python3 \
-        python3-pip \
-        python3-setuptools \
-    && \
-    SUPERVISORURL="https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0" && \
-    SUPERVISORTARFILE="supervisor-4.2.2.tar.gz" && \
-    pip3 install $SUPERVISORURL/$SUPERVISORTARFILE && \
-    rm -rf /var/lib/apt/lists/* 
+        jq
 
 ENV BALLOT_VERSION 1.0.3
 ADD https://github.com/scality/ballot/releases/download/v${BALLOT_VERSION}/ballot-v${BALLOT_VERSION}-linux-amd64 /usr/src/app/ballot
@@ -39,6 +38,8 @@ RUN chmod +x /usr/src/app/ballot
 
 COPY ./ ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules/
+
+COPY --from=builder /usr/src/app/supervisord /usr/local/bin/
 
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
