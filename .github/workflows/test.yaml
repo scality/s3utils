@@ -1,8 +1,14 @@
-name: Basic Tests
+name: tests
 
 on:
-  - push
+  push:
+    branches-ignore:
+      - development/**
+      - q/*/**
 
+concurrency:
+  group: 'tests-${{ github.ref }}'
+  cancel-in-progress: true
 
 jobs:
   tests:
@@ -28,7 +34,7 @@ jobs:
         env:
           MONGODB_REPLICASET: "localhost:27018"
 
-  release-commit:
+  build:
     runs-on: ubuntu-latest
     needs:
       - tests
