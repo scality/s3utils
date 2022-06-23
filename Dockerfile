@@ -1,5 +1,5 @@
 # Use separate builder to retrieve & build node modules
-FROM node:16.15.1-slim AS builder
+FROM node:16.15.1-bullseye-slim AS builder
 
 WORKDIR /usr/src/app
 
@@ -15,7 +15,7 @@ COPY ./package.json ./yarn.lock ./
 RUN yarn install --production
 
 ################################################################################
-FROM node:16.15.1-slim
+FROM node:16.15.1-bullseye-slim
 
 WORKDIR /usr/src/app
 
