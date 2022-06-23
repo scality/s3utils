@@ -1,5 +1,7 @@
+ARG NODE_VERSION=16.15.1-bullseye-slim
+
 # Use separate builder to retrieve & build node modules
-FROM node:16.15.1-bullseye-slim AS builder
+FROM node:${NODE_VERSION} AS builder
 
 WORKDIR /usr/src/app
 
@@ -15,7 +17,7 @@ COPY ./package.json ./yarn.lock ./
 RUN yarn install --production
 
 ################################################################################
-FROM node:16.15.1-bullseye-slim
+FROM node:${NODE_VERSION}
 
 WORKDIR /usr/src/app
 
