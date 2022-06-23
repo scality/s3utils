@@ -13,7 +13,8 @@ RUN apt-get update && \
         jq \
         python3 \
         ssh \
-        wget
+        wget \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV SUPERVISOR_VERSION 0.7.3
 RUN wget https://github.com/ochinchina/supervisord/releases/download/v${SUPERVISOR_VERSION}/supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz && \
@@ -30,7 +31,8 @@ WORKDIR /usr/src/app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        jq
+        jq \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV BALLOT_VERSION 1.0.3
 ADD https://github.com/scality/ballot/releases/download/v${BALLOT_VERSION}/ballot-v${BALLOT_VERSION}-linux-amd64 /usr/src/app/ballot
