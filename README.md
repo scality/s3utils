@@ -404,6 +404,57 @@ Logged fields:
     object versions
 
 
+# Compare follower's databases against leader view
+
+The **CompareRaftMembers/followerDiff** tool compares Metadata leveldb
+databases on the repd follower on which it is run against the leader's
+view, and outputs the differences to the file path given as the
+DIFF_OUTPUT_FILE environment variable.
+
+In this file, it outputs each key that differs as line-separated JSON
+entries, where each entry can be one of:
+
+- [{ key, value }, null]: this key is present on this follower but not
+  on the leader
+
+- [null, { key, value }]: this key is not present on this follower but
+  is present on the leader
+
+- [{ key, value: "{value1}" }, { key, value: "{value2}" }]: this key
+  has a different value between this follower and the leader: "value1"
+  is the value seen on the follower and "value2" the value seen on the
+  leader.
+
+It is possible and recommended to speed-up the comparison by providing
+a pre-computed digests database via the LISTING_DIGESTS_INPUT_DIR
+environment variable, so that ranges of keys that match the digests
+database do not have to be checked by querying the leader. The
+pre-computed digests database can be generated via a run of
+"verifyBucketSproxydKeys" script, providing it the
+LISTING_DIGESTS_OUTPUT_DIR environment variable.
+
+## Usage
+
+```
+node followerDiff.js
+```
+
+## Mandatory environment variables
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+* **DATABASES**: space-separated list of databases to scan
+
+* **DIFF_OUTPUT_FILE**: file path where diff output will be stored
+
+## Optional environment variables
+
+* **LISTING_DIGESTS_INPUT_DIR**: read listing digests from the
+    specified LevelDB database
+
+* **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
+
+
 # Remove delete markers
 
 The removeDeleteMarkers.js script removes delete markers from one or
