@@ -6,7 +6,7 @@ const {
 
 class MongoClientInterfaceStalled extends MongoClientInterface {
     constructor(params) {
-        super(params);
+        super(params.mongodb);
         this.cursorWrapperFactory = params.cursorWrapperFactory;
         this.requestHandlerFactory = params.requestHandlerFactory;
     }
