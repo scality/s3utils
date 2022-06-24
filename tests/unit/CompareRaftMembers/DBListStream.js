@@ -255,6 +255,21 @@ describe('DBListStream', () => {
                     },
                 ],
             },
+            {
+                desc: 'special buckets should be ignored',
+                dbName: 'storeDb42',
+                dbEntries: [
+                    { key: 'users..bucket/object', value: '{"foo":"bar"}' },
+                    { key: 'mpuShadowBucketfoobar/object', value: '{"foo":"bar"}' },
+                    { key: 'mpushadowbucketiamnotashadowbucket/object', value: '{"foo":"bar"}' },
+                ],
+                listEntries: [
+                    {
+                        key: 'mpushadowbucketiamnotashadowbucket/object',
+                        value: '{"foo":"bar"}',
+                    },
+                ],
+            },
         ].forEach(testCase => {
             test(testCase.desc, done => {
                 const dbStream = new MockDBStream(testCase.dbEntries);
