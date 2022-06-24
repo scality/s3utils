@@ -18,11 +18,32 @@ function buildItemFromIndex(index, flags) {
         : `key-${paddedIndex}`;
     let value;
     if (flags.isPHD) {
-        value = '{"isPHD":true}';
-    } else if (flags.versionKey || flags.hasVersionId) {
-        value = `{"versionId":"${DUMMY_VERSION_ID}","value":"value-${paddedIndex}"}`;
+        value = { isPHD: true };
     } else {
-        value = `{"value":"value-${paddedIndex}"}`;
+        // introduce:
+        //
+        // - a few objects with a hidden location, typically a large MPU
+        // - where the listing does not show the location that is
+        // - larger than a certain size (for the test we can do with a
+        // - small location)
+        //
+        // - a few empty objects i.e. with a null location
+        //
+        const locationHidden = (index >= VERSIONED_RANGE[0] + 1 && index < VERSIONED_RANGE[0] + 5);
+        const emptyObject = (index >= VERSIONED_RANGE[0] + 6 && index < VERSIONED_RANGE[0] + 10);
+        let location;
+        if (emptyObject) {
+            location = null;
+        } else if (locationHidden) {
+            location = `location-hidden-${paddedIndex}`;
+        } else {
+            location = `location-${paddedIndex}`;
+        }
+        if (flags.versionKey || flags.hasVersionId) {
+            value = { versionId: DUMMY_VERSION_ID, location };
+        } else {
+            value = { location };
+        }
     }
     return { key, value };
 }
@@ -64,15 +85,7 @@ describe('BucketStream', () => {
     let httpServer;
     let reqCount = 0;
     beforeAll(() => {
-        httpServer = http.createServer((req, res) => {
-            req.resume();
-            reqCount += 1;
-            // fail each other request
-            if (reqCount % 2 === 0) {
-                res.writeHead(500);
-                return res.end('OOPS');
-            }
-            const url = new URL(req.url, `http://${req.headers.host}`);
+        const handleListBucketRequest = (req, res, url) => {
             const marker = url.searchParams.get('marker');
             let contents;
             let isTruncated;
@@ -85,7 +98,17 @@ describe('BucketStream', () => {
             } else {
                 // limit to 1000 entries returned per page, like bucketd does
                 const endIndex = startIndex + 1000;
-                contents = TEST_BUCKET_CONTENTS.slice(startIndex, endIndex);
+                contents = TEST_BUCKET_CONTENTS
+                    .slice(startIndex, endIndex)
+                    .map(item => {
+                        const { key, value } = item;
+                        const listedValue = { ...value };
+                        if (listedValue.location
+                            && listedValue.location.startsWith('location-hidden')) {
+                            delete listedValue.location;
+                        }
+                        return { key, value: JSON.stringify(listedValue) };
+                    });
                 isTruncated = (endIndex < TEST_BUCKET_CONTENTS.length);
             }
             const responseBody = JSON.stringify({
@@ -97,6 +120,39 @@ describe('BucketStream', () => {
                 'Content-Length': responseBody.length,
             });
             return res.end(responseBody);
+        };
+        const handleGetObjectRequest = (req, res, url) => {
+            const sepIndex = url.pathname.lastIndexOf('/');
+            const objectKey = decodeURIComponent(url.pathname.slice(sepIndex + 1));
+            const objectIndex = TEST_BUCKET_CONTENTS.findIndex(item => item.key === objectKey);
+            if (objectIndex === -1) {
+                res.writeHead(404);
+                return res.end();
+            }
+            const objectEntry = TEST_BUCKET_CONTENTS[objectIndex];
+            const responseBody = JSON.stringify(objectEntry.value);
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Content-Length': responseBody.length,
+            });
+            return res.end(responseBody);
+        };
+        httpServer = http.createServer((req, res) => {
+            req.resume();
+            reqCount += 1;
+            // fail each other request
+            if (reqCount % 2 === 0) {
+                res.writeHead(500);
+                return res.end('OOPS');
+            }
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            if (url.pathname === '/default/bucket/test-bucket') {
+                return handleListBucketRequest(req, res, url);
+            }
+            if (url.pathname.startsWith('/default/bucket/test-bucket/')) {
+                return handleGetObjectRequest(req, res, url);
+            }
+            throw new Error(`unexpected request path ${url.pathname}`);
         });
         httpServer.listen(HTTP_TEST_PORT);
     });
@@ -169,11 +225,9 @@ describe('BucketStream', () => {
                         flags.versionKey = true;
                     }
                     const listingItem = buildItemFromIndex(nextIndex, flags);
-                    const expectedItem = {
-                        key: `test-bucket/${listingItem.key}`,
-                        value: listingItem.value,
-                    };
-                    expect(item).toEqual(expectedItem);
+                    const parsedValue = JSON.parse(item.value);
+                    expect(item.key).toEqual(`test-bucket/${listingItem.key}`);
+                    expect(parsedValue).toEqual(listingItem.value);
                     nextIndex += 1;
                 })
                 .on('end', () => {

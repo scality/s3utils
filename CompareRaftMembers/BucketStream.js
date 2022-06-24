@@ -17,17 +17,24 @@ class BucketStream extends stream.Readable {
             bucketName,
             marker,
             lastKey,
-            retryDelayMs,
-            maxRetryDelayMs,
+            retryDelayMs: userRetryDelayMs,
+            maxRetryDelayMs: userMaxRetryDelayMs,
         } = params;
         this.bucketdHost = bucketdHost;
         this.bucketdPort = bucketdPort;
         this.bucketName = bucketName;
         this.marker = marker;
         this.lastKey = lastKey;
-        this.retryDelayMs = retryDelayMs || 1000;
-        this.maxRetryDelayMs = maxRetryDelayMs || 10000;
-
+        const retryDelayMs = userRetryDelayMs || 1000;
+        const maxRetryDelayMs = userMaxRetryDelayMs || 10000;
+        this.retryParams = {
+            times: 20,
+            interval: retryCount => Math.min(
+                // the first retry comes as "retryCount=2", hence substract 2
+                this.retryDelayMs * (2 ** (retryCount - 2)),
+                this.maxRetryDelayMs,
+            ),
+        };
         // for filtering seen master keys from listing
         if (marker && marker.indexOf('\0') === -1) {
             // if the marker resembles a master key, record it as the
@@ -50,7 +57,7 @@ class BucketStream extends stream.Readable {
             res.on('data', chunk => chunks.push(chunk));
             res.once('end', () => {
                 if (res.statusCode === 404) {
-                    // bucket does not exist: return no contents
+                    // bucket/object does not exist: return no contents
                     return cb();
                 }
                 if (res.statusCode !== 200) {
@@ -65,15 +72,15 @@ class BucketStream extends stream.Readable {
         req.end();
     }
 
-    _shouldOutputItem(item) {
+    _preprocessItem(item) {
         if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
-            return false;
+            return null;
         }
         const vidSepPos = item.key.lastIndexOf('\0');
         const md = JSON.parse(item.value);
         if (md.isPHD) {
             // object is a Place Holder Delete (PHD)
-            return false;
+            return null;
         }
         if (vidSepPos === -1) {
             this.lastMasterKey = item.key;
@@ -84,10 +91,10 @@ class BucketStream extends stream.Readable {
                 // master key, so skip it, but reset the state to not
                 // skip further versions of the same key
                 this.lastMasterKey = null;
-                return false;
+                return null;
             }
         }
-        return true;
+        return md;
     }
 
     _listMore() {
@@ -96,14 +103,7 @@ class BucketStream extends stream.Readable {
             url += `?marker=${encodeURIComponent(this.marker)}`;
         }
         return async.retry(
-            {
-                times: 20,
-                interval: retryCount => Math.min(
-                    // the first retry comes as "retryCount=2", hence substract 2
-                    this.retryDelayMs * (2 ** (retryCount - 2)),
-                    this.maxRetryDelayMs,
-                ),
-            },
+            this.retryParams,
             done => this._requestWrapper({ method: 'GET', path: url }, done),
             (err, response) => {
                 if (err) {
@@ -116,26 +116,71 @@ class BucketStream extends stream.Readable {
                 const parsedBody = JSON.parse(response.body);
                 const { Contents, IsTruncated } = parsedBody;
                 let ended = false;
-                for (const item of Contents) {
-                    const fullKey = `${this.bucketName}/${item.key}`;
-                    if (!this.lastKey || item.key <= this.lastKey) {
-                        if (this._shouldOutputItem(item)) {
+                return async.mapLimit(Contents, 10, (item, itemCb) => {
+                    if (this.lastKey && item.key > this.lastKey) {
+                        ended = true;
+                        return itemCb(null, null);
+                    }
+                    const metadata = this._preprocessItem(item);
+                    if (!metadata) {
+                        return itemCb(null, null);
+                    }
+                    if (metadata.location !== undefined) {
+                        return itemCb(null, item);
+                    }
+                    // need to fetch the object metadata to retrieve
+                    // the full location array
+                    return this._fetchObjectMetadata(item.key, (err, completeMetadata) => {
+                        if (err) {
+                            return itemCb(err);
+                        }
+                        if (!completeMetadata) {
+                            // can happen if the object was not found,
+                            // just skip it in that case
+                            return itemCb(null, null);
+                        }
+                        return itemCb(null, { key: item.key, value: completeMetadata });
+                    });
+                }, (err, listing) => {
+                    if (err) {
+                        // there was an error fetching metadata after
+                        // retries: destroy the stream
+                        return this.destroy(err);
+                    }
+                    for (const item of listing) {
+                        if (item) {
+                            const fullKey = `${this.bucketName}/${item.key}`;
                             this.push({
                                 key: fullKey,
                                 value: item.value,
                             });
                         }
-                    } else {
-                        ended = true;
-                        break;
                     }
+                    if (IsTruncated && !ended) {
+                        this.marker = Contents[Contents.length - 1].key;
+                    } else {
+                        this.push(null);
+                    }
+                    return undefined;
+                });
+            },
+        );
+    }
+
+    _fetchObjectMetadata(objectKey, callback) {
+        const url = `/default/bucket/${this.bucketName}/${encodeURIComponent(objectKey)}`;
+        return async.retry(
+            this.retryParams,
+            done => this._requestWrapper({ method: 'GET', path: url }, done),
+            (err, response) => {
+                if (err) {
+                    return callback(err);
                 }
-                if (IsTruncated && !ended) {
-                    this.marker = Contents[Contents.length - 1].key;
-                } else {
-                    this.push(null);
+                if (!response) {
+                    // the object was not found
+                    return callback();
                 }
-                return undefined;
+                return callback(null, response.body);
             },
         );
     }
