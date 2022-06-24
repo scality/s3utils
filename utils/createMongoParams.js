@@ -64,6 +64,4 @@ function createMongoParams(log, customParams) {
     return Object.assign(params, customParams || {});
 }
 
-module.exports = {
-    createMongoParams,
-};
+module.exports = createMongoParams;
