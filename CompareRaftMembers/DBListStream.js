@@ -49,6 +49,11 @@ class DBListStream extends stream.Transform {
             }
             [bucket, objectKey] = [key.slice(0, slashIndex), key.slice(slashIndex + 1)];
         }
+        // ignore special buckets, that cannot be listed from bucketd
+        // like regular buckets
+        if (bucket === 'users..bucket' || bucket.startsWith('mpuShadowBucket')) {
+            return callback();
+        }
         // ignore both internal replay keys and metadata v1 keys, by
         // skipping any key beginning with the '\x7f' byte
         //
