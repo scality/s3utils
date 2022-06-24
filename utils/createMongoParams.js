@@ -48,7 +48,9 @@ function createMongoParams(log, customParams) {
         ...config,
         database: process.env.MONGODB_DATABASE || config.database,
         replicaSetHosts: process.env.MONGODB_REPLICASET || config.replicaSetHosts,
+        replicationGroupId: process.env.REPLICATION_GROUP_ID || config.replicationGroupId,
         isLocationTransient: getIsLocationTransientCb(log, locationConfigFile),
+        shardCollections: process.env.MONGODB_SHARD_COLLECTIONS || config.shardCollections,
         writeConcern: 'majority',
         readPreference: 'secondaryPreferred',
         logger: log,
@@ -64,6 +66,4 @@ function createMongoParams(log, customParams) {
     return Object.assign(params, customParams || {});
 }
 
-module.exports = {
-    createMongoParams,
-};
+module.exports = createMongoParams;

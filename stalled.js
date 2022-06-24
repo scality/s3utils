@@ -15,12 +15,11 @@ const {
 } = require('./StalledRetry/StalledRequestHandler');
 
 const { parseEnvInt } = require('./utils');
+const createMongoParams = require('./utils/createMongoParams');
 
 const { ENDPOINT } = process.env;
 const { ACCESS_KEY } = process.env;
 const { SECRET_KEY } = process.env;
-const { MONGODB_REPLICASET } = process.env;
-const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'metadata';
 const DRY_RUN = process.env.DRY_RUN && process.env.DRY_RUN !== 'false';
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
@@ -38,9 +37,6 @@ if (!ACCESS_KEY) {
 }
 if (!SECRET_KEY) {
     throw new Error('SECRET_KEY not defined');
-}
-if (!MONGODB_REPLICASET) {
-    throw new Error('MONGODB_REPLICASET not defined');
 }
 
 const HEAP_PROFILER_INTERVAL_MS = parseEnvInt(process.env.HEAP_PROFILER_INTERVAL_MS, 10 * 60 * 1000);
@@ -86,13 +82,7 @@ function handlerFactory(log) {
 }
 
 const config = {
-    replicaSetHosts: MONGODB_REPLICASET,
-    writeConcern: 'majority',
-    replicaSet: 'rs0',
-    readPreference: 'primary',
-    database: MONGODB_DATABASE,
-    replicationGroupId: 'RG001',
-    logger: log,
+    mongodb: createMongoParams(log, { readPreference: 'primary' }),
     cursorWrapperFactory: wrapperFactory,
     requestHandlerFactory: handlerFactory,
 };

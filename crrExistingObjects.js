@@ -27,7 +27,6 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
     && Number.parseInt(process.env.MAX_SCANNED, 10));
 let { KEY_MARKER } = process.env;
 let { VERSION_ID_MARKER } = process.env;
-const { REPLICATION_GROUP_ID } = process.env;
 
 const LISTING_LIMIT = (process.env.LISTING_LIMIT
     && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
@@ -37,10 +36,6 @@ const LOG_PROGRESS_INTERVAL_MS = 10000;
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide '
         + 'a comma-separated list of buckets');
-    process.exit(1);
-}
-if (!REPLICATION_GROUP_ID) {
-    log.fatal('REPLICATION_GROUP_ID not defined!');
     process.exit(1);
 }
 if (!STORAGE_TYPE) {
