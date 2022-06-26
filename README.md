@@ -258,6 +258,11 @@ This script verifies that all sproxyd keys referenced by objects in S3
 buckets exist on the RING. It can help to identify objects affected by
 the S3C-1959 bug.
 
+The script can also be used to generate block digests from the listing
+results as seen by the leader, for the purpose of finding
+discrepancies between raft members, that can be caused by bugs like
+S3C-5739.
+
 ## Usage
 
 ```
@@ -322,6 +327,12 @@ node verifyBucketSproxydKeys.js
 * **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
     keys, for a performance benefit - other checks like duplicate keys
     are still done
+
+* **LISTING_DIGESTS_OUTPUT_DIR**: output listing digests into the
+    specified directory (in the LevelDB format)
+
+* **LISTING_DIGESTS_BLOCK_SIZE**: number of keys in each listing
+    digest block (default 1000)
 
 ## Output
 
