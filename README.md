@@ -465,6 +465,217 @@ node followerDiff.js
 
 * **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
 
+## Scan Procedure
+
+In order to scan a set of raft sessions to detect discrepancies
+between raft members, you may use the following procedure involving
+the two scan tools
+[verifyBucketSproxydKeys](#verify-existence-of-sproxyd-keys) and
+[followerDiff](#compare-followers-databases-against-leader-view).
+
+- Steps 1-3 are to be run once, on a host having access to bucketd as
+  well as having direct SSH access to stateful hosts (e.g. the
+  supervisor)
+
+- Step 4-7 are to be run repeatedly for each stateful host
+
+- Step 8 is to be run once at the end of the scan, to gather results
+
+Note: If running on RH8 or Rocky Linux 8, you may adapt the given
+docker commands with `crictl` instead.
+
+
+### Step 1: Generate the digests database
+
+Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
+to generate a digests database in order to have a more efficient scan
+of followers later on, that does not require an entire listing of the
+leader again.
+
+Provide the environment variables **LISTING_DIGESTS_OUTPUT_DIR** and
+enable **NO_MISSING_KEY_CHECK** to speed up the listing.
+
+Example:
+
+```
+DIGESTS_PATH=~/followerDiff-digests-$(date -I);
+docker run \
+--net=host \
+--rm \
+-e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+-e 'RAFT_SESSIONS=1,2,3,4,5,6,7,8' \
+-e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
+-v "${DIGESTS_PATH}:/digests" \
+-e 'NO_MISSING_KEY_CHECK=1' \
+registry.scality.com/s3utils/s3utils:1.13.0 \
+node verifyBucketSproxydKeys.js \
+| tee -a verifyBucketSproxydKeys.log
+```
+
+### Step 2: Copy the digests database to each active metadata stateful server
+
+Example:
+
+```
+USER=root
+for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
+    scp -r ${DIGESTS_PATH} ${USER}@${HOST}:followerDiff-digests
+done
+```
+
+### Step 3: Save the list of raft sessions to scan on each stateful server
+
+The following script computes the list of raft sessions to scan for
+each stateful server, and outputs the result as a series of ssh
+commands to execute to save the list on each active stateful. It
+requires the 'jq' command to be installed where it is executed.
+
+It starts with all listed raft sessions for each active stateful, but
+removes the raft sessions on each active stateful on which it is the
+leader.
+
+You may save the following script to a file before executing it with "sh".
+
+```
+#!/bin/sh
+
+### Config
+
+BUCKETD_ENDPOINT=localhost:9000
+USER=root
+RS_LIST="1 2 3 4 5 6 7 8"
+
+
+### Script
+
+JQ_SCRIPT_EACH='
+.leader.host as $leader
+| .connected[]
+| select(.host != $leader)
+| { host, $rs }'
+
+JQ_SCRIPT_ALL='
+group_by(.host)
+| .[]
+| .[0].host as $host
+| "echo \(map(.rs) | join(" ")) > /tmp/rs-to-scan"
+| @sh "ssh -n \($user)@\($host) \(.)"'
+
+for RS in $RS_LIST; do
+    curl -s http://${BUCKETD_ENDPOINT}/_/raft_sessions/${RS}/info \
+    | jq --arg rs ${RS} "${JQ_SCRIPT_EACH}";
+done | jq -rs --arg user ${USER} "${JQ_SCRIPT_ALL}"
+```
+
+Executing this script gives on the standard output, the list of ssh
+commands to run to save the list of raft sessions to scan in a
+temporary file on each active stateful member, for example:
+
+```
+ssh -n 'root'@'storage-1' 'echo 3 4 5 7 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-2' 'echo 1 2 3 5 6 7 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-3' 'echo 1 2 3 4 5 6 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-4' 'echo 1 2 3 4 5 6 7 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-5' 'echo 1 2 4 6 7 8 > /tmp/rs-to-scan'
+```
+
+Check that what you get looks like the above, then execute those
+commands on the shell (e.g. by piping with `| bash -x`).
+
+**The following steps are to be run for each metadata stateful node.**
+
+### Step 4: SSH to next stateful host to scan
+
+```
+USER=root
+HOST=storage-1
+ssh ${USER}@${HOST}
+```
+
+### Step 5: Stop all follower repd processes
+
+In order to be able to scan the databases, follower repd processes
+must be stopped with the following command:
+
+```
+for RS in $(cat /tmp/rs-to-scan); do
+    docker exec -u root scality-metadata-bucket-repd \
+    supervisorctl -c /conf/supervisor/supervisord-repd.conf stop repd:repd_${RS}
+done
+```
+
+### Step 6:
+
+Run the "CompareRaftMembers/followerDiff" tool to generate a
+line-separated JSON output file showing all differences found between
+the leader and the local metadata databases, for raft sessions where
+the repd process is a follower.
+
+Example command:
+
+```
+DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)
+
+mkdir -p followerDiff-results
+docker run --net=host --rm \
+-e 'BUCKETD_HOSTPORT=localhost:9000' \
+-v "/scality/ssd01/s3/scality-metadata-databases-bucket:/databases" \
+-e "DATABASES_GLOB=${DATABASES_GLOB}" \
+-v "${PWD}/followerDiff-digests:/digests" \
+-e "LISTING_DIGESTS_INPUT_DIR=/digests" \
+-v "${PWD}/followerDiff-results:/followerDiff-results" \
+-e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.jsonl" \
+registry.scality.com/s3utils/s3utils:1.13.0 \
+bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
+| tee -a followerDiff.log
+```
+
+### Step 7: Restart all stopped repd processes
+
+```
+for RS in $(cat /tmp/rs-to-scan); do
+    docker exec -u root scality-metadata-bucket-repd \
+    supervisorctl -c /conf/supervisor/supervisord-repd.conf start repd:repd_${RS}
+done
+```
+
+**If there are more active stateful hosts to scan, continue with Step 4
+on the next active stateful host.**
+
+### Step 8: Gather results
+
+Finally, once all scans have been done on all active stateful hosts,
+gather all diff results for later analysis.
+
+For example:
+
+```
+for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
+    scp -r ${USER}@${HOST}:followerDiff-results ./followerDiff-results.${HOST}
+done
+```
+
+### Caveats
+
+- The more up-to-date the digests database is, the more efficient the
+  subsequent stateful host scans are. This means that it's better not
+  to wait too long between the digests database generation and each
+  host scan, in order to reduce the number of updates that occurred
+  in-between, therefore limiting the number of new listings that have
+  to be done on the leader.
+
+- It is possible to generate the digests database in multiple steps if
+  need be, however in such case it's best not to re-scan the same
+  range of keys multiple times outputting to the same digests
+  database, the risk being to render that range of digests much less
+  efficient to optimize the comparisons, or even useless. If an update
+  of the digests database is wanted, it's best to re-create a new one
+  from scratch (e.g. by deleting the old digests directory first).
+
+- The current version of the script does not work with Metadata bucket
+  format v1, only with v0. If the need arises, it could be made to
+  work with v1 with some more work.
+
 
 # Remove delete markers
 
