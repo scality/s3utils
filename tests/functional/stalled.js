@@ -211,13 +211,15 @@ describe('StalledRetry', () => {
     beforeAll(done => {
         reqClient = new TrackingClient();
         const opts = {
-            replicaSetHosts: MONGODB_REPLICASET,
-            writeConcern: 'majority',
-            replicaSet: 'rs0',
-            readPreference: 'primary',
-            database: dbName,
-            replicationGroupId: 'RG001',
-            logger,
+            mongodb: {
+                replicaSetHosts: MONGODB_REPLICASET,
+                writeConcern: 'majority',
+                replicaSet: 'rs0',
+                readPreference: 'primary',
+                database: dbName,
+                replicationGroupId: 'RG001',
+                logger,
+            },
             cursorWrapperFactory: wrapperFactory,
             requestHandlerFactory: handlerFactory.bind(null, reqClient),
         };

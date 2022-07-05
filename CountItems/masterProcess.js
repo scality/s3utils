@@ -4,7 +4,7 @@ const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient
 
 const CountMaster = require('./CountMaster');
 const CountManager = require('./CountManager');
-const { createMongoParams } = require('./utils');
+const createMongoParams = require('../utils/createMongoParams');
 const createWorkers = require('./utils/createWorkers');
 
 const loggerConfig = {

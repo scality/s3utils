@@ -6,7 +6,7 @@ const { BucketInfo, ObjectMD } = require('arsenal').models;
 
 const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
-const { createMongoParams } = require('../../CountItems/utils');
+const createMongoParams = require('../../utils/createMongoParams');
 const createWorkers = require('../../CountItems/utils/createWorkers');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');

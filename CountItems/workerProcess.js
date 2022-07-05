@@ -3,7 +3,7 @@ const { reshapeExceptionError } = require('arsenal').errorUtils;
 const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 
 const CountWorker = require('./CountWorker');
-const { createMongoParams } = require('./utils');
+const createMongoParams = require('../utils/createMongoParams');
 
 const loggerConfig = {
     level: 'info',
