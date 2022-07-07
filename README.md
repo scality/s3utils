@@ -425,13 +425,13 @@ DIFF_OUTPUT_FILE environment variable.
 In this file, it outputs each key that differs as line-separated JSON
 entries, where each entry can be one of:
 
-- [{ key, value }, null]: this key is present on this follower but not
-  on the leader
+- `[{ key, value }, null]`: this key is present on this follower but
+  not on the leader
 
-- [null, { key, value }]: this key is not present on this follower but
-  is present on the leader
+- `[null, { key, value }]`: this key is not present on this follower
+  but is present on the leader
 
-- [{ key, value: "{value1}" }, { key, value: "{value2}" }]: this key
+- `[{ key, value: "{value1}" }, { key, value: "{value2}" }]`: this key
   has a different value between this follower and the leader: "value1"
   is the value seen on the follower and "value2" the value seen on the
   leader.
@@ -473,19 +473,46 @@ the two scan tools
 [verifyBucketSproxydKeys](#verify-existence-of-sproxyd-keys) and
 [followerDiff](#compare-followers-databases-against-leader-view).
 
-- Steps 1-3 are to be run once, on a host having access to bucketd as
-  well as having direct SSH access to stateful hosts (e.g. the
-  supervisor)
+The general idea is to compare each follower's view in turn against
+the current leader's view, without disturbing the leader in order to
+avoid downtime.
 
-- Step 4-7 are to be run repeatedly for each stateful host
+To speed up the comparisons, a digests database is first generated
+from the current leader's view of all raft sessions, which is then
+used by individual comparisons on followers to skim quickly over what
+hasn't changed without sending requests to the leader.
 
-- Step 8 is to be run once at the end of the scan, to gather results
+- **Step Pre-check** is to be run on the supervisor
+
+- **Steps Prep-1 to Prep-3** are to be run once, on a host having
+  access to bucketd as well as having direct SSH access to stateful
+  hosts (e.g. the supervisor)
+
+- **Step Scan-1 to Scan-4** are to be run repeatedly for each active
+  stateful host, so five times on most systems
+
+- **Step Results-1** is to be run once at the end of the scan, to
+  gather results
 
 Note: If running on RH8 or Rocky Linux 8, you may adapt the given
 docker commands with `crictl` instead.
 
+### Pre-check: followers must be up-to-date
 
-### Step 1: Generate the digests database
+On each raft session, check that all followers are up-to-date with the leader.
+
+You may use the following command on the supervisor to check this:
+
+```
+./ansible-playbook -i env/s3config/inventory tooling-playbooks/check-status-metadata.yml
+```
+
+Results are gathered in `/tmp/results.txt`: for all raft sessions,
+make sure that all `committed` values across active `md[x]-cluster[y]`
+members are within less than 100 entries to each other. Ignore values
+of `wsb[x]-cluster[y]` members.
+
+### Step Prep-1: Generate the digests database
 
 Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
 to generate a digests database in order to have a more efficient scan
@@ -494,6 +521,10 @@ leader again.
 
 Provide the environment variables **LISTING_DIGESTS_OUTPUT_DIR** and
 enable **NO_MISSING_KEY_CHECK** to speed up the listing.
+
+If the command is restarted, e.g. after an error or manual abortion,
+make sure to delete the `${DIGESTS_PATH}` directory before running the
+command again to generate a clean and efficient database.
 
 Example:
 
@@ -512,7 +543,7 @@ node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
 
-### Step 2: Copy the digests database to each active metadata stateful server
+### Step Prep-2: Copy the digests database to each active metadata stateful server
 
 Example:
 
@@ -523,7 +554,7 @@ for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
 done
 ```
 
-### Step 3: Save the list of raft sessions to scan on each stateful server
+### Step Prep-3: Save the list of raft sessions to scan on each stateful server
 
 The following script computes the list of raft sessions to scan for
 each stateful server, and outputs the result as a series of ssh
@@ -580,19 +611,31 @@ ssh -n 'root'@'storage-5' 'echo 1 2 4 6 7 8 > /tmp/rs-to-scan'
 ```
 
 Check that what you get looks like the above, then execute those
-commands on the shell (e.g. by piping with `| bash -x`).
+commands on the shell.
 
-**The following steps are to be run for each metadata stateful node.**
-
-### Step 4: SSH to next stateful host to scan
+Example, assuming you saved the above script as `output-rs-to-scan-commands.sh`:
 
 ```
-USER=root
-HOST=storage-1
-ssh ${USER}@${HOST}
+# sh output-rs-to-scan-commands.sh
+ssh -n 'root'@'storage-1' 'echo 3 4 5 7 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-2' 'echo 1 2 3 5 6 7 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-3' 'echo 1 2 3 4 5 6 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-4' 'echo 1 2 3 4 5 6 7 8 > /tmp/rs-to-scan'
+ssh -n 'root'@'storage-5' 'echo 1 2 4 6 7 8 > /tmp/rs-to-scan'
+# sh output-rs-to-scan-commands.sh | bash -x
 ```
 
-### Step 5: Stop all follower repd processes
+**The following steps are to be run for each active metadata stateful node.**
+
+### Step Scan-1: SSH to next stateful host to scan
+
+Example:
+
+```
+ssh root@storage-1
+```
+
+### Step Scan-2: Stop all follower repd processes
 
 In order to be able to scan the databases, follower repd processes
 must be stopped with the following command:
@@ -604,7 +647,9 @@ for RS in $(cat /tmp/rs-to-scan); do
 done
 ```
 
-### Step 6:
+In case errors occur, restart the command.
+
+### Step Scan-3: Scan local databases
 
 Run the "CompareRaftMembers/followerDiff" tool to generate a
 line-separated JSON output file showing all differences found between
@@ -614,13 +659,11 @@ the repd process is a follower.
 Example command:
 
 ```
-DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)
-
-mkdir -p followerDiff-results
+mkdir -p followerDiff-results && \
 docker run --net=host --rm \
 -e 'BUCKETD_HOSTPORT=localhost:9000' \
 -v "/scality/ssd01/s3/scality-metadata-databases-bucket:/databases" \
--e "DATABASES_GLOB=${DATABASES_GLOB}" \
+-e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)" \
 -v "${PWD}/followerDiff-digests:/digests" \
 -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
 -v "${PWD}/followerDiff-results:/followerDiff-results" \
@@ -630,7 +673,11 @@ bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff'
 | tee -a followerDiff.log
 ```
 
-### Step 7: Restart all stopped repd processes
+**Note**: the tool will refuse to override an existing diff output
+  file. If you need to re-run the command, first delete the output
+  file or give another path as DIFF_OUTPUT_FILE.
+
+### Step Scan-4: Restart all stopped repd processes
 
 ```
 for RS in $(cat /tmp/rs-to-scan); do
@@ -639,10 +686,13 @@ for RS in $(cat /tmp/rs-to-scan); do
 done
 ```
 
-**If there are more active stateful hosts to scan, continue with Step 4
-on the next active stateful host.**
+In case errors occur, restart the command.
 
-### Step 8: Gather results
+**If there are more active stateful hosts to scan, continue with
+[Step Scan-1](#step-scan-1-ssh-to-next-stateful-host-to-scan) on the next
+active stateful host.**
+
+### Step Results-1: Gather results
 
 Finally, once all scans have been done on all active stateful hosts,
 gather all diff results for later analysis.
@@ -654,6 +704,14 @@ for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
     scp -r ${USER}@${HOST}:followerDiff-results ./followerDiff-results.${HOST}
 done
 ```
+
+At this point, each results file contains a newline-separated set of
+JSON entries describing each difference found on each of the servers,
+for the databases used by repd processes acting as followers in the
+Raft protocol. This output is meant to be passed on to a repair script
+to actually repair the divergences. More details on the output format
+can be found in the
+[tool's description summary](#compare-followers-databases-against-leader-view).
 
 ### Caveats
 
