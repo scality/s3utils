@@ -22,7 +22,7 @@ RUN wget https://github.com/ochinchina/supervisord/releases/download/v${SUPERVIS
     rm supervisord_${SUPERVISOR_VERSION}_Linux_64-bit.tar.gz
 
 COPY ./package.json ./yarn.lock ./
-RUN yarn install --production
+RUN yarn install --production --network-concurrency 1
 
 ################################################################################
 FROM node:${NODE_VERSION}
