@@ -205,6 +205,31 @@ function _markObjectPending(
                 return next();
             }
 
+            // Initialize replication info, if missing
+            if (!objMD.getReplicationInfo()
+                || !objMD.getReplicationSiteStatus(storageClass)) {
+                const { Rules, Role } = repConfig;
+                const destination = Rules[0].Destination.Bucket;
+                // set replication properties
+                const ops = objMD.getContentLength() === 0 ? ['METADATA']
+                    : ['METADATA', 'DATA'];
+                const backends = [{
+                    site: storageClass,
+                    status: 'PENDING',
+                    dataStoreVersionId: '',
+                }];
+                const replicationInfo = {
+                    status: 'PENDING',
+                    backends,
+                    content: ops,
+                    destination,
+                    storageClass,
+                    role: Role,
+                    storageType: STORAGE_TYPE,
+                };
+                objMD.setReplicationInfo(replicationInfo);
+            }
+
             objMD.setReplicationSiteStatus(storageClass, 'PENDING');
             objMD.setReplicationStatus('PENDING');
             objMD.updateMicroVersionId();
