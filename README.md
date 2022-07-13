@@ -538,7 +538,7 @@ docker run \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
 -e 'NO_MISSING_KEY_CHECK=1' \
-registry.scality.com/s3utils/s3utils:1.13.0 \
+registry.scality.com/s3utils/s3utils:1.13.1 \
 node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
@@ -668,7 +668,7 @@ docker run --net=host --rm \
 -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
 -v "${PWD}/followerDiff-results:/followerDiff-results" \
 -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.jsonl" \
-registry.scality.com/s3utils/s3utils:1.13.0 \
+registry.scality.com/s3utils/s3utils:1.13.1 \
 bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
 | tee -a followerDiff.log
 ```

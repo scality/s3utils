@@ -226,7 +226,11 @@ describe('BucketStream', () => {
                     }
                     const listingItem = buildItemFromIndex(nextIndex, flags);
                     const parsedValue = JSON.parse(item.value);
-                    expect(item.key).toEqual(`test-bucket/${listingItem.key}`);
+                    if (flags.hasVersionId && !flags.versionKey) {
+                        expect(item.key).toEqual(`test-bucket/${listingItem.key}\0${DUMMY_VERSION_ID}`);
+                    } else {
+                        expect(item.key).toEqual(`test-bucket/${listingItem.key}`);
+                    }
                     expect(parsedValue).toEqual(listingItem.value);
                     nextIndex += 1;
                 })

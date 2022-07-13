@@ -80,11 +80,12 @@ class DBListStream extends stream.Transform {
                 return callback();
             }
         }
-
+        const versionedKey = vidSepPos === -1 && md.versionId
+            ? `${item.key}\0${md.versionId}` : item.key;
         if (this.isLegacyDb) {
-            this.push({ key: `${bucket}/${objectKey}`, value });
+            this.push({ key: `${bucket}/${versionedKey}`, value });
         } else {
-            this.push(item);
+            this.push({ key: versionedKey, value: item.value });
         }
         return callback();
     }

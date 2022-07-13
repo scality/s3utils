@@ -74,13 +74,13 @@ class BucketStream extends stream.Readable {
 
     _preprocessItem(item) {
         if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
-            return null;
+            return {};
         }
         const vidSepPos = item.key.lastIndexOf('\0');
         const md = JSON.parse(item.value);
         if (md.isPHD) {
             // object is a Place Holder Delete (PHD)
-            return null;
+            return {};
         }
         if (vidSepPos === -1) {
             this.lastMasterKey = item.key;
@@ -91,10 +91,12 @@ class BucketStream extends stream.Readable {
                 // master key, so skip it, but reset the state to not
                 // skip further versions of the same key
                 this.lastMasterKey = null;
-                return null;
+                return {};
             }
         }
-        return md;
+        const versionedKey = vidSepPos === -1 && md.versionId
+            ? `${item.key}\0${md.versionId}` : item.key;
+        return { versionedKey, metadata: md };
     }
 
     _listMore() {
@@ -121,12 +123,12 @@ class BucketStream extends stream.Readable {
                         ended = true;
                         return itemCb(null, null);
                     }
-                    const metadata = this._preprocessItem(item);
+                    const { versionedKey, metadata } = this._preprocessItem(item);
                     if (!metadata) {
                         return itemCb(null, null);
                     }
                     if (metadata.location !== undefined) {
-                        return itemCb(null, item);
+                        return itemCb(null, { key: versionedKey, value: item.value });
                     }
                     // need to fetch the object metadata to retrieve
                     // the full location array
@@ -139,7 +141,7 @@ class BucketStream extends stream.Readable {
                             // just skip it in that case
                             return itemCb(null, null);
                         }
-                        return itemCb(null, { key: item.key, value: completeMetadata });
+                        return itemCb(null, { key: versionedKey, value: completeMetadata });
                     });
                 }, (err, listing) => {
                     if (err) {

@@ -66,7 +66,7 @@ describe('DBListStream', () => {
                 ],
                 listEntries: [
                     {
-                        key: 'bucket/object',
+                        key: 'bucket/object\u000098345767321527999998RG001  74.489.8',
                         value: '{"versionId":"98345767321527999998RG001  74.489.8"}',
                     },
                 ],
@@ -82,7 +82,7 @@ describe('DBListStream', () => {
                 ],
                 listEntries: [
                     {
-                        key: 'bucket/object',
+                        key: 'bucket/object\u000098345767321527999998RG001  74.489.8',
                         value: '{"versionId":"98345767321527999998RG001  74.489.8"}',
                     },
                 ],
@@ -130,7 +130,7 @@ describe('DBListStream', () => {
                 ],
                 listEntries: [
                     {
-                        key: 'bucket/object',
+                        key: 'bucket/object\u000098345767320931999999RG001  74.505.48',
                         value: '{"versionId":"98345767320931999999RG001  74.505.48"}',
                     },
                     {
@@ -189,11 +189,11 @@ describe('DBListStream', () => {
                 ],
                 listEntries: [
                     {
-                        key: 'bucket/object',
+                        key: 'bucket/object\u000098345767320931999999RG001  74.505.48',
                         value: '{"versionId":"98345767320931999999RG001  74.505.48"}',
                     },
                     {
-                        key: 'bucket/object3',
+                        key: 'bucket/object3\u000098345767320611999999RG001  74.519.84',
                         value: '{"versionId":"98345767320611999999RG001  74.519.84"}',
                     },
                 ],
@@ -246,11 +246,11 @@ describe('DBListStream', () => {
                 ],
                 listEntries: [
                     {
-                        key: 'legacy/object',
+                        key: 'legacy/object\u000098345767320931999999RG001  74.505.48',
                         value: '{"versionId":"98345767320931999999RG001  74.505.48"}',
                     },
                     {
-                        key: 'legacy/object3',
+                        key: 'legacy/object3\u000098345767320611999999RG001  74.519.84',
                         value: '{"versionId":"98345767320611999999RG001  74.519.84"}',
                     },
                 ],

@@ -408,11 +408,15 @@ function listBucketIter(bucket, cb) {
             }
             const vidSepPos = item.key.lastIndexOf('\0');
             const objectUrl = getObjectURL(bucket, item.key);
+            let digestKey = item.key;
 
             const md = JSON.parse(item.value);
             if (vidSepPos === -1) {
                 lastMasterKey = item.key;
                 lastMasterVersionId = md.versionId;
+                if (md.versionId) {
+                    digestKey = `${item.key}\0${md.versionId}`;
+                }
             } else {
                 const masterKey = item.key.slice(0, vidSepPos);
                 if (masterKey === lastMasterKey
@@ -445,14 +449,16 @@ function listBucketIter(bucket, cb) {
                 findDuplicateSproxydKeys.skipVersion();
                 // empty objects should be included in the digest,
                 // hence returning their metadata to the map results
-                return itemDone(null, item);
+                return itemDone(null, { key: digestKey, value: item.value });
             }
 
             // big MPUs may not have their location in the listing
             // result, we need to fetch the locations array from
             // bucketd explicitly in this case
             if (md.location) {
-                return checkSproxydKeys(objectUrl, md.location, () => itemDone(null, item));
+                return checkSproxydKeys(objectUrl, md.location, () => {
+                    itemDone(null, { key: digestKey, value: item.value });
+                });
             }
             return fetchAndCheckObject(bucket, item.key, location => {
                 if (location && digestsStream) {
@@ -462,7 +468,7 @@ function listBucketIter(bucket, cb) {
                     // stored in the DB on disk. This is needed for
                     // the block digests to have a chance to match.
                     const fullMdBlob = JSON.stringify(Object.assign(md, { location }));
-                    itemDone(null, { key: item.key, value: fullMdBlob });
+                    itemDone(null, { key: digestKey, value: fullMdBlob });
                 } else {
                     // if there was an error fetching locations, just ignore the entry
                     itemDone();
