@@ -681,10 +681,9 @@ bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff'
 
 Example command for multiple SSDs (GROW):
 ```
-### echo -n '/scality/ssd01/s3' | md5sum
-DB1=/databases/681ffabacfa6cde2a86c0f0cf2b967a0
-### echo -n '/scality/ssd02/s3' | md5sum
-DB2=/databases/ee6522bda37caf593c331e223c53b1f6
+DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
+DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1)
 
 mkdir -p followerDiff-results
 docker run --net=host --rm \
