@@ -656,48 +656,27 @@ line-separated JSON output file showing all differences found between
 the leader and the local metadata databases, for raft sessions where
 the repd process is a follower.
 
-First determine the number of databases managed by metadata.  Run the command
-```
-docker exec -u scality -it scality-metadata-bucket-repd ls -l /databases
-```
-If you have one line of output, you can run the first example command.  If you have multiple lines of output you have to use that output in the second example command for the tool.
+Note that the container must mount all metadata databases mountpoints
+in order to have access to all databases.
 
-
-Example command for a single SSD:
+Example command:
 ```
-mkdir -p followerDiff-results && \
-docker run --net=host --rm \
--e 'BUCKETD_HOSTPORT=localhost:9000' \
--v "/scality/ssd01/s3/scality-metadata-databases-bucket:/databases" \
--e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)" \
--v "${PWD}/followerDiff-digests:/digests" \
--e "LISTING_DIGESTS_INPUT_DIR=/digests" \
--v "${PWD}/followerDiff-results:/followerDiff-results" \
--e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.jsonl" \
-registry.scality.com/s3utils/s3utils:1.13.1 \
-bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
-| tee -a followerDiff.log
-```
-
-Example command for multiple SSDs (GROW):
-```
-### echo -n '/scality/ssd01/s3' | md5sum
-DB1=/databases/681ffabacfa6cde2a86c0f0cf2b967a0
-### echo -n '/scality/ssd02/s3' | md5sum
-DB2=/databases/ee6522bda37caf593c331e223c53b1f6
+DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
+DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1 | cut -d: -f2)
 
 mkdir -p followerDiff-results
 docker run --net=host --rm \
   -e 'BUCKETD_HOSTPORT=localhost:9000' \
-  -v "/scality/ssd01/s3/scality-metadata-databases-bucket:${DB1}" \
-  -v "/scality/ssd02/s3/scality-metadata-databases-bucket:${DB2}" \
-  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DB1}/RS/0/* ${DB2}/RS/0/*)" \
+  ${DATABASE_MOUNTS} \
+  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNT}/RS/0/*)" \
   -v "${PWD}/followerDiff-digests:/digests" \
   -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
   -v "${PWD}/followerDiff-results:/followerDiff-results" \
   -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.json" \
   registry.scality.com/s3utils/s3utils:1.13.1 \
-  bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' | tee -a followerDiff.log
+  bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
+| tee -a followerDiff.log
 
 ```
 
