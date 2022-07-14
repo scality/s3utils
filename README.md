@@ -688,8 +688,7 @@ DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1)
 mkdir -p followerDiff-results
 docker run --net=host --rm \
   -e 'BUCKETD_HOSTPORT=localhost:9000' \
-  -v "/scality/ssd01/s3/scality-metadata-databases-bucket:${DB1}" \
-  -v "/scality/ssd02/s3/scality-metadata-databases-bucket:${DB2}" \
+  ${DATABASE_MOUNTS} \
   -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNT}/RS/0/*)" \
   -v "${PWD}/followerDiff-digests:/digests" \
   -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
