@@ -683,7 +683,7 @@ Example command for multiple SSDs (GROW):
 ```
 DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
-DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1)
+DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1 | cut -d: -f2)
 
 mkdir -p followerDiff-results
 docker run --net=host --rm \
