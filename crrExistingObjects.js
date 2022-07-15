@@ -27,6 +27,7 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
     && Number.parseInt(process.env.MAX_SCANNED, 10));
 let { KEY_MARKER } = process.env;
 let { VERSION_ID_MARKER } = process.env;
+const { GENERATE_INTERNAL_VERSION_ID } = process.env;
 
 const LISTING_LIMIT = (process.env.LISTING_LIMIT
     && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
@@ -121,6 +122,13 @@ function _markObjectPending(
                 // the listed version is "null", the object may have
                 // an actual internal versionId, only if the bucket
                 // was versioning-suspended when the object was put.
+                return next();
+            }
+            if (!GENERATE_INTERNAL_VERSION_ID) {
+                // When the GENERATE_INTERNAL_VERSION_ID env variable is set,
+                // matching objects with no *internal* versionId will get
+                // "updated" to get an internal versionId. The external versionId
+                // will still be "null".
                 return next();
             }
             // The object does not have an *internal* versionId, as it
