@@ -7,6 +7,8 @@ const { doWhilst, eachSeries } = require('async');
 
 const { Logger } = require('werelogs');
 
+const parseOlderThan = require('./utils/parseOlderThan');
+
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
 
 function _parseBoolean(value) {
@@ -24,7 +26,7 @@ const MAX_LISTED = (process.env.MAX_LISTED
     && Number.parseInt(process.env.MAX_LISTED, 10));
 const { MARKER } = process.env;
 const OLDER_THAN = (process.env.OLDER_THAN
-    ? new Date(process.env.OLDER_THAN) : null);
+    ? parseOlderThan(process.env.OLDER_THAN) : null);
 const DELETED_BEFORE = (process.env.DELETED_BEFORE
     ? new Date(process.env.DELETED_BEFORE) : null);
 const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
@@ -63,8 +65,11 @@ Optional environment variables:
                 "|" encodeURI(key)
                 "|" encodeURI(versionId)
     OLDER_THAN: cleanup only objects which last modified date is older
-    than this date, e.g. setting to "2021-01-09T00:00:00Z" limits the
-    cleanup to objects created or modified before Jan 9th 2021.
+    than this, as an ISO date or a number of days, e.g.:
+     - setting to "2021-01-09T00:00:00Z" limits the cleanup to objects
+       created or modified before Jan 9th 2021
+     - setting to "30 days" limits the cleanup to objects created more
+       than 30 days ago
     ONLY_DELETED: if set to "1" or "true" or "yes", only remove
     otherwise eligible noncurrent versions if the object's current
     version is a delete marker (also removes the delete marker as
