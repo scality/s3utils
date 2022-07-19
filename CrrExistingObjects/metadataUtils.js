@@ -3,6 +3,12 @@ const metadataClient = require('./metadataClient');
 
 const versionIdUtils = versioning.VersionID;
 
+const { GENERATE_INTERNAL_VERSION_ID } = process.env;
+const REPLICATION_GROUP_ID = process.env.REPLICATION_GROUP_ID || 'RG001';
+// Use Arsenal function to generate a version ID used internally by metadata
+// for null versions that are created before bucket versioning is configured
+const nonVersionedObjId = versionIdUtils.getInfVid(REPLICATION_GROUP_ID);
+
 function _processVersions(list) {
     /* eslint-disable no-param-reassign */
     list.NextVersionIdMarker = list.NextVersionIdMarker
@@ -149,14 +155,36 @@ function getMetadata(params, log, cb) {
     );
 }
 
-function putMetadata(params, log, cb) {
-    const { Bucket, Key, Body: objMD } = params;
+function getOptions(objMD) {
+    const options = {};
+
+    if (objMD.versionId === undefined) {
+        if (!GENERATE_INTERNAL_VERSION_ID) {
+            return options;
+        }
+
+        objMD.setIsNull(true);
+        objMD.setVersionId(nonVersionedObjId);
+
+        options.nullVersionId = objMD.versionId;
+        // non-versioned (non-null) MPU objects don't have a
+        // replay ID, so don't reference their uploadId
+        if (objMD.uploadId) {
+            options.nullUploadId = objMD.uploadId;
+        }
+    }
+
     // specify both 'versioning' and 'versionId' to create a "new"
     // version (updating master as well) but with specified versionId
-    const options = {
-        versioning: true,
-        versionId: objMD.versionId,
-    };
+    options.versioning = true;
+    options.versionId = objMD.versionId;
+    return options;
+}
+
+function putMetadata(params, log, cb) {
+    const { Bucket, Key, Body: objMD } = params;
+    const options = getOptions(objMD);
+
     log.debug('updating object metadata', {
         method: 'metadataUtils.putMetadata',
         bucket: Bucket,

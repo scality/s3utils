@@ -27,6 +27,7 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
     && Number.parseInt(process.env.MAX_SCANNED, 10));
 let { KEY_MARKER } = process.env;
 let { VERSION_ID_MARKER } = process.env;
+const { GENERATE_INTERNAL_VERSION_ID } = process.env;
 
 const LISTING_LIMIT = (process.env.LISTING_LIMIT
     && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
@@ -123,6 +124,13 @@ function _markObjectPending(
                 // was versioning-suspended when the object was put.
                 return next();
             }
+            if (!GENERATE_INTERNAL_VERSION_ID) {
+                // When the GENERATE_INTERNAL_VERSION_ID env variable is set,
+                // matching objects with no *internal* versionId will get
+                // "updated" to get an internal versionId. The external versionId
+                // will still be "null".
+                return next();
+            }
             // The object does not have an *internal* versionId, as it
             // was put on a nonversioned bucket: do a first metadata
             // update to generate one, just passing on the existing metadata
@@ -149,26 +157,34 @@ function _markObjectPending(
             if (skip) {
                 return next();
             }
-            const { Rules, Role } = repConfig;
-            const destination = Rules[0].Destination.Bucket;
-            // set replication properties
-            const ops = objMD.getContentLength() === 0 ? ['METADATA']
-                : ['METADATA', 'DATA'];
-            const backends = [{
-                site: storageClass,
-                status: 'PENDING',
-                dataStoreVersionId: '',
-            }];
-            const replicationInfo = {
-                status: 'PENDING',
-                backends,
-                content: ops,
-                destination,
-                storageClass,
-                role: Role,
-                storageType: STORAGE_TYPE,
-            };
-            objMD.setReplicationInfo(replicationInfo);
+
+            // Initialize replication info, if missing
+            if (!objMD.getReplicationInfo()
+                || !objMD.getReplicationSiteStatus(storageClass)) {
+                const { Rules, Role } = repConfig;
+                const destination = Rules[0].Destination.Bucket;
+                // set replication properties
+                const ops = objMD.getContentLength() === 0 ? ['METADATA']
+                    : ['METADATA', 'DATA'];
+                const backends = [{
+                    site: storageClass,
+                    status: 'PENDING',
+                    dataStoreVersionId: '',
+                }];
+                const replicationInfo = {
+                    status: 'PENDING',
+                    backends,
+                    content: ops,
+                    destination,
+                    storageClass,
+                    role: Role,
+                    storageType: STORAGE_TYPE,
+                };
+                objMD.setReplicationInfo(replicationInfo);
+            }
+
+            objMD.setReplicationSiteStatus(storageClass, 'PENDING');
+            objMD.setReplicationStatus('PENDING');
             objMD.updateMicroVersionId();
             const md = objMD.getValue();
             return metadataUtil.putMetadata({
