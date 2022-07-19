@@ -47,7 +47,7 @@ mc.setup(err => {
         }
         const c = mc.db.collection(BUCKET);
         return async.eachLimit(filteredList, 20, (key, cb) => {
-            return c.insert({ _id: key._id, value: 'TEST'}, (err, obj) => {
+            return c.insert({ _id: key._id, value: { "foo": "bar", "bar" : "baz", replicationInfo: { status: 'COMPLETED' } }}, (err, obj) => {
                 if (err) {
                     return cb(err);
                 }

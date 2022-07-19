@@ -41,20 +41,34 @@ mc.setup(err => {
     const c = mc.db.collection(BUCKET);
     let updated = 0;
     async.eachLimit(filteredList, 20, (key, cb) => {
-        return c.findOne({ _id: key._id }, {}, (err, obj) => {
-            if (err) {
-                return cb(err);
-            }
-            return c.replaceOne({ _id: key._id }, obj, { upsert: true }, err => {
+        return async.waterfall([
+            next => c.findOne({ _id: key._id }, {}, (err, obj) => {
                 if (err) {
-                    log.error('error during replace', { error: err, stack: err.stack });
-                    return cb(err);
+                    log.error('error during find', { error: err, stack: err.stack });
+                    return next(err);
+                }
+                obj.value.replicationInfo.status = 'PROCESSING';
+                return next(null, obj);
+            }),
+            (obj, next) => c.replaceOne({ _id: key._id }, obj, {}, (err, res) => {
+                if (err) {
+                    log.error('error during replace#1', { error: err, stack: err.stack });
+                    return next(err);
                 }
                 updated++;
-                return cb();
+                obj.value.replicationInfo.status = 'PENDING';
+                return next(null, obj);
 
-            });
-        });
+            }),
+            (obj, next) => c.replaceOne({ _id: key._id }, obj, {}, (err, res) => {
+                if (err) {
+                    log.error('error during replace#2', { error: err, stack: err.stack });
+                    return next(err);
+                }
+                updated++;
+                return next(null, obj);
+
+            })], cb)
     }, err => {
         if (err) {
             log.error('final cb', err);
