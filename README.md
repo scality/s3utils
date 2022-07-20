@@ -735,6 +735,43 @@ can be found in the
   work with v1 with some more work.
 
 
+# Repair objects affected by raft divergence
+
+This script checks each entry from stdin, corresponding to a line from
+the output of followerDiff.js, and repairs the object on metadata if
+deemed safe to do so with a readable version.
+
+## Usage
+
+```
+    node CompareRaftMembers/repairObjects.js
+```
+
+## Mandatory environment variables
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+
+## Optional environment variables
+
+* **VERBOSE**: set to 1 for more verbose output (shows one line for
+every sproxyd key checked)
+
+* **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
+
+## Example
+
+```
+docker run -i --net=host --rm \
+  -e "BUCKETD_HOSTPORT=localhost:9000" \
+  -e "SPROXYD_HOSTPORT=localhost:8181" \
+  registry.scality.com/s3utils/s3utils:1.13.2 \
+  node CompareRaftMembers/repairObjects < followerDiff-results/followerDiff-results.jsonl \
+  | tee -a repairObjects.log
+```
+
+
 # Remove delete markers
 
 The removeDeleteMarkers.js script removes delete markers from one or
