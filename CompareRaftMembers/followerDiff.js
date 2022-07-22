@@ -3,12 +3,14 @@
 const async = require('async');
 const fs = require('fs');
 const path = require('path');
+const stream = require('stream');
 
 const { Logger } = require('werelogs');
 const Level = require('level');
 
 const DBListStream = require('./DBListStream');
 const DiffStream = require('./DiffStream');
+const DiffStreamOplogFilter = require('./DiffStreamOplogFilter');
 
 const DEFAULT_PARALLEL_SCANS = 4;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
@@ -30,6 +32,8 @@ const PARALLEL_SCANS = (
         && Number.parseInt(process.env.PARALLEL_SCANS, 10))
       || DEFAULT_PARALLEL_SCANS;
 
+const EXCLUDE_FROM_CSEQS = process.env.EXCLUDE_FROM_CSEQS
+      && JSON.parse(process.env.EXCLUDE_FROM_CSEQS);
 
 const USAGE = `
 followerDiff.js
@@ -72,6 +76,13 @@ Mandatory environment variables:
 Optional environment variables:
     LISTING_DIGESTS_INPUT_DIR: read listing digests from the specified LevelDB database
     PARALLEL_SCANS: number of databases to scan in parallel (default ${DEFAULT_PARALLEL_SCANS})
+    EXCLUDE_FROM_CSEQS: cseq values for a set of raft sessions, to filter
+        out diff entries which keys appear in the corresponding raft
+        journal later than the corresponding cseq value. The value must be
+        in the following JSON format:
+            {"rsId":cseq[,"rsId":cseq...]}
+        Example:
+            {"1":1234,"4":4567,"6":6789}
 `;
 
 if (!BUCKETD_HOSTPORT) {
@@ -120,6 +131,47 @@ setInterval(
     LOG_PROGRESS_INTERVAL * 1000,
 );
 
+// Output a byte stream of newline-separated JSON entries from input
+// streamed objects + update metrics
+class JSONLStream extends stream.Transform {
+    constructor() {
+        super({ objectMode: true });
+    }
+
+    _transform(diffEntry, encoding, callback) {
+        if (diffEntry[0] === null) {
+            status.onlyOnLeader += 1;
+        } else if (diffEntry[1] === null) {
+            status.onlyOnFollower += 1;
+        } else {
+            status.differingValue += 1;
+        }
+        this.push(`${JSON.stringify(diffEntry)}\n`);
+        callback();
+    }
+
+    _flush(callback) {
+        this.push(null);
+        callback();
+    }
+}
+
+let diffStreamsSink;
+if (EXCLUDE_FROM_CSEQS) {
+    diffStreamsSink = new DiffStreamOplogFilter({
+        bucketdHost: BUCKETD_HOST,
+        bucketdPort: BUCKETD_PORT,
+        excludeFromCseqs: EXCLUDE_FROM_CSEQS,
+    });
+    diffStreamsSink
+        .pipe(new JSONLStream())
+        .pipe(DIFF_OUTPUT_STREAM);
+} else {
+    diffStreamsSink = new JSONLStream();
+    diffStreamsSink
+        .pipe(DIFF_OUTPUT_STREAM);
+}
+
 let digestsDb;
 if (LISTING_DIGESTS_INPUT_DIR) {
     digestsDb = new Level(LISTING_DIGESTS_INPUT_DIR, { createIfMissing: false });
@@ -145,20 +197,12 @@ function scanDb(dbPath, cb) {
         });
     diffStream
         .on('data', data => {
-            if (data[0] === null) {
-                status.onlyOnLeader += 1;
-            } else if (data[1] === null) {
-                status.onlyOnFollower += 1;
-            } else {
-                status.differingValue += 1;
-            }
-            if (!DIFF_OUTPUT_STREAM.write(JSON.stringify(data))) {
+            if (!diffStreamsSink.write(data)) {
                 diffStream.pause();
-                DIFF_OUTPUT_STREAM.once('drain', () => {
+                diffStreamsSink.once('drain', () => {
                     diffStream.resume();
                 });
             }
-            DIFF_OUTPUT_STREAM.write('\n');
         })
         .on('end', () => {
             log.info('completed scan of database', { dbPath });
@@ -181,7 +225,15 @@ function main() {
                 done();
             }
         },
-    ], () => {
+        done => {
+            diffStreamsSink.end();
+            diffStreamsSink.on('finish', done);
+        },
+    ], err => {
+        if (err) {
+            logProgress('error during scan');
+            process.exit(1);
+        }
         logProgress('completed scan');
         DIFF_OUTPUT_STREAM.end();
         DIFF_OUTPUT_STREAM.on('finish', () => {

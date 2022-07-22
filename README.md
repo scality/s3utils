@@ -461,9 +461,18 @@ node followerDiff.js
 ## Optional environment variables
 
 * **LISTING_DIGESTS_INPUT_DIR**: read listing digests from the
-    specified LevelDB database
+  specified LevelDB database
 
 * **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
+
+* **EXCLUDE_FROM_CSEQS**: cseq values for a set of raft sessions, to
+  filter out diff entries which keys appear in the corresponding raft
+  journal later than the corresponding cseq value. The value must be
+  in the following JSON format:
+
+  * `{"rsId":cseq[,"rsId":cseq...]}`
+
+  * Example: `{"1":1234,"4":4567,"6":6789}`
 
 ## Scan Procedure
 
