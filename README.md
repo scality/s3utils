@@ -561,7 +561,7 @@ docker run \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
 -e 'NO_MISSING_KEY_CHECK=1' \
-registry.scality.com/s3utils/s3utils:1.13.1 \
+registry.scality.com/s3utils/s3utils:1.13.3 \
 node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
@@ -658,7 +658,41 @@ Example:
 ssh root@storage-1
 ```
 
-### Step Scan-2: Stop all follower repd processes
+### Step Scan-2: Gather current cseq of each raft session to scan
+
+This step gathers the current cseq value of the follower repds for all
+raft sessions to be scanned. The result will be passed on to the
+followerDiff command in order to remove false positives due to live
+changes while the script is running.
+
+**Note**: the base admin port specified here is the default value
+defined in `group_vars/all` as `defaults.bucket.repd_base_admin_port`.
+
+```
+REPD_BASE_ADMIN_PORT=9143
+for RS in $(cat /tmp/rs-to-scan); do
+    echo -n '{"'${RS}'":'
+    curl -s "http://localhost:$((REPD_BASE_ADMIN_PORT + RS))/_/raft/state"
+    echo '}'
+done \
+| jq -s 'reduce .[] as $item ({}; . + ($item | map_values(.committed)))' \
+| tee /tmp/rs-cseqs.json
+```
+
+This command should show a result resembling this, mapping raft
+session numbers to latest cseq values, and storing it in
+`/tmp/rs-cseqs.json`:
+
+```
+{
+  "3": 17074,
+  "4": 11121,
+  "5": 15666,
+  "7": 169677
+}
+```
+
+### Step Scan-3: Stop all follower repd processes
 
 In order to be able to scan the databases, follower repd processes
 must be stopped with the following command:
@@ -672,7 +706,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Scan-3: Scan local databases
+### Step Scan-4: Scan local databases
 
 Run the "CompareRaftMembers/followerDiff" tool to generate a
 line-separated JSON output file showing all differences found between
@@ -697,7 +731,8 @@ docker run --net=host --rm \
   -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
   -v "${PWD}/followerDiff-results:/followerDiff-results" \
   -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.json" \
-  registry.scality.com/s3utils/s3utils:1.13.1 \
+  -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
+  registry.scality.com/s3utils/s3utils:1.13.3 \
   bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
 | tee -a followerDiff.log
 
@@ -708,7 +743,7 @@ docker run --net=host --rm \
   file. If you need to re-run the command, first delete the output
   file or give another path as DIFF_OUTPUT_FILE.
 
-### Step Scan-4: Restart all stopped repd processes
+### Step Scan-5: Restart all stopped repd processes
 
 ```
 for RS in $(cat /tmp/rs-to-scan); do
