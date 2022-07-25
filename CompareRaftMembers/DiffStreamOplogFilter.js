@@ -12,7 +12,39 @@ const httpAgent = new http.Agent({
     keepAlive: true,
 });
 
+/**
+ * @class DiffStreamOplogFilter
+ * @classdesc Transform stream that takes as input diff entries as
+ * produced by the {@link DiffStream} class, and outputs them
+ * unchanged only if the keys they refer to (entry[0].key or
+ * entry[1].key) are not present in the latest Raft oplog of their
+ * bucket's raft session.
+ *
+ * The idea is to remove false positives of the diff algorithm that
+ * can occur due to operations being executed on a raft session while
+ * the scan is in progress.
+ */
 class DiffStreamOplogFilter extends stream.Transform {
+    /**
+     * @constructor
+     * @param {object} params - params object
+     * @param {string} params.bucketdHost - bucketd host name or IP address
+     * @param {number} params.bucketdPort - bucketd API port
+     * @param {object} params.excludeFromCseqs - mapping of raft
+     * sessions to filter on, where keys are raft session IDs and
+     * values are the cseq value for that raft session. Filtering will
+     * be based on all oplog records more recent than the given "cseq"
+     * for the raft session. Example: { "1": 1234, "3": 3456 }. Input
+     * diff entries not belonging to one of the declared raft sessions
+     * are discarded from the output.
+     * @param {number} [params.maxBufferedEntries=10000] - how many
+     * input diff entries may be buffered in memory at once before
+     * applying backpressure on the stream writer
+     * @param {number} [params.retryDelayMs=1000] - initial retry
+     * delay in milliseconds when requests to bucketd fail
+     * @param {number} [params.maxRetryDelayMs=10000] - maximum retry
+     * delay in milliseconds when requests to bucketd fail
+     */
     constructor(params) {
         super({ objectMode: true });
         const {
@@ -52,17 +84,21 @@ class DiffStreamOplogFilter extends stream.Transform {
         this.raftSessionStates = {};
         for (const rsId of Object.keys(excludeFromCseqs)) {
             const raftSessionState = {};
-            this.raftSessionStates[rsId] = raftSessionState;
             const oplogStream = new RaftOplogStream({
                 bucketdHost,
                 bucketdPort,
                 raftSessionId: rsId,
+                // start reading oplog from the next sequence number,
+                // since the raft session's cseq value points to its
+                // latest record to date (which would be returned if
+                // passed as "startSeq")
                 startSeq: excludeFromCseqs[rsId] + 1,
             });
             this._setupOplogStream(raftSessionState, oplogStream);
             raftSessionState.oplogStream = oplogStream;
             raftSessionState.oplogKeys = new Set();
             raftSessionState.inputBuffer = [];
+            this.raftSessionStates[rsId] = raftSessionState;
         }
     }
 
@@ -92,15 +128,7 @@ class DiffStreamOplogFilter extends stream.Transform {
 
     _transform(diffEntry, encoding, callback) {
         const bucketName = this._extractBucketName(diffEntry);
-        async.waterfall([
-            next => {
-                const rsId = this.bucketNameToRaftSessionId[bucketName];
-                if (rsId !== undefined) {
-                    return next(null, rsId);
-                }
-                return this._fetchBucketRaftSessionId(bucketName, next);
-            },
-        ], (err, rsId) => {
+        this._fetchBucketRaftSessionId(bucketName, (err, rsId) => {
             if (err) {
                 this.emit('error', err);
                 return callback();
@@ -177,7 +205,7 @@ class DiffStreamOplogFilter extends stream.Transform {
                 if (res.statusCode !== 200) {
                     return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
                 }
-                return cb(null, { statusCode: res.statusCode, body });
+                return cb(null, { statusCode: 200, body });
             });
             res.once('error', err => cb(err));
         });
@@ -186,6 +214,10 @@ class DiffStreamOplogFilter extends stream.Transform {
     }
 
     _fetchBucketRaftSessionId(bucketName, cb) {
+        const rsId = this.bucketNameToRaftSessionId[bucketName];
+        if (rsId !== undefined) {
+            return cb(null, rsId);
+        }
         return async.retry(
             this.retryParams,
             done => this._requestWrapper({
