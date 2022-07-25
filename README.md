@@ -521,7 +521,7 @@ make sure that all `committed` values across active `md[x]-cluster[y]`
 members are within less than 100 entries to each other. Ignore values
 of `wsb[x]-cluster[y]` members.
 
-### Step Prep-1: Generate the digests database
+### Step Prep-1: Generate the digests database on one metadata server
 
 Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
 to generate a digests database in order to have a more efficient scan
@@ -699,23 +699,31 @@ line-separated JSON output file showing all differences found between
 the leader and the local metadata databases, for raft sessions where
 the repd process is a follower.
 
+Note that the container must mount all metadata databases mountpoints
+in order to have access to all databases.
+
 Example command:
+```
+DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
+DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1 | cut -d: -f2)
+
+mkdir -p followerDiff-results
+docker run --net=host --rm \
+  -e 'BUCKETD_HOSTPORT=localhost:9000' \
+  ${DATABASE_MOUNTS} \
+  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNT}/RS/0/*)" \
+  -v "${PWD}/followerDiff-digests:/digests" \
+  -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
+  -v "${PWD}/followerDiff-results:/followerDiff-results" \
+  -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.json" \
+  -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
+  registry.scality.com/s3utils/s3utils:1.13.1 \
+  bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
+| tee -a followerDiff.log
 
 ```
-mkdir -p followerDiff-results && \
-docker run --net=host --rm \
--e 'BUCKETD_HOSTPORT=localhost:9000' \
--v "/scality/ssd01/s3/scality-metadata-databases-bucket:/databases" \
--e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)" \
--v "${PWD}/followerDiff-digests:/digests" \
--e "LISTING_DIGESTS_INPUT_DIR=/digests" \
--v "${PWD}/followerDiff-results:/followerDiff-results" \
--e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.jsonl" \
--e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
-registry.scality.com/s3utils/s3utils:1.13.1 \
-bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
-| tee -a followerDiff.log
-```
+
 
 **Note**: the tool will refuse to override an existing diff output
   file. If you need to re-run the command, first delete the output
@@ -777,6 +785,43 @@ can be found in the
 - The current version of the script does not work with Metadata bucket
   format v1, only with v0. If the need arises, it could be made to
   work with v1 with some more work.
+
+
+# Repair objects affected by raft divergence
+
+This script checks each entry from stdin, corresponding to a line from
+the output of followerDiff.js, and repairs the object on metadata if
+deemed safe to do so with a readable version.
+
+## Usage
+
+```
+    node CompareRaftMembers/repairObjects.js
+```
+
+## Mandatory environment variables
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+
+## Optional environment variables
+
+* **VERBOSE**: set to 1 for more verbose output (shows one line for
+every sproxyd key checked)
+
+* **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
+
+## Example
+
+```
+docker run -i --net=host --rm \
+  -e "BUCKETD_HOSTPORT=localhost:9000" \
+  -e "SPROXYD_HOSTPORT=localhost:8181" \
+  registry.scality.com/s3utils/s3utils:1.13.2 \
+  node CompareRaftMembers/repairObjects < followerDiff-results/followerDiff-results.jsonl \
+  | tee -a repairObjects.log
+```
 
 
 # Remove delete markers
