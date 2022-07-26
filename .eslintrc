@@ -3,6 +3,7 @@
     "plugins": ["jest"],
     "env": {
         "es6": true,
+        "jasmine": true,
         "jest/globals": true
     },
     "parserOptions": {
