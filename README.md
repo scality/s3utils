@@ -512,7 +512,7 @@ make sure that all `committed` values across active `md[x]-cluster[y]`
 members are within less than 100 entries to each other. Ignore values
 of `wsb[x]-cluster[y]` members.
 
-### Step Prep-1: Generate the digests database
+### Step Prep-1: Generate the digests database on one metadata server
 
 Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
 to generate a digests database in order to have a more efficient scan
@@ -656,22 +656,30 @@ line-separated JSON output file showing all differences found between
 the leader and the local metadata databases, for raft sessions where
 the repd process is a follower.
 
+Note that the container must mount all metadata databases mountpoints
+in order to have access to all databases.
+
 Example command:
+```
+DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
+DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1 | cut -d: -f2)
+
+mkdir -p followerDiff-results
+docker run --net=host --rm \
+  -e 'BUCKETD_HOSTPORT=localhost:9000' \
+  ${DATABASE_MOUNTS} \
+  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNT}/RS/0/*)" \
+  -v "${PWD}/followerDiff-digests:/digests" \
+  -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
+  -v "${PWD}/followerDiff-results:/followerDiff-results" \
+  -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.json" \
+  registry.scality.com/s3utils/s3utils:1.13.1 \
+  bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
+| tee -a followerDiff.log
 
 ```
-mkdir -p followerDiff-results && \
-docker run --net=host --rm \
--e 'BUCKETD_HOSTPORT=localhost:9000' \
--v "/scality/ssd01/s3/scality-metadata-databases-bucket:/databases" \
--e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo /databases/RS/0/*)" \
--v "${PWD}/followerDiff-digests:/digests" \
--e "LISTING_DIGESTS_INPUT_DIR=/digests" \
--v "${PWD}/followerDiff-results:/followerDiff-results" \
--e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.jsonl" \
-registry.scality.com/s3utils/s3utils:1.13.1 \
-bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
-| tee -a followerDiff.log
-```
+
 
 **Note**: the tool will refuse to override an existing diff output
   file. If you need to re-run the command, first delete the output
