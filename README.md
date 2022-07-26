@@ -852,14 +852,14 @@ and ignores other entries.
 
 ## Mandatory environment variables
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+* **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+* **OBJECT_REPAIR_SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
 ## Example
 
 ```
-cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'BUCKETD_HOSTPORT=127.0.0.1:9000 SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
+cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 OBJECT_REPAIR_SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
 ```
 
 ## Caveat

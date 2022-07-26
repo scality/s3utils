@@ -40,17 +40,17 @@ Standard Input:
     sproxyd key found" and ignores other entries.
 
 Mandatory environment variables:
-    BUCKETD_HOSTPORT: ip:port of bucketd endpoint
-    SPROXYD_HOSTPORT: ip:port of sproxyd endpoint
+    OBJECT_REPAIR_BUCKETD_HOSTPORT: ip:port of bucketd endpoint
+    OBJECT_REPAIR_SPROXYD_HOSTPORT: ip:port of sproxyd endpoint
 `;
 
 if (!OBJECT_REPAIR_BUCKETD_HOSTPORT) {
-    console.error('ERROR: BUCKETD_HOSTPORT not defined');
+    console.error('ERROR: OBJECT_REPAIR_BUCKETD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);
 }
 if (!OBJECT_REPAIR_SPROXYD_HOSTPORT) {
-    console.error('ERROR: SPROXYD_HOSTPORT not defined');
+    console.error('ERROR: OBJECT_REPAIR_SPROXYD_HOSTPORT not defined');
     console.error(USAGE);
     process.exit(1);
 }
