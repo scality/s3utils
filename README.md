@@ -708,10 +708,11 @@ done
 At this point, each results file contains a newline-separated set of
 JSON entries describing each difference found on each of the servers,
 for the databases used by repd processes acting as followers in the
-Raft protocol. This output is meant to be passed on to a repair script
-to actually repair the divergences. More details on the output format
-can be found in the
-[tool's description summary](#compare-followers-databases-against-leader-view).
+Raft protocol. This output is meant to be passed on to the [repair
+script](#repair-objects-affected-by-raft-divergence) to actually
+repair the divergences. More details on the output format can be found
+in the [tool's description
+summary](#compare-followers-databases-against-leader-view).
 
 ### Caveats
 
@@ -734,12 +735,23 @@ can be found in the
   format v1, only with v0. If the need arises, it could be made to
   work with v1 with some more work.
 
+- The current version of the script does not support internal TLS
+  feature
+
 
 # Repair objects affected by raft divergence
 
+The repair script provided here attempts to automatically repair the
+object metadata affected by divergences between leaders and followers,
+to fix consistency while making sure the repaired object is
+readable. It does not necessarily mean that the repaired version will
+be the legitimate version from the application point of view, but the
+tool strives to be non-destructive and best-effort.
+
 This script checks each entry from stdin, corresponding to a line from
 the output of followerDiff.js, and repairs the object on metadata if
-deemed safe to do so with a readable version.
+deemed safe to do so with a readable version, and if there's no
+ambiguity on what's the best way to repair.
 
 ## Usage
 
@@ -760,17 +772,98 @@ every sproxyd key checked)
 
 * **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
 
-## Example
+## Logs
+
+The script outputs logs in JSON. Each object repair analysis or
+attempt outputs a single log line, for example:
 
 ```
+{"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563031,"bucket":"s3c-5862-nv-0072","key":"test-2022-07-05T21-06-16-960Z/190","repairStatus":"AutoRepair","repairSource":"Leader","repairMaster":false,"level":"info","message":"repaired object metadata successfully","hostname":"jonathan-storage-1","pid":1}
+```
+
+In the above log, the repair status is `AutoRepair`, which means the
+script attempted to repair automatically the object metadata, and it
+succeeded.
+
+The status can be one of:
+
+* **AutoRepair**: the object can be repaired automatically
+  (`repairSource` described the source metadata for the repair, either
+  `Leader` or `Follower`).
+
+* **ManualRepair**: the object can be repaired but an operator needs
+  to decide on which version to repair from. This is normally when
+  both versions are readable and the script is unable to take an
+  automatic decision. There is currently no support to use
+  `objectRepair` to help with those cases, but it can be done via the
+  bucketd API.
+
+* **NotRepairable**: the object metadata is either absent or
+  unreadable from both leader and follower (the message gives extra
+  detail), so the script did not attempt any repair.
+
+* **UpdatedByClient**: this status is given when the repair script
+  detects that the current metadata does not match one of the leader
+  or follower's entry in the current diff entry being processed. This
+  normally means that the application has overwritten the object with
+  new contents since the scan ran. It can then safely be ignored, and
+  the repair script did not attempt to repair anything here.
+
+Additionally, logs may contain such lines, when a check failed on a
+particular sproxyd key that belongs to one instance of the metadata
+(whether on leader or follower):
+
+```
+{"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563000,"bucketdUrl":"http://localhost:9000/default/bucket/s3c-5862-nv-0072/test-2022-07-05T21-06-16-960Z%2F190","sproxydKey":"A553B230F05B0B55C2D090233B280559E730D320","level":"error","message":"sproxyd check reported missing key","hostname":"jonathan-storage-1","pid":1}
+```
+
+Those are expected when metadata divergence exists, they can give some
+complementary information for diagnosis.
+
+At the end of the run, a single line shows the final count per status
+(which is also shown during the run every 10 seconds). For example
+here, we know that there were 2 automatic repairs performed, and one
+requiring a manual check and repair (which entry can be found from the
+logs, looking for "ManualRepair" status):
+
+```
+{"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563064,"countByStatus":{"AutoRepair":2,"AutoRepairError":0,"ManualRepair":1,"NotRepairable":0,"UpdatedByClient":0},"level":"info","message":"completed repair","hostname":"jonathan-storage-1","pid":1}
+```
+
+## Repair Procedure
+
+To repair a set of objects with inconsistencies, first make sure that
+you ran the [scan procedure](#scan-procedure) and got results ready
+from `followerDiff-results.[host]` directories.
+
+### Example Repair Command
+
+Assuming the hosts are named storage-1 through storage-5, this command
+can be used to launch the repair in dry-run mode first (it's a good
+practice to get a sense of what the script will attempt to do before
+executing it for real, looking at the logs first):
+
+```
+cat followerDiff-results.storage-{1..5}/followerDiff-results.jsonl | \
 docker run -i --net=host --rm \
   -e "BUCKETD_HOSTPORT=localhost:9000" \
   -e "SPROXYD_HOSTPORT=localhost:8181" \
-  registry.scality.com/s3utils/s3utils:1.13.2 \
-  node CompareRaftMembers/repairObjects < followerDiff-results/followerDiff-results.jsonl \
-  | tee -a repairObjects.log
+  -e "DRY_RUN=1" \
+  registry.scality.com/s3utils/s3utils:1.13.3 \
+  node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
+If results make sense, it can be executed without the "DRY_RUN"
+option to execute the possible automatic repairs, if any:
+
+```
+cat followerDiff-results.storage-{1..5}/followerDiff-results.jsonl | \
+docker run -i --net=host --rm \
+  -e "BUCKETD_HOSTPORT=localhost:9000" \
+  -e "SPROXYD_HOSTPORT=localhost:8181" \
+  registry.scality.com/s3utils/s3utils:1.13.3 \
+  node CompareRaftMembers/repairObjects | tee -a repairObjects.log
+```
 
 # Remove delete markers
 
