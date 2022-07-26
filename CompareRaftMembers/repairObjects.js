@@ -314,7 +314,12 @@ function repairDiffEntry(diffEntry, cb) {
                     keyBucketdURL,
                     repairStrategy.repairMaster ? masterKeyBucketdURL : null,
                 ],
-                (url, urlDone) => repairObjectMD(url, repairMd, urlDone),
+                (url, urlDone) => {
+                    if (!url) {
+                        return urlDone();
+                    }
+                    return repairObjectMD(url, repairMd, urlDone);
+                },
                 err => {
                     if (err) {
                         log.error('error during repair of object metadata', {
