@@ -804,7 +804,7 @@ The status can be one of:
 
 * **UpdatedByClient**: this status is given when the repair script
   detects that the current metadata does not match one of the leader
-  of follower's entry in the current diff entry being processed. This
+  or follower's entry in the current diff entry being processed. This
   normally means that the application has overwritten the object with
   new contents since the scan ran. It can then safely be ignored, and
   the repair script did not attempt to repair anything here.
@@ -832,7 +832,7 @@ logs, looking for "ManualRepair" status):
 
 ## Repair Procedure
 
-To repair a set of objects for inconsistencies, first make sure that
+To repair a set of objects with inconsistencies, first make sure that
 you ran the [scan procedure](#scan-procedure) and got results ready
 from `followerDiff-results.[host]` directories.
 
