@@ -718,15 +718,16 @@ in order to have access to all databases.
 
 Example command:
 ```
-DATABASE_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
-DATABASE_MASTER_MOUNT=$(echo ${DATABASE_MOUNTS} | head -1 | cut -d: -f2)
+DATABASE_MASTER_MOUNTPOINT=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and contains("ssd01")) | .Destination) | .[]')
 
 mkdir -p followerDiff-results
 docker run --net=host --rm \
   -e 'BUCKETD_HOSTPORT=localhost:9000' \
-  ${DATABASE_MOUNTS} \
-  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNT}/RS/0/*)" \
+  ${DATABASE_VOLUME_MOUNTS} \
+  -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNTPOINT}/RS/0/*)" \
   -v "${PWD}/followerDiff-digests:/digests" \
   -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
   -v "${PWD}/followerDiff-results:/followerDiff-results" \
