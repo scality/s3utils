@@ -721,7 +721,7 @@ Example command:
 DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
 DATABASE_MASTER_MOUNTPOINT=$(docker inspect scality-metadata-bucket-repd \
-| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and contains("ssd01")) | .Destination) | .[]')
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and (contains("/ssd01/") or contains("/ssd1/"))) | .Destination) | .[]')
 
 mkdir -p followerDiff-results
 docker run --net=host --rm \
