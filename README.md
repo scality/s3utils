@@ -1226,3 +1226,31 @@ script outputs this status on a single line.
   "pid": 717
 }
 ```
+
+# UtapiV2 Service Report
+
+Generates a service level usage report from UtapiV2 in HTML or JSON format.
+
+## Usage
+
+Commands must be executed on a stateful server that hosts the target UtapiV2 deployment.
+
+```
+docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/conf:/conf:ro -v $PWD:/output zenko/s3utils utapi/service-report.py --output /output
+```
+
+## Flags
+
+```
+  -c CONFIG, --config CONFIG
+                        Specify an alternate config file (default: /conf/config.json)
+  -r MAX_RETRIES, --max-retries MAX_RETRIES
+                        Max retries before failing a request to an external service (default: 2)
+  -p PARALLEL_QUERIES, --parallel-queries PARALLEL_QUERIES
+                        Max number of parallel queries to warp 10 (default: 5)
+  -j, --json            Output raw reports in json format (default: False)
+  -o OUTPUT, --output OUTPUT
+                        Write report to this directory (default: Current Directory)
+  --debug               Enable debug level logging (default: False)
+  --dry-run             Don't do any computation. Only validate and print the configuration. (default: False)
+```

@@ -32,6 +32,8 @@ WORKDIR /usr/src/app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         jq \
+        python3 \
+        python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV BALLOT_VERSION 1.0.3
@@ -45,6 +47,8 @@ COPY --from=builder /usr/src/app/supervisord /usr/local/bin/
 
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
+
+RUN pip install -r utapi/requirements.txt
 
 ## This section duplicates S3C Federation Dockerfile, this needs to be refactored
 # Rename the "node" user to "scality" and setup associated env variables
