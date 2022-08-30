@@ -24,13 +24,13 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
             'value.last-modified': 1,
         };
         return c.aggregate([
-            { $project: reducedFields },
             {
                 $match: {
-                    '_id.id': { $regex: /\0/ },
-                    '_id.status': { $eq: 'PENDING' },
+                    '_id': { $regex: /\0/ },
+                    'value.replicationInfo.status': { $eq: 'PENDING' },
                 },
             },
+            { $project: reducedFields },
         ]);
     }
 
