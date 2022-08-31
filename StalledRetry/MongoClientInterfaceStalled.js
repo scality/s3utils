@@ -26,7 +26,6 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
         return c.aggregate([
             {
                 $match: {
-                    '_id': { $regex: /\0/ },
                     'value.replicationInfo.status': { $eq: 'PENDING' },
                 },
             },

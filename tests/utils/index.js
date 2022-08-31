@@ -1,13 +1,26 @@
 const { ObjectMD } = require('arsenal').models;
-const { encode } = require('arsenal').versioning.VersionID;
+const {
+    VersionID: { encode },
+    VersioningConstants,
+} = require('arsenal').versioning;
 
 const { StalledEntry } = require('../../StalledRetry/CursorWrapper');
 
 const testVersion = '98502347359531999999RG001  5.2375.2122';
 
-function generateObjectMD(objectKey, lastModified, storageClasses) {
+function generateKeyId(isMaster, key, versionId) {
+    if (isMaster) {
+        return key;
+    }
+    return `${key}${VersioningConstants.VersionId.Separator}${versionId}`;
+}
+
+function generateMD(isMaster, objectKey, lastModified, storageClasses) {
+    const keyId = generateKeyId(isMaster, objectKey, testVersion);
+
     return {
         _id: {
+            id: keyId,
             key: objectKey,
             storageClasses,
             versionId: testVersion,
@@ -19,6 +32,13 @@ function generateObjectMD(objectKey, lastModified, storageClasses) {
             .setReplicationStorageClass(storageClasses)
             .getValue(),
     };
+}
+
+function generateObjectMD(objectKey, lastModified, storageClasses) {
+    const versionMd = generateMD(false, objectKey, lastModified, storageClasses);
+    const masterMd = generateMD(true, objectKey, lastModified, storageClasses);
+    // mock master and version md
+    return [versionMd, masterMd];
 }
 
 function generateRequestObject(bucket, objectKey, storageClass) {

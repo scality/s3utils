@@ -1,5 +1,5 @@
 const { MongoError } = require('mongodb');
-const { encode } = require('arsenal').versioning.VersionID;
+const { isMasterKey, VersionID: { encode } } = require('arsenal').versioning;
 const { once } = require('arsenal').jsutil;
 
 class StalledEntry {
@@ -25,6 +25,12 @@ class StalledEntry {
 function objectToEntries(bucketName, cmpDate, data) {
     if (!data || typeof data !== 'object'
         || !data.value || typeof data.value !== 'object') {
+        return [];
+    }
+
+    // skip if master
+    const docId = data._id.id;
+    if (!docId || isMasterKey(docId)) {
         return [];
     }
 

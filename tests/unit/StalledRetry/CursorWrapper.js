@@ -52,12 +52,12 @@ describe('RateLimitingCursor', () => {
         );
 
         writeItemsTo(mockCursor, [
-            generateObjectMD(
+            ...generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
                 'us-east-1,us-east-2',
             ),
-            generateObjectMD(
+            ...generateObjectMD(
                 'testobject-1',
                 generateModifiedDateString(cmpDate, -24),
                 'us-east-1,us-east-2',
@@ -87,7 +87,7 @@ describe('RateLimitingCursor', () => {
         );
 
         writeItemsTo(mockCursor, [
-            generateObjectMD(
+            ...generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, +24),
                 'us-east-1,us-east-2',
@@ -117,7 +117,7 @@ describe('RateLimitingCursor', () => {
         );
 
         writeItemsTo(mockCursor, [
-            generateObjectMD(
+            ...generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
                 'us-east-1,us-east-2',
@@ -168,7 +168,7 @@ describe('RateLimitingCursor', () => {
         );
 
         writeItemsTo(mockCursor, [
-            generateObjectMD(
+            ...generateObjectMD(
                 'testobject-0',
                 generateModifiedDateString(cmpDate, -24),
                 'us-east-1,us-east-2',
@@ -247,12 +247,12 @@ describe('RateLimitingCursor', () => {
 
             setTimeout(() => {
                 writeItemsTo(mockCursor, [
-                    generateObjectMD(
+                    ...generateObjectMD(
                         'testobject-0',
                         generateModifiedDateString(cmpDate, -24),
                         'us-east-1,us-east-2,us-east-3',
                     ),
-                    generateObjectMD(
+                    ...generateObjectMD(
                         'testobject-1',
                         generateModifiedDateString(cmpDate, -24),
                         'us-east-1,us-east-2,us-east-3',
@@ -273,7 +273,7 @@ describe('RateLimitingCursor', () => {
             );
 
             writeItemsTo(mockCursor, [
-                generateObjectMD(
+                ...generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
                     'us-east-1',
@@ -326,12 +326,12 @@ describe('RateLimitingCursor', () => {
             );
 
             writeItemsTo(mockCursor, [
-                generateObjectMD(
+                ...generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
                     'us-east-1,us-east-2,us-east-3',
                 ),
-                generateObjectMD(
+                ...generateObjectMD(
                     'testobject-1',
                     generateModifiedDateString(cmpDate, -24),
                     'us-east-1,us-east-2,us-east-3',
@@ -373,12 +373,12 @@ describe('RateLimitingCursor', () => {
 
             mockCursor.pause();
             writeItemsTo(mockCursor, [
-                generateObjectMD(
+                ...generateObjectMD(
                     'testobject-0',
                     generateModifiedDateString(cmpDate, -24),
                     'us-east-1,us-east-2,us-east-3',
                 ),
-                generateObjectMD(
+                ...generateObjectMD(
                     'testobject-1',
                     generateModifiedDateString(cmpDate, -24),
                     'us-east-1,us-east-2,us-east-3',
