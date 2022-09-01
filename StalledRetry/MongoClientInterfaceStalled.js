@@ -13,6 +13,7 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
 
     _getStalledObjectsByBucket(bucketName) {
         const c = this.getCollection(bucketName);
+        // TODO: refactor the object structure, property '_id' may not be required
         const reducedFields = {
             '_id': {
                 id: '$_id',

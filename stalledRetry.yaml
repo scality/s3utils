@@ -17,11 +17,11 @@ spec:
           containers:
           - name: utils
             image: zenko/s3utils:0.2
-            imagePullPolicy: IfNotPresent 
+            imagePullPolicy: IfNotPresent
             command: ["/bin/bash"]
             args:
             - -c
-            - node stalled.js 
+            - node stalled.js
             env:
             - name: ENDPOINT
               value: ""
@@ -53,3 +53,7 @@ spec:
               # path to write heap snapshots
             - name: HEAP_PROFILER_PATH
               value: "/path/to/write"
+              # https://www.mongodb.com/docs/v4.2/core/read-preference/index.html
+              # mongodb read preference - primary|secondary|primaryPreferred|secondaryPreferred|nearest
+            - name: MONGODB_READ_PREFERENCE
+              value: "secondaryPreferred"

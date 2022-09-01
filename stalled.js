@@ -20,6 +20,7 @@ const createMongoParams = require('./utils/createMongoParams');
 const { ENDPOINT } = process.env;
 const { ACCESS_KEY } = process.env;
 const { SECRET_KEY } = process.env;
+const { MONGODB_READ_PREFERENCE } = process.env;
 const DRY_RUN = process.env.DRY_RUN && process.env.DRY_RUN !== 'false';
 
 const BATCH_SIZE = parseEnvInt(process.env.REQUEST_BATCH_SIZE, 10);
@@ -81,8 +82,10 @@ function handlerFactory(log) {
     );
 }
 
+const readPreference = MONGODB_READ_PREFERENCE;
+const customParams = readPreference ? { readPreference } : null;
 const config = {
-    mongodb: createMongoParams(log, { readPreference: 'primary' }),
+    mongodb: createMongoParams(log, customParams),
     cursorWrapperFactory: wrapperFactory,
     requestHandlerFactory: handlerFactory,
 };

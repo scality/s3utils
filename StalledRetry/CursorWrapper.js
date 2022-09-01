@@ -1,5 +1,8 @@
 const { MongoError } = require('mongodb');
-const { isMasterKey, VersionID: { encode } } = require('arsenal').versioning;
+const {
+    isMasterKey,
+    VersionID: { encode },
+} = require('arsenal').versioning;
 const { once } = require('arsenal').jsutil;
 
 class StalledEntry {
