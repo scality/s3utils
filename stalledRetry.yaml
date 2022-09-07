@@ -38,7 +38,7 @@ spec:
             - name: EXPIRED_BY_HOUR
               value: "1"
               # limits the number of retry resources per retry request
-            - name: BATCH_SIZE
+            - name: REQUEST_BATCH_SIZE
               value: "10"
               # limits the number of retry resource entries in queue
             - name: QUEUE_LIMIT
