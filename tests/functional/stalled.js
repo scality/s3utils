@@ -204,7 +204,7 @@ function populateMongo(client, callback) {
 
 
 jest.setTimeout(3600000);
-describe('StalledRetry', () => {
+describe.skip('StalledRetry', () => {
     let mgoClient;
     let reqClient;
 
