@@ -36,7 +36,7 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
 
     queueStalledObjects(expiredBy, cb) {
         const cmpDate = new Date();
-        cmpDate.setHours(cmpDate.getHours() - expiredBy);
+        cmpDate.setMinutes(cmpDate.getMinutes() - expiredBy);
         const reqHandler = this.requestHandlerFactory(this.logger);
 
         let stalledCount = 0;
