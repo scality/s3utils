@@ -14,6 +14,7 @@ RUN apt-get update && \
         python3 \
         ssh \
         wget \
+        vim \
     && rm -rf /var/lib/apt/lists/*
 
 ENV SUPERVISOR_VERSION 0.7.3
