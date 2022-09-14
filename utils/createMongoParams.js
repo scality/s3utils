@@ -31,10 +31,10 @@ function getMongoDbConfig(log, configFile) {
     } catch (err) {
         log.info(`could not parse config file: ${err.message}`);
         config = {
-            database: 'metadata',
-            replicaSet: 'rs0',
-            replicationGroupId: 'RG001',
-            shardCollections: false,
+            // database: 'metadata',
+            // replicaSet: 'rs0',
+            // replicationGroupId: 'RG001',
+            // shardCollections: false,
         };
     }
     return config;
@@ -47,10 +47,11 @@ function createMongoParams(log, customParams) {
     const params = {
         ...config,
         database: process.env.MONGODB_DATABASE || config.database,
-        replicaSetHosts: process.env.MONGODB_REPLICASET || config.replicaSetHosts,
+        replicaSet: process.env.MONGODB_REPLICASET || config.replicaSet,
+        replicaSetHosts: process.env.MONGODB_REPLICASET_HOSTS || config.replicaSetHosts,
         replicationGroupId: process.env.REPLICATION_GROUP_ID || config.replicationGroupId,
         isLocationTransient: getIsLocationTransientCb(log, locationConfigFile),
-        shardCollections: process.env.MONGODB_SHARD_COLLECTIONS || config.shardCollections,
+        shardCollections: true,
         writeConcern: 'majority',
         readPreference: 'secondaryPreferred',
         logger: log,
