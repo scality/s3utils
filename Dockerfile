@@ -35,6 +35,7 @@ RUN apt-get update && \
         jq \
         python3 \
         python3-pip \
+        vim \
     && rm -rf /var/lib/apt/lists/*
 
 ENV BALLOT_VERSION 1.0.3
