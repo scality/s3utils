@@ -65,7 +65,7 @@ def get_config(args):
     try:
         read_token = utapi_conf['warp10']['readToken']
         write_token = utapi_conf['warp10']['writeToken']
-        warp10_conf = [Warp10Conf(read_token=read_token, **server) for server in utapi_conf['warp10']['hosts']]
+        warp10_conf = [Warp10Conf(read_token=read_token, **utapi_conf['warp10']['hosts'][0])]
     except Exception as e:
         _log.debug(e)
         _fatal_error('Utapi config does not contain a valid "warp10" section')
