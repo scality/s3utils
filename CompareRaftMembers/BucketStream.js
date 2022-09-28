@@ -149,6 +149,7 @@ class BucketStream extends stream.Readable {
                         // retries: destroy the stream
                         return this.destroy(err);
                     }
+                    let hasPushed = false;
                     for (const item of listing) {
                         if (item) {
                             const fullKey = `${this.bucketName}/${item.key}`;
@@ -156,10 +157,14 @@ class BucketStream extends stream.Readable {
                                 key: fullKey,
                                 value: item.value,
                             });
+                            hasPushed = true;
                         }
                     }
                     if (IsTruncated && !ended) {
                         this.marker = Contents[Contents.length - 1].key;
+                        if (!hasPushed) {
+                            this._listMore();
+                        }
                     } else {
                         this.push(null);
                     }

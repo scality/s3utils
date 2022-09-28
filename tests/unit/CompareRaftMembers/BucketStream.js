@@ -74,12 +74,31 @@ function buildTestBucketContents() {
     // introduce a replay key to check those are filtered out
     contents.push({
         key: `${versioning.VersioningConstants.DbPrefixes.Replay}foobar`,
-        value: '{}',
+        value: {},
+    });
+    return contents;
+}
+
+function buildBucketWithReplayKeysContents() {
+    const contents = [{
+        key: 'foo',
+        value: { location: null },
+    }];
+    for (let i = 0; i < 3000; ++i) {
+        contents.push({
+            key: `${versioning.VersioningConstants.DbPrefixes.Replay}replay-key-${`0000${i}`.slice(-4)}`,
+            value: {},
+        });
+    }
+    contents.push({
+        key: 'éléphant',
+        value: { location: null },
     });
     return contents;
 }
 
 const TEST_BUCKET_CONTENTS = buildTestBucketContents();
+const BUCKET_WITH_REPLAY_KEYS_CONTENTS = buildBucketWithReplayKeysContents();
 
 describe('BucketStream', () => {
     let httpServer;
@@ -87,9 +106,18 @@ describe('BucketStream', () => {
     beforeAll(() => {
         const handleListBucketRequest = (req, res, url) => {
             const marker = url.searchParams.get('marker');
+            let rawContents;
+            const bucketName = url.pathname.slice('/default/bucket/'.length);
+            if (bucketName === 'test-bucket') {
+                rawContents = TEST_BUCKET_CONTENTS;
+            } else if (bucketName === 'bucket-with-replay-keys') {
+                rawContents = BUCKET_WITH_REPLAY_KEYS_CONTENTS;
+            } else {
+                throw new Error(`unexpected bucket name ${bucketName}`);
+            }
             let contents;
             let isTruncated;
-            const startIndex = TEST_BUCKET_CONTENTS.findIndex(
+            const startIndex = rawContents.findIndex(
                 item => (!marker || item.key > marker),
             );
             if (startIndex === -1) {
@@ -98,7 +126,7 @@ describe('BucketStream', () => {
             } else {
                 // limit to 1000 entries returned per page, like bucketd does
                 const endIndex = startIndex + 1000;
-                contents = TEST_BUCKET_CONTENTS
+                contents = rawContents
                     .slice(startIndex, endIndex)
                     .map(item => {
                         const { key, value } = item;
@@ -109,15 +137,15 @@ describe('BucketStream', () => {
                         }
                         return { key, value: JSON.stringify(listedValue) };
                     });
-                isTruncated = (endIndex < TEST_BUCKET_CONTENTS.length);
+                isTruncated = (endIndex < rawContents.length);
             }
-            const responseBody = JSON.stringify({
+            const responseBody = Buffer.from(JSON.stringify({
                 Contents: contents,
                 IsTruncated: isTruncated,
-            });
+            }), 'utf8');
             res.writeHead(200, {
                 'Content-Type': 'application/json',
-                'Content-Length': responseBody.length,
+                'Content-Length': responseBody.byteLength,
             });
             return res.end(responseBody);
         };
@@ -146,10 +174,11 @@ describe('BucketStream', () => {
                 return res.end('OOPS');
             }
             const url = new URL(req.url, `http://${req.headers.host}`);
-            if (url.pathname === '/default/bucket/test-bucket') {
-                return handleListBucketRequest(req, res, url);
-            }
-            if (url.pathname.startsWith('/default/bucket/test-bucket/')) {
+            if (url.pathname.startsWith('/default/bucket/')) {
+                const path = url.pathname.slice('/default/bucket/'.length);
+                if (path.indexOf('/') === -1) {
+                    return handleListBucketRequest(req, res, url);
+                }
                 return handleGetObjectRequest(req, res, url);
             }
             throw new Error(`unexpected request path ${url.pathname}`);
@@ -240,5 +269,34 @@ describe('BucketStream', () => {
                 })
                 .on('error', done);
         });
+    });
+
+    test('listing should continue when all keys in a page are ignored', done => {
+        const bucketStream = new BucketStream({
+            bucketdHost: 'localhost',
+            bucketdPort: HTTP_TEST_PORT,
+            bucketName: 'bucket-with-replay-keys',
+            retryDelayMs: 50,
+            maxRetryDelayMs: 1000,
+        });
+        const listedContents = [];
+        bucketStream
+            .on('data', item => {
+                listedContents.push(item);
+            })
+            .on('end', () => {
+                expect(listedContents).toEqual([
+                    {
+                        key: 'bucket-with-replay-keys/foo',
+                        value: '{"location":null}',
+                    },
+                    {
+                        key: 'bucket-with-replay-keys/éléphant',
+                        value: '{"location":null}',
+                    },
+                ]);
+                done();
+            })
+            .on('error', done);
     });
 });
