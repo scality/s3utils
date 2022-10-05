@@ -187,6 +187,7 @@ function _markObjectPending(
             return bb.putMetadata({
                 Bucket: bucket,
                 Key: key,
+                VersionId: versionId,
                 ContentLength: Buffer.byteLength(mdBlob),
                 Body: mdBlob,
             }, (err, putRes) => {
@@ -237,6 +238,7 @@ function _markObjectPending(
             return bb.putMetadata({
                 Bucket: bucket,
                 Key: key,
+                VersionId: versionId,
                 ContentLength: Buffer.byteLength(mdBlob),
                 Body: mdBlob,
             }, next);
