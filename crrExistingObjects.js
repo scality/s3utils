@@ -5,10 +5,10 @@ const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
 
+const { ObjectMD } = require('arsenal').models;
 const werelogs = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
-const { ObjectMD } = require('arsenal').models;
 
 const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
     ? 'debug' : 'info';
@@ -27,12 +27,12 @@ let {
     STORAGE_TYPE, TARGET_REPLICATION_STATUS,
 } = process.env;
 const { TARGET_PREFIX } = process.env;
-const WORKERS = (process.env.WORKERS &&
-    Number.parseInt(process.env.WORKERS, 10)) || 10;
-const MAX_UPDATES = (process.env.MAX_UPDATES &&
-    Number.parseInt(process.env.MAX_UPDATES, 10));
-const MAX_SCANNED = (process.env.MAX_SCANNED &&
-    Number.parseInt(process.env.MAX_SCANNED, 10));
+const WORKERS = (process.env.WORKERS
+    && Number.parseInt(process.env.WORKERS, 10)) || 10;
+const MAX_UPDATES = (process.env.MAX_UPDATES
+    && Number.parseInt(process.env.MAX_UPDATES, 10));
+const MAX_SCANNED = (process.env.MAX_SCANNED
+    && Number.parseInt(process.env.MAX_SCANNED, 10));
 let { KEY_MARKER } = process.env;
 let { VERSION_ID_MARKER } = process.env;
 
@@ -106,7 +106,7 @@ const s3Options = {
         log.error('aws sdk request error', { error, retryCount });
         // computed delay is not truly exponential, it is reset to minimum after
         // every 10 calls, with max delay of 15 seconds!
-        return AWS_SDK_REQUEST_DELAY_MS * Math.pow(2, retryCount % 10);
+        return AWS_SDK_REQUEST_DELAY_MS * 2 ** (retryCount % 10);
     },
 };
 const s3 = new AWS.S3(Object.assign(options, s3Options));
@@ -328,7 +328,8 @@ function triggerCRROnBucket(bucketName, cb) {
                     KeyMarker = data.NextKeyMarker;
                     return done();
                 });
-            }),
+            },
+        ),
         () => {
             if (nUpdated >= MAX_UPDATES || nProcessed >= MAX_SCANNED) {
                 _logProgress();
