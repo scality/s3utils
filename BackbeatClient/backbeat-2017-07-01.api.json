@@ -16,7 +16,7 @@
         "PutData": {
             "http": {
                 "method": "PUT",
-                "requestUri": "/_/backbeat/data/{Bucket}/{Key+}"
+                "requestUri": "/_/backbeat/data/{Bucket}/{Key+}?v2"
             },
             "input": {
                 "type": "structure",
@@ -66,9 +66,27 @@
                                 },
                                 "dataStoreName": {
                                     "type": "string"
+                                },
+                                "cryptoScheme": {
+                                    "type": "long"
+                                },
+                                "cipheredDataKey": {
+                                    "type": "string"
                                 }
                             }
                         }
+                    },
+                    "ServerSideEncryption": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption"
+                    },
+                    "SSECustomerAlgorithm": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-customer-algorithm"
+                    },
+                    "SSEKMSKeyId": {
+                        "location": "header",
+                        "locationName": "x-amz-server-side-encryption-aws-kms-key-id"
                     }
                 },
                 "payload": "Location"
@@ -140,6 +158,10 @@
                         "location": "header",
                         "locationName": "X-Scal-Version-Id"
                     },
+                    "Tags": {
+                        "location": "header",
+                        "locationName": "X-Scal-Tags"
+                    },
                     "Body": {
                         "streaming": true,
                         "type": "blob"
@@ -152,6 +174,12 @@
                 "members": {
                     "versionId": {
                         "type": "string"
+                    },
+                    "location": {
+                        "type": "list",
+                        "member": {
+                            "shape": "LocationMDObj"
+                        }
                     }
                 }
             }
@@ -195,6 +223,53 @@
                 "type": "structure",
                 "members": {
                     "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "MultipleBackendHeadObject": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/backbeat/multiplebackendmetadata/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "Locations"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "Locations": {
+                        "location": "header",
+                        "locationName": "X-Scal-Locations",
+                        "type": "string",
+                        "member": {
+                            "type": "structure",
+                            "required": [
+                                "key",
+                                "dataStoreName"
+                            ],
+                            "member": {
+                                "shape": "LocationMDObj"
+                            }
+                        }
+                    }
+                }
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "lastModified": {
                         "type": "string"
                     }
                 }
@@ -318,6 +393,10 @@
                         "location": "header",
                         "locationName": "X-Scal-Content-Encoding"
                     },
+                    "Tags": {
+                        "location": "header",
+                        "locationName": "X-Scal-Tags"
+                    },
                     "Body": {
                         "type": "blob"
                     }
@@ -331,6 +410,46 @@
                         "type": "string"
                     }
                 }
+            }
+        },
+        "MultipleBackendAbortMPU": {
+            "http": {
+                "method": "DELETE",
+                "requestUri": "/_/backbeat/multiplebackenddata/{Bucket}/{Key+}?operation=abortmpu"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key",
+                    "StorageClass"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "StorageType": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Type"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "UploadId": {
+                        "location": "header",
+                        "locationName": "X-Scal-Upload-Id"
+                    }
+                }
+            },
+            "output": {
+                "type": "structure",
+                "members": {}
             }
         },
         "MultipleBackendCompleteMPU": {
@@ -390,6 +509,10 @@
                         "location": "header",
                         "locationName": "X-Scal-Upload-Id"
                     },
+                    "Tags": {
+                        "location": "header",
+                        "locationName": "X-Scal-Tags"
+                    },
                     "Body": {
                         "type": "blob"
                     }
@@ -401,6 +524,12 @@
                 "members": {
                     "versionId": {
                         "type": "string"
+                    },
+                    "location": {
+                        "type": "list",
+                        "member": {
+                            "shape": "LocationMDObj"
+                        }
                     }
                 }
             }
@@ -548,6 +677,12 @@
                     "Key": {
                         "location": "uri",
                         "locationName": "Key"
+                    },
+                    "VersionId": {
+                        "type": "string",
+                        "documentation": "VersionId used to reference a specific version of the object.",
+                        "location": "querystring",
+                        "locationName": "versionId"
                     },
                     "ContentLength": {
                         "location": "header",
@@ -845,13 +980,34 @@
         "BatchDelete": {
             "http": {
                 "method": "POST",
-                "requestUri": "/_/backbeat/batchdelete"
+                "requestUri": "/_/backbeat/batchdelete/{Bucket}/{Key+}"
             },
             "input": {
                 "type": "structure",
                 "required": [
                 ],
                 "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "IfUnmodifiedSince": {
+                        "location": "header",
+                        "locationName": "If-Unmodified-Since",
+                        "type": "string"
+                    },
+                    "StorageClass": {
+                        "location": "header",
+                        "locationName": "X-Scal-Storage-Class"
+                    },
+                    "Tags": {
+                        "location": "header",
+                        "locationName": "X-Scal-Tags"
+                    },
                     "ContentType": {
                         "location": "header",
                         "locationName": "X-Scal-Content-Type"
@@ -873,6 +1029,9 @@
                                 },
                                 "size": {
                                     "type": "integer"
+                                },
+                                "dataStoreVersionId": {
+                                    "type": "string"
                                 }
                             }
                         }
@@ -888,7 +1047,7 @@
         "GetRaftBuckets": {
             "http": {
                 "method": "GET",
-                "requestUri": "/_/metadata/listbuckets/{LogId}"
+                "requestUri": "/_/metadata/admin/raft_sessions/{LogId}/bucket"
             },
             "input": {
                 "type": "structure",
@@ -909,10 +1068,67 @@
                 }
             }
         },
+        "GetRaftId": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/admin/buckets/{Bucket}/id"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    }
+                }
+            },
+            "output": {
+                "type": "string"
+            }
+        },
+        "GetRaftLog": {
+            "http": {
+                "method": "GET",
+                "requestUri": "/_/metadata/admin/raft_sessions/{LogId}/log"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "LogId"
+                ],
+                "members": {
+                    "LogId": {
+                        "location": "uri",
+                        "locationName": "LogId"
+                    },
+                    "Begin": {
+                        "type": "integer",
+                        "location": "querystring",
+                        "locationName": "begin"
+                    },
+                    "Limit": {
+                        "type": "integer",
+                        "location": "querystring",
+                        "locationName": "limit"
+                    },
+                    "TargetLeader": {
+                        "type": "boolean",
+                        "location": "querystring",
+                        "locationName": "targetLeader"
+                    }
+                }
+            },
+            "output": {
+                "shape": "RaftLogOutput"
+            }
+        },
         "GetBucketMetadata": {
             "http": {
                 "method": "GET",
-                "requestUri": "/_/metadata/getbucket/{Bucket}"
+                "requestUri": "/_/metadata/default/attributes/{Bucket}"
             },
             "input": {
                 "type": "structure",
@@ -933,7 +1149,7 @@
         "GetObjectList": {
             "http": {
                 "method": "GET",
-                "requestUri": "/_/metadata/listobjects/{Bucket}"
+                "requestUri": "/_/metadata/default/bucket/{Bucket}"
             },
             "input": {
                 "type": "structure",
@@ -951,32 +1167,33 @@
                 "shape": "ObjectMDListResponse"
             }
         },
-        "GetObjectMetadata": {
+        "GetBucketCseq": {
             "http": {
                 "method": "GET",
-                "requestUri": "/_/metadata/getobject/{Bucket}/{Key+}"
+                "requestUri": "/_/metadata/default/informations/{Bucket}"
             },
             "input": {
                 "type": "structure",
                 "required": [
-                    "Bucket",
-                    "Key"
+                    "Bucket"
                 ],
                 "members": {
                     "Bucket": {
                         "location": "uri",
                         "locationName": "Bucket"
-                    },
-                    "Key": {
-                        "location": "uri",
-                        "locationName": "Key"
                     }
                 }
             },
             "output": {
-                "type": "map",
-                "key": {},
-                "value": {}
+                "type": "list",
+                "member": {
+                    "type": "structure",
+                    "members": {
+                        "cseq": {
+                            "type": "integer"
+                        }
+                    }
+                }
             }
         }
     },
@@ -999,6 +1216,18 @@
             "members": {
                 "Contents": {
                     "shape": "ObjectMDList"
+                },
+                "CommonPrefixes": {
+                    "type": "list",
+                    "members": {
+                        "type": "string"
+                    }
+                },
+                "IsTruncated": {
+                    "type": "boolean"
+                },
+                "Delimiter": {
+                    "type": "string"
                 }
             }
         },
@@ -1195,6 +1424,79 @@
                     "type": "list",
                     "member": {
                         "type": "string"
+                    }
+                }
+            }
+        },
+        "LocationMDObj": {
+            "type": "structure",
+            "members": {
+                "key": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "dataStoreName": {
+                    "type": "string"
+                },
+                "dataStoreType": {
+                    "type": "string"
+                },
+                "dataStoreETag": {
+                    "type": "string"
+                },
+                "dataStoreVersionId": {
+                    "type": "string"
+                }
+            }
+        },
+        "RaftLogOutput": {
+            "type": "structure",
+            "members": {
+                "info": {
+                    "type": "structure",
+                    "members": {
+                        "start": {
+                            "type": "integer"
+                        },
+                        "cseq": {
+                            "type": "integer"
+                        },
+                        "prune": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "log": {
+                    "type": "list",
+                    "member": {
+                        "type": "structure",
+                        "members": {
+                            "db": {
+                                "type": "string"
+                            },
+                            "entries": {
+                                "type": "list",
+                                "member": {
+                                    "type": "structure",
+                                    "members": {
+                                        "key": {
+                                            "type": "string"
+                                        },
+                                        "value": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "method": {
+                                "type": "integer"
+                            }
+                        }
                     }
                 }
             }
