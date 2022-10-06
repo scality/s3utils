@@ -26,12 +26,12 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
-    "arsenal": "github:scality/arsenal#development/8.1",
+    "arsenal": "git+https://github.com/scality/arsenal#e531e5e",
     "async": "^2.6.1",
     "aws-sdk": "^2.333.0",
     "node-uuid": "^1.4.8",
-    "werelogs": "scality/werelogs",
-    "zenkoclient": "scality/zenkoclient#5c7f655"
+    "werelogs": "git+https://github.com/scality/werelogs#351a2a3",
+    "zenkoclient": "git+https://github.com/scality/zenkoclient#5c7f655"
   },
   "devDependencies": {
     "eslint": "^2.13.1",
