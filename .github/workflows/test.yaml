@@ -24,7 +24,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v2
         with:
-          node-version: '10'
+          node-version: '16'
           cache: 'yarn'
       - run: sudo apt-get update -q
       - run: yarn --network-concurrency 1
