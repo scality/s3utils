@@ -39,7 +39,8 @@
     "zenkoclient": "scality/zenkoclient#1.2.1"
   },
   "resolutions": {
-    "ioctl": "2.0.2"
+    "ioctl": "2.0.2",
+    "jsprim": "1.4.2"
   },
   "devDependencies": {
     "@sinonjs/fake-timers": "^9.1.2",
