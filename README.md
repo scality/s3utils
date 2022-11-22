@@ -1254,3 +1254,177 @@ docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/co
   --debug               Enable debug level logging (default: False)
   --dry-run             Don't do any computation. Only validate and print the configuration. (default: False)
 ```
+
+
+# UtapiV2 Service level metrics sidecar
+
+REST API to provide service level reports for UtapiV2
+
+## Usage
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_API_KEY=dev_key_change_me \
+  -e SIDECAR_SCALE_FACTOR=1.4 \
+  -e SIDECAR_WARP10_NODE="md1-cluster1:4802@127.0.0.1:4802" \
+  scality/s3utils service-level-sidecar/index.js
+
+curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report | jq
+{
+  "account": [
+    {
+      "arn": "arn:aws:iam::081797933446:/test_1669749866/",
+      "name": "test_1669749866",
+      "obj_count": 25,
+      "bytes_stored": 25,
+      "bytes_stored_total": 35
+    },
+    {
+      "arn": "arn:aws:iam::024022147664:/test_1669748782/",
+      "name": "test_1669748782",
+      "obj_count": 25,
+      "bytes_stored": 25,
+      "bytes_stored_total": 35
+    }
+  ],
+  "bucket": {
+    "arn:aws:iam::081797933446:/test_1669749866/": [
+      {
+        "name": "test3",
+        "obj_count": 25,
+        "bytes_stored": 25,
+        "bytes_stored_total": 35
+      }
+    ],
+    "arn:aws:iam::024022147664:/test_1669748782/": [
+      {
+        "name": "test",
+        "obj_count": 15,
+        "bytes_stored": 15,
+        "bytes_stored_total": 21
+      },
+      {
+        "name": "test2",
+        "obj_count": 10,
+        "bytes_stored": 10,
+        "bytes_stored_total": 14
+      }
+    ]
+  },
+  "service": {
+    "obj_count": 50,
+    "bytes_stored": 50,
+    "bytes_stored_total": 70
+  }
+}
+```
+
+### Authentication
+
+By default a random API key is generated and logged to stdout at startup.
+
+```json
+{"name":"s3utils::utapi-service-sidecar","time":1669677797644,"key":"c489cc0f5bec1c757be7aecd7cdd61dc9db5bfbc4e4f7bad","level":"info","message":"using random API key","hostname":"f2988d47e450","pid":1}
+```
+
+A custom static key can be set using the `SIDECAR_API_KEY` environment variable.
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_API_KEY=dev_key_change_me \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+API requests to `/api/report` require this API token to be present in the `Authorization` header.
+
+```shell
+curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report
+```
+
+### Scale Factor
+
+Scale factor is provided as a floating point number that represents the percentage to scale reported byte values.
+For example, a value of `1.4` will output byte numbers 140% of the calculated value ie 100 bytes will be reported as 140 bytes.
+If this produces a non-integer result it is rounded up to the next whole number.
+
+It can be set using the `SIDECAR_SCALE_FACTOR` environment variable.
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_SCALE_FACTOR=1.4 \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+### TLS
+
+TLS can be enabled for the api server as well as internal connections to vault and bucketd.
+To enable TLS for the API server specify the path to the TLS certificate and key using
+the `SIDECAR_TLS_KEY_PATH` and `SIDECAR_TLS_CERT_PATH` environment variables.
+A CA can optionally be set using `SIDECAR_TLS_CA_PATH`.
+Certificates should be mounted into the container using a docker volume.
+
+```shell
+docker run -d \
+  --network=host \
+  -v $PWD/certs:/certs \
+  -e SIDECAR_TLS_CERT_PATH=/certs/cert.pem \
+  -e SIDECAR_TLS_KEY_PATH=/certs/key.pem \
+  -e SIDECAR_TLS_CA_PATH=/certs/key.pem \ // CA path is optional
+  scality/s3utils service-level-sidecar/index.js
+```
+
+To enable TLS for internal connections to vault or bucketd set `SIDECAR_VAULT_ENABLE_TLS=true` or `SIDECAR_BUCKETD_ENABLE_TLS=true` respectively.
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_VAULT_ENABLE_TLS=true \
+  -e SIDECAR_BUCKETD_ENABLE_TLS=true \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+### Backend addresses
+#### Vault
+
+Vault is configured using `SIDECAR_VAULT_ENDPOINT`
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_VAULT_ENDPOINT=127.0.0.1:8500 \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+#### Bucketd
+
+Bucketd is configured using `SIDECAR_BUCKETD_BOOTSTRAP`
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_BUCKETD_BOOTSTRAP=127.0.0.1:9000 \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+#### Warp10
+
+The Warp 10 address is configured using `SIDECAR_WARP10_NODE`.
+The Warp 10 `nodeId` must be included (normally matches ansible inventory name plus port ie `md1-cluster1:4802`).
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_WARP10_NODE="md1-cluster1:4802@127.0.0.1:4802" \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+### Other Settings
+
+- Log level can be set using `SIDECAR_LOG_LEVEL` (defaults to `info`)
+- The concurrency used to query backend APIs can be set using `SIDECAR_CONCURRENCY_LIMIT` (defaults to 10)
+- The maximum retries allowed when querying backend APIs can be set using `SIDECAR_RETRY_LIMIT` (defaults to 5)
+- The IP address to bind can be set using `SIDECAR_HOST` (default `0.0.0.0`)
+- The port to bind can be set using `SIDECAR_PORT` (default `24742`)
