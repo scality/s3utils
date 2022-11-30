@@ -55,6 +55,7 @@ class CountMaster {
                 });
                 return this.stop(null, () => callback(err));
             }
+            this.log.info('finished count items job and updated metrics in db');
             return this.stop(null, () => callback());
         });
     }
