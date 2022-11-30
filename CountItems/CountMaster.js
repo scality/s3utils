@@ -55,7 +55,10 @@ class CountMaster {
                 });
                 return this.stop(null, () => callback(err));
             }
-            this.log.info('finished count items job and updated metrics in db');
+            this.log.info('finished count items job and updated metrics in db', {
+                countItems: this.manager.store,
+                method: 'CountMaster::start',
+            });
             return this.stop(null, () => callback());
         });
     }
