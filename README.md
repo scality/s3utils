@@ -1254,3 +1254,85 @@ docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/co
   --debug               Enable debug level logging (default: False)
   --dry-run             Don't do any computation. Only validate and print the configuration. (default: False)
 ```
+
+# Verify Replication
+
+The verify replication script checks/compares the replication source with the replication destination. The script produces logs about missing objects on destination and destination objects whose size doesnt match the source size. The script verifies only current version of objects. It relies on standard s3 api's for the source and the destination.
+
+## Usage
+
+```
+node VerifyReplication/index.js
+```
+
+## Mandatory environment variables
+
+* **SRC_ENDPOINT**: replication source s3 endpoint
+
+* **SRC_BUCKET**: replication source bucket
+
+* **SRC_ACCESS_KEY**: replication source s3 account access key
+
+* **SRC_SECRET_KEY**: replication source s3 account secret key 
+
+* **DST_BUCKET**: replication destination bucket
+
+* **DST_ACCESS_KEY**: replication destination s3 account access key
+
+* **DST_SECRET_KEY**: replication destination s3 account secret key 
+
+## Optional environment variables:
+
+* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
+
+* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+
+* **LISTING_WORKERS**: number of concurrent workers to handle listing (default 10)
+
+* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+
+* **BUCKET_MATCH**: set to 1 if bucket match is enabled with replication, when not enabled objects will be replicated with keyname pattern `sourceBucket/key`
+
+* **COMPARE_OBJECT_SIZE**: set to 1 to compare source and destination object sizes
+
+* **DST_ENDPOINT**: replication destination s3 endpoint (only for storage type `aws_s3`)
+
+* **DST_STORAGE_TYPE**: destination storage type, currently supports only `aws_s3`
+
+* **DST_REGION**: destination s3 region (only for storage type `aws_s3`, default `us-east-1`)
+
+* **DST_MD_REQUEST_WORKERS**: number of concurrent workers to handle destination metadata requests (default 50)
+
+* **HTTPS_CA_PATH**: path to a CA certificate bundle used to authentify the source S3 endpoint
+
+* **HTTPS_NO_VERIFY**: set to 1 to disable source S3 endpoint certificate check
+
+## Output
+
+The output of the script consists of JSON log lines.
+
+### Info
+
+One log line is output for each missing object,
+
+```
+{"name":"s3utils:verifyReplication","time":1669902228537,"key":"rna-2/998","size":10,"level":"info","message":"object missing in destination","hostname":"scality.local","pid":74759}
+```
+
+and for each size mismatched object,
+
+```
+{"name":"s3utils:verifyReplication","time":1669902729632,"key":"rna-2/102","sourceSize":1,"destinationSize":0,"level":"info","message":"object size does not match in destination","hostname":"scality.local","pid":74955}
+```
+
+The script also logs a progress update (a summary), every 10 seconds by default,
+
+```
+{"name":"s3utils:verifyReplication","time":1669902566462,"srcListedCount":1235,"dstProcessedCount":1235,"missingInDstCount":1235,"sizeMismatchCount":0,"replicatedCount":0,"dstBucketInProgress":"dst-bucket","srcBucketInProgress":"src-bucket","level":"info","message":"completed replication verification","hostname":"scality.local","pid":74891}
+```
+
+## Example
+
+```
+docker run --net=host -ti scality/s3utils:latest bash -c 'SRC_ENDPOINT=http://source.s3.com:8000 SRC_BUCKET=src-bucket SRC_ACCESS_KEY=src_access_key SRC_SECRET_KEY=src_secret_key DST_ACCESS_KEY=dst_access_key DST_SECRET_KEY=dst_secret_key DST_BUCKET=dst-bucket SRC_BUCKET_PREFIXES=pref1,pref2 BUCKET_MATCH=1 COMPARE_OBJECT_SIZE=1 node VerifyReplication/index.js' > /tmp/verifyReplication.log
+```
