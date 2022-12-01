@@ -4,7 +4,6 @@ const AWS = require('aws-sdk');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-// AWS.config.logger = console;
 
 function getClient(params) {
     const {
@@ -15,9 +14,11 @@ function getClient(params) {
         httpsCaPath,
         httpsNoVerify,
         httpTimeout,
+        showClientLogsIfAvailable,
     } = params;
     const s3EndpointIsHttps = (endpoint && endpoint.startsWith('https:')) || false;
     let agent;
+    let clientLogger;
 
     if (s3EndpointIsHttps) {
         agent = new https.Agent({
@@ -27,6 +28,12 @@ function getClient(params) {
         });
     } else {
         agent = new http.Agent({ keepAlive: true });
+    }
+
+    // enable/disable sdk logs
+    if (showClientLogsIfAvailable) {
+        // TODO: may be use werelogs
+        clientLogger = console;
     }
 
     const options = {
@@ -43,6 +50,7 @@ function getClient(params) {
             timeout: httpTimeout,
             agent,
         },
+        logger: clientLogger,
     };
 
     return new AWS.S3(options);

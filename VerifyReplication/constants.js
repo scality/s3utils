@@ -13,6 +13,7 @@ module.exports = {
         AWS_REGION: 'us-east-1',
         STORAGE_TYPE: 'aws_s3',
         SUPPORTED_STORAGE_TYPES: ['aws_s3'],
+        SHOW_CLIENT_LOGS_IF_AVAILABLE: 0,
     },
     mandatoryVars: [
         'SRC_ENDPOINT',

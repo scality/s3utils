@@ -24,6 +24,7 @@ const {
     DST_ACCESS_KEY,
     DST_SECRET_KEY,
     DST_BUCKET,
+    SHOW_CLIENT_LOGS_IF_AVAILABLE,
     LOG_PROGRESS_INTERVAL,
     SRC_BUCKET_PREFIXES,
     LISTING_LIMIT,
@@ -92,6 +93,7 @@ if (DST_STORAGE_TYPE && !defaults.SUPPORTED_STORAGE_TYPES.includes(DST_STORAGE_T
 
 const logProgressInterval = (LOG_PROGRESS_INTERVAL
     && Number.parseInt(LOG_PROGRESS_INTERVAL, 10)) || defaults.LOG_PROGRESS_INTERVAL;
+const showClientLogsIfAvailable = SHOW_CLIENT_LOGS_IF_AVAILABLE === '1';
 
 // NOTE: aws rate limit
 // ref: https://aws.amazon.com/premiumsupport/knowledge-center/s3-503-within-request-rate-prefix/
@@ -128,6 +130,7 @@ function main() {
             httpTimeout: defaults.AWS_SDK_REQUEST_TIMEOUT,
             listingLimit,
             listingWorkers,
+            showClientLogsIfAvailable,
         },
         destination: {
             storageType: destinationStorageType,
@@ -139,6 +142,7 @@ function main() {
             region: destinationRegion,
             requestWorkers: destinationRequestWorkers,
             httpTimeout: defaults.AWS_SDK_REQUEST_TIMEOUT,
+            showClientLogsIfAvailable,
             // TODO: check if https should be supported on destinations
         },
         verification: {
@@ -150,9 +154,7 @@ function main() {
     };
     verifyReplication(params, err => {
         if (err) {
-            log.error('an error occurred during replication verification', {
-                error: { message: err.message },
-            });
+            log.error('an error occurred during replication verification', err);
             logProgress('last status', status);
             process.exit(1);
         } else {
