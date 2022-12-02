@@ -1307,6 +1307,8 @@ node VerifyReplication/index.js
 
 * **HTTPS_NO_VERIFY**: set to 1 to disable source S3 endpoint certificate check
 
+* **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if available (enable only for debugging as it may produce a lot of log entries), this may be disregarded if the client (depending on storage type) does not support it
+
 ## Output
 
 The output of the script consists of JSON log lines.
