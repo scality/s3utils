@@ -1283,7 +1283,7 @@ node VerifyReplication/index.js
 
 ## Optional environment variables:
 
-* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
+* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes (prefixes are not exact matches, they are applied like **starts with**)
 
 * **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
@@ -1318,19 +1318,19 @@ The output of the script consists of JSON log lines.
 One log line is output for each missing object,
 
 ```
-{"name":"s3utils:verifyReplication","time":1669902228537,"key":"rna-2/998","size":10,"level":"info","message":"object missing in destination","hostname":"scality.local","pid":74759}
+{"name":"s3utils:verifyReplication","time":1670279729106,"key":"rna-4/rna33","size":0,"srcLastModified":"2022-12-01T12:27:11.469Z","level":"info","message":"object missing in destination","hostname":"scality.local","pid":24601}
 ```
 
 and for each size mismatched object,
 
 ```
-{"name":"s3utils:verifyReplication","time":1669902729632,"key":"rna-2/102","sourceSize":1,"destinationSize":0,"level":"info","message":"object size does not match in destination","hostname":"scality.local","pid":74955}
+{"name":"s3utils:verifyReplication","time":1670279723474,"key":"rna-2/34","srcSize":1,"dstSize":0,"srcLastModified":"2022-12-01T11:31:27.528Z","dstLastModified":"2022-12-01T11:33:42.000Z","level":"info","message":"object size does not match in destination","hostname":"scality.local","pid":24601}
 ```
 
 The script also logs a progress update (a summary), every 10 seconds by default,
 
 ```
-{"name":"s3utils:verifyReplication","time":1669902566462,"srcListedCount":1235,"dstProcessedCount":1235,"missingInDstCount":1235,"sizeMismatchCount":0,"replicatedCount":0,"dstBucketInProgress":"dst-bucket","srcBucketInProgress":"src-bucket","level":"info","message":"completed replication verification","hostname":"scality.local","pid":74891}
+{"name":"s3utils:verifyReplication","time":1670280035601,"srcListedCount":492,"dstProcessedCount":492,"missingInDstCount":123,"sizeMismatchCount":123,"replicatedCount":246,"dstBucket":"dst-bucket","srcBucket":"src-bucket","prefixFilters":["pref1","pref2"],"level":"info","message":"completed replication verification","hostname":"scality.local","pid":24780}
 ```
 
 ## Example

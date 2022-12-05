@@ -12,8 +12,9 @@ const status = {
     missingInDstCount: 0,
     sizeMismatchCount: 0,
     replicatedCount: 0,
-    dstBucketInProgress: null,
-    srcBucketInProgress: null,
+    dstBucket: null,
+    srcBucket: null,
+    prefixFilters: null,
 };
 const {
     SRC_ENDPOINT,

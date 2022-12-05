@@ -19,11 +19,11 @@ let statusObj = {};
 function verifyObjects(objectList, cb) {
     statusObj.srcListedCount += objectList.length;
     return async.eachLimit(objectList, mdRequestWorkers, (object, done) => {
-        const { Key: key, Size: size } = object;
+        const { Key: key, Size: size, LastModified: srcLastModified } = object;
         const params = {
             client: destinationClient,
-            bucket: statusObj.dstBucketInProgress,
-            key: bucketMatch ? key : `${statusObj.srcBucketInProgress}/${key}`,
+            bucket: statusObj.dstBucket,
+            key: bucketMatch ? key : `${statusObj.srcBucket}/${key}`,
         };
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
@@ -35,6 +35,7 @@ function verifyObjects(objectList, cb) {
                 logger.info('object missing in destination', {
                     key,
                     size,
+                    srcLastModified,
                 });
                 return done();
             }
@@ -44,8 +45,10 @@ function verifyObjects(objectList, cb) {
                 ++statusObj.sizeMismatchCount;
                 logger.info('object size does not match in destination', {
                     key,
-                    sourceSize: srcSize,
-                    destinationSize: dstSize,
+                    srcSize,
+                    dstSize,
+                    srcLastModified,
+                    dstLastModified: dstMd.lastModified,
                 });
             } else {
                 ++statusObj.replicatedCount;
@@ -60,7 +63,7 @@ function handlePrefixes(prefixList, cb) {
     return async.eachLimit(prefixes, listingWorkers, (prefix, done) => {
         const params = {
             client: sourceClient,
-            bucket: statusObj.srcBucketInProgress,
+            bucket: statusObj.srcBucket,
             prefix,
             listingLimit,
         };
@@ -118,8 +121,8 @@ function verifyReplication(params, cb) {
     listingWorkers = source.listingWorkers;
     mdRequestWorkers = destination.requestWorkers;
     bucketMatch = destination.bucketMatch;
-    statusObj.srcBucketInProgress = source.bucket;
-    statusObj.dstBucketInProgress = destination.bucket;
+    statusObj.srcBucket = source.bucket;
+    statusObj.dstBucket = destination.bucket;
 
     // initial listing params
     const listingParams = {
@@ -130,6 +133,8 @@ function verifyReplication(params, cb) {
 
     // prefix filters
     if (prefixFilters.length > 0) {
+        // include the prefix filters used in the result/summary
+        status.prefixFilters = prefixFilters;
         return async.eachLimit(prefixFilters, listingWorkers, (prefix, done) => {
             const listParam = { ...listingParams, prefix };
             return listAndCompare(listParam, done);
