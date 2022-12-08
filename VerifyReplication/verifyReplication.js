@@ -20,14 +20,20 @@ function verifyObjects(objectList, cb) {
     statusObj.srcListedCount += objectList.length;
     return async.eachLimit(objectList, mdRequestWorkers, (object, done) => {
         const { Key: key, Size: size, LastModified: srcLastModified } = object;
+        const dstKey = bucketMatch ? key : `${statusObj.srcBucket}/${key}`;
         const params = {
             client: destinationClient,
             bucket: statusObj.dstBucket,
-            key: bucketMatch ? key : `${statusObj.srcBucket}/${key}`,
+            key: dstKey,
         };
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
             if (err && err.code !== 'NotFound') {
+                logger.error('error getting metadata', {
+                    error: err,
+                    bucket: statusObj.dstBucket,
+                    key: dstKey,
+                });
                 return done(err);
             }
             if (err && err.code === 'NotFound') {
@@ -59,6 +65,7 @@ function verifyObjects(objectList, cb) {
 }
 
 function handlePrefixes(prefixList, cb) {
+    // check if the prefixes have `/` at the end!!!
     const prefixes = prefixList.map(p => p.Prefix);
     return async.eachLimit(prefixes, listingWorkers, (prefix, done) => {
         const params = {
@@ -75,6 +82,12 @@ function handlePrefixes(prefixList, cb) {
 function listAndCompare(params, cb) {
     return sourceStorage.listObjects(params, (err, data) => {
         if (err) {
+            logger.error('error listing objects', {
+                error: err,
+                bucket: params.bucket,
+                prefix: params.prefix,
+                nextContinuationToken: params.nextContinuationToken,
+            });
             return cb(err);
         }
         const {

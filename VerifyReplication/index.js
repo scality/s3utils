@@ -153,6 +153,21 @@ function main() {
         status,
         log,
     };
+    log.info('starting verification', {
+        srcBucket: SRC_BUCKET,
+        srcEndpoint: SRC_ENDPOINT,
+        srcPrefixes: SRC_BUCKET_PREFIXES,
+        dstBucket: DST_BUCKET,
+        dstEndpoint: DST_ENDPOINT,
+        dstStorageType: destinationStorageType,
+        compareObjectSize,
+        compareObjectAllVersions,
+        bucketMatch,
+        listingLimit,
+        listingWorkers,
+        destinationRequestWorkers,
+        showClientLogsIfAvailable,
+    });
     verifyReplication(params, err => {
         if (err) {
             log.error('an error occurred during replication verification', err);
