@@ -65,7 +65,6 @@ function verifyObjects(objectList, cb) {
 }
 
 function handlePrefixes(prefixList, cb) {
-    // check if the prefixes have `/` at the end!!!
     const prefixes = prefixList.map(p => p.Prefix);
     return async.eachLimit(prefixes, listingWorkers, (prefix, done) => {
         const params = {
@@ -129,7 +128,7 @@ function verifyReplication(params, cb) {
     destinationStorage = storage[destination.storageType];
     sourceClient = sourceStorage.getClient({ ...source, log });
     destinationClient = destinationStorage.getClient({ ...destination, log });
-    prefixFilters = source.prefixes ? source.prefixes.split(',') : [];
+    prefixFilters = source.prefixes;
     listingLimit = source.listingLimit;
     listingWorkers = source.listingWorkers;
     mdRequestWorkers = destination.requestWorkers;
@@ -153,7 +152,7 @@ function verifyReplication(params, cb) {
             return listAndCompare(listParam, done);
         }, cb);
     }
-    return listAndCompare({ ...listingParams, delimiter: '/' }, cb);
+    return listAndCompare({ ...listingParams, delimiter: source.delimiter }, cb);
 }
 
 module.exports = {

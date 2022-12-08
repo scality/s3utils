@@ -1254,7 +1254,9 @@ node VerifyReplication/index.js
 
 ## Optional environment variables:
 
-* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes (prefixes are not exact matches, they are applied like **starts with**)
+* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
+
+* **SRC_DELIMITER**: delimiter used with prefixes in source (default '/')
 
 * **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 

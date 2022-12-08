@@ -15,6 +15,7 @@ module.exports = {
         STORAGE_TYPE: 'aws_s3',
         SUPPORTED_STORAGE_TYPES: ['aws_s3'],
         SHOW_CLIENT_LOGS_IF_AVAILABLE: 0,
+        DELIMITER: '/',
     },
     mandatoryVars: [
         'SRC_ENDPOINT',

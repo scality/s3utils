@@ -28,6 +28,7 @@ const {
     SHOW_CLIENT_LOGS_IF_AVAILABLE,
     LOG_PROGRESS_INTERVAL,
     SRC_BUCKET_PREFIXES,
+    SRC_DELIMITER,
     LISTING_LIMIT,
     LISTING_WORKERS,
     BUCKET_MATCH,
@@ -109,6 +110,10 @@ const destinationRequestWorkers = (DST_MD_REQUEST_WORKERS
     && Number.parseInt(DST_MD_REQUEST_WORKERS, 10)) || defaults.DESTINATION_MD_REQUEST_WORKERS;
 const compareObjectSize = COMPARE_OBJECT_SIZE === '1';
 const compareObjectAllVersions = COMPARE_OBJECT_ALL_VERSIONS === '1';
+const delimiter = SRC_DELIMITER || defaults.DELIMITER;
+const prefixes = SRC_BUCKET_PREFIXES ? SRC_BUCKET_PREFIXES.split(',')
+    .filter(x => x)
+    .map(x => (x.endsWith(delimiter) ? x : `${x}${delimiter}`)) : [];
 
 function logProgress(message, status) {
     log.info(message, status);
@@ -125,13 +130,14 @@ function main() {
             secretKey: SRC_SECRET_KEY,
             bucket: SRC_BUCKET,
             region: defaults.AWS_REGION,
-            prefixes: SRC_BUCKET_PREFIXES,
+            prefixes,
             httpsCaPath: HTTPS_CA_PATH,
             httpsNoVerify: HTTPS_NO_VERIFY,
             httpTimeout: defaults.AWS_SDK_REQUEST_TIMEOUT,
             listingLimit,
             listingWorkers,
             showClientLogsIfAvailable,
+            delimiter,
         },
         destination: {
             storageType: destinationStorageType,
@@ -156,7 +162,7 @@ function main() {
     log.info('starting verification', {
         srcBucket: SRC_BUCKET,
         srcEndpoint: SRC_ENDPOINT,
-        srcPrefixes: SRC_BUCKET_PREFIXES,
+        srcPrefixes: prefixes,
         dstBucket: DST_BUCKET,
         dstEndpoint: DST_ENDPOINT,
         dstStorageType: destinationStorageType,
@@ -167,6 +173,7 @@ function main() {
         listingWorkers,
         destinationRequestWorkers,
         showClientLogsIfAvailable,
+        delimiter,
     });
     verifyReplication(params, err => {
         if (err) {
