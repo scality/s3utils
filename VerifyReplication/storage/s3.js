@@ -5,6 +5,8 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 
+const { defaults } = require('../constants');
+
 function getClient(params) {
     const {
         endpoint,
@@ -15,6 +17,7 @@ function getClient(params) {
         httpsNoVerify,
         httpTimeout,
         showClientLogsIfAvailable,
+        log,
     } = params;
     const s3EndpointIsHttps = (endpoint && endpoint.startsWith('https:')) || false;
     let agent;
@@ -53,7 +56,24 @@ function getClient(params) {
         logger: clientLogger,
     };
 
-    return new AWS.S3(options);
+    /**
+     *  Options specific to s3 requests
+     *  `maxRetries` & `customBackoff` are set only to s3 requests
+     *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
+     */
+     const s3Options = {
+        maxRetries: defaults.AWS_SDK_REQUEST_RETRIES,
+        customBackoff: (retryCount, error) => {
+            log.error('awssdk request error', { error, retryCount });
+            // retry with exponential backoff delay capped at 60s max
+            // between retries, and a little added jitter
+            return Math.min(defaults.AWS_SDK_REQUEST_INITIAL_DELAY_MS
+                * 2 ** retryCount, defaults.AWS_SDK_REQUEST_MAX_BACKOFF_LIMIT_MS)
+                * (0.9 + Math.random() * 0.2);
+        },
+    };
+
+    return new AWS.S3({ ...options, ...s3Options });
 }
 
 function getObjMd(params, cb) {

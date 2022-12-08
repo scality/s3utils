@@ -114,8 +114,8 @@ function verifyReplication(params, cb) {
     compareAllVersions = verification.compareObjectAllVersions;
     sourceStorage = storage[source.storageType];
     destinationStorage = storage[destination.storageType];
-    sourceClient = sourceStorage.getClient(source);
-    destinationClient = destinationStorage.getClient(destination);
+    sourceClient = sourceStorage.getClient({ ...source, log });
+    destinationClient = destinationStorage.getClient({ ...destination, log });
     prefixFilters = source.prefixes ? source.prefixes.split(',') : [];
     listingLimit = source.listingLimit;
     listingWorkers = source.listingWorkers;
