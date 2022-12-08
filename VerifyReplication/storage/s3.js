@@ -61,7 +61,7 @@ function getClient(params) {
      *  `maxRetries` & `customBackoff` are set only to s3 requests
      *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
      */
-     const s3Options = {
+    const s3Options = {
         maxRetries: defaults.AWS_SDK_REQUEST_RETRIES,
         customBackoff: (retryCount, error) => {
             log.error('awssdk request error', { error, retryCount });
