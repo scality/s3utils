@@ -3,6 +3,7 @@
 /* eslint-disable comma-dangle */
 
 const http = require('http');
+const { http: httpArsn } = require('httpagent');
 const async = require('async');
 const { URL } = require('url');
 const jsonStream = require('JSONStream');
@@ -128,7 +129,7 @@ if (!SPROXYD_HOSTPORT && !NO_MISSING_KEY_CHECK) {
 
 const log = new Logger('s3utils:verifyBucketSproxydKeys');
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

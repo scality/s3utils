@@ -3,6 +3,7 @@
 const async = require('async');
 const http = require('http');
 const jsonStream = require('JSONStream');
+const { http: httpArsn } = require('httpagent');
 
 const { Logger } = require('werelogs');
 const { jsutil, errors, versioning } = require('arsenal');
@@ -60,7 +61,7 @@ const countByStatus = {
     UpdatedByClient: 0,
 };
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

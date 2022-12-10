@@ -1,6 +1,7 @@
 const async = require('async');
 const http = require('http');
 const stream = require('stream');
+const { http: httpArsn } = require('httpagent');
 
 const RaftOplogStream = require('./RaftOplogStream');
 
@@ -8,7 +9,7 @@ const DEFAULT_MAX_BUFFERED_ENTRIES = 10000;
 const DEFAULT_RETRY_DELAY_MS = 1000;
 const DEFAULT_MAX_RETRY_DELAY_MS = 10000;
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

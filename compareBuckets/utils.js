@@ -1,10 +1,11 @@
 const http = require('http');
 const async = require('async');
 const { URL } = require('url');
+const { http: httpArsn } = require('httpagent');
 
 const { jsutil } = require('arsenal');
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

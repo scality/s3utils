@@ -1,13 +1,14 @@
 const async = require('async');
 const http = require('http');
 const stream = require('stream');
+const { http: httpArsn } = require('httpagent');
 
 const DEFAULT_REFRESH_PERIOD_MS = 5000;
 const DEFAULT_MAX_RECORDS_PER_REQUEST = 1000;
 const DEFAULT_RETRY_DELAY_MS = 1000;
 const DEFAULT_MAX_RETRY_DELAY_MS = 10000;
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

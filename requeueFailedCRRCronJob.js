@@ -2,6 +2,7 @@ const {
     waterfall, doWhilst, eachLimit, retry,
 } = require('async');
 const http = require('http');
+const { http: httpArsn } = require('httpagent');
 const { Producer } = require('node-rdkafka');
 const { scheduleJob } = require('node-schedule');
 
@@ -65,7 +66,7 @@ const bbOptions = {
     signatureCache: false,
     httpOptions: {
         timeout: 0,
-        agent: new http.Agent({ keepAlive: true }),
+        agent: new httpArsn.Agent({ keepAlive: true }),
     },
 };
 

@@ -1,10 +1,11 @@
 const async = require('async');
 const http = require('http');
+const { http: httpArsn } = require('httpagent');
 const stream = require('stream');
 
 const { versioning } = require('arsenal');
 
-const httpAgent = new http.Agent({
+const httpAgent = new httpArsn.Agent({
     keepAlive: true,
 });
 

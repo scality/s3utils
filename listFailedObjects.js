@@ -1,6 +1,6 @@
 const async = require('async');
 const AWS = require('aws-sdk');
-const http = require('http');
+const { http } = require('httpagent');
 
 const { Logger } = require('werelogs');
 

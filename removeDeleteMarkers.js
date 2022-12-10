@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 /* eslint-disable no-console */
 
-const http = require('http');
+const { http } = require('httpagent');
 const async = require('async');
 const AWS = require('aws-sdk');
 const { Logger } = require('werelogs');

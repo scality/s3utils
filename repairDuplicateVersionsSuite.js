@@ -7,6 +7,8 @@ const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const { http: httpArsn, https: httpsArsn } = require('httpagent');
+
 const { URL } = require('url');
 const readline = require('readline');
 
@@ -33,7 +35,7 @@ const sproxydAgent = new http.Agent({
 });
 
 const bucketdAgent = useHttps
-    ? new https.Agent({
+    ? new httpsArsn.Agent({
         key: fs.readFileSync(OBJECT_REPAIR_TLS_KEY_PATH),
         cert: fs.readFileSync(OBJECT_REPAIR_TLS_CERT_PATH),
         ca: OBJECT_REPAIR_TLS_CA_PATH
@@ -41,7 +43,7 @@ const bucketdAgent = useHttps
             : undefined,
         keepAlive: true,
     })
-    : new http.Agent({
+    : new httpArsn.Agent({
         keepAlive: true,
     });
 
