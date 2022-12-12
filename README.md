@@ -1226,13 +1226,14 @@ script outputs this status on a single line.
   "pid": 717
 }
 ```
+
 # Verify Replication
 
 The verify replication script checks/compares the replication source with the replication destination. The script produces logs about missing objects on destination and destination objects whose size doesnt match the source size. The script verifies only current version of objects. It relies on standard s3 api's for the source and the destination.
 
 ## Usage
 
-```
+```shell
 node VerifyReplication/index.js
 ```
 
@@ -1290,26 +1291,111 @@ The output of the script consists of JSON log lines.
 
 One log line is output for each missing object,
 
-```
-{"name":"s3utils:verifyReplication","time":1670279729106,"key":"rna-4/rna33","size":0,"srcLastModified":"2022-12-01T12:27:11.469Z","level":"info","message":"object missing in destination","hostname":"scality.local","pid":24601}
+```json
+{
+  "name":"s3utils:verifyReplication",
+  "time":1670279729106,
+  "key":"rna-4/rna33",
+  "size":0,"srcLastModified":"2022-12-01T12:27:11.469Z",
+  "level":"info",
+  "message":"object missing in destination",
+  "hostname":"scality.local",
+  "pid":24601
+}
 ```
 
 and for each size mismatched object,
 
+```json
+{
+  "name":"s3utils:verifyReplication",
+  "time":1670279723474,
+  "key":"rna-2/34",
+  "srcSize":1,
+  "dstSize":0,
+  "srcLastModified":"2022-12-01T11:31:27.528Z",
+  "dstLastModified":"2022-12-01T11:33:42.000Z",
+  "level":"info",
+  "message":"object size does not match in destination",
+  "hostname":"scality.local",
+  "pid":24601
+}
 ```
-{"name":"s3utils:verifyReplication","time":1670279723474,"key":"rna-2/34","srcSize":1,"dstSize":0,"srcLastModified":"2022-12-01T11:31:27.528Z","dstLastModified":"2022-12-01T11:33:42.000Z","level":"info","message":"object size does not match in destination","hostname":"scality.local","pid":24601}
+
+and for each failed metadata retrieval (after retries),
+
+```json
+{
+  "name":"s3utils:verifyReplication",
+  "time":1670887351694,
+  "error":{
+    "message":"socket hang up",
+    "code":"TimeoutError",
+    "time":"2022-12-12T23:22:31.694Z",
+    "region":"us-east-1",
+    "hostname":"localhost",
+    "retryable":true
+    },
+  "bucket":"src-bucket",
+  "key":"pref1/key404",
+  "level":"error",
+  "message":"error getting metadata",
+  "hostname":"scality.local",
+  "pid":11398
+}
 ```
 
 The script also logs a progress update (a summary), every 10 seconds by default,
 
+```json
+{
+  "name":"s3utils:verifyReplication",
+  "time":1670280035601,
+  "srcListedCount":492,
+  "dstProcessedCount":492,
+  "missingInDstCount":123,
+  "sizeMismatchCount":123,
+  "replicatedCount":246,
+  "dstFailedMdRetrievalsCount":37,
+  "dstBucket":"dst-bucket",
+  "srcBucket":"src-bucket",
+  "prefixFilters":["pref1","pref2"],
+  "level":"info",
+  "message":"completed replication verification",
+  "hostname":"scality.local",
+  "pid":24780
+}
 ```
-{"name":"s3utils:verifyReplication","time":1670280035601,"srcListedCount":492,"dstProcessedCount":492,"missingInDstCount":123,"sizeMismatchCount":123,"replicatedCount":246,"dstBucket":"dst-bucket","srcBucket":"src-bucket","prefixFilters":["pref1","pref2"],"level":"info","message":"completed replication verification","hostname":"scality.local","pid":24780}
-```
+
+Description of the properties in the summary/progress update log,
+
+- **srcListedCount** - total number of objects listed from source
+- **dstProcessedCount** - total number of objects checked in destination (includes missing, mismatched & failed)
+- **missingInDstCount** - total number of objects missing in destination
+- **sizeMismatchCount** - total number of objects with mismtached size in destination
+- **dstFailedMdRetrievalsCount** - total number of failed object metadata retrievals (after retries) from destination
+- **replicatedCount** - total number of successful replications
+- **srcBucket** - source bucket
+- **dstBucket** - destination bucket
 
 ## Example
 
-```
-docker run --net=host -ti scality/s3utils:latest bash -c 'SRC_ENDPOINT=http://source.s3.com:8000 SRC_BUCKET=src-bucket SRC_ACCESS_KEY=src_access_key SRC_SECRET_KEY=src_secret_key DST_ACCESS_KEY=dst_access_key DST_SECRET_KEY=dst_secret_key DST_BUCKET=dst-bucket SRC_BUCKET_PREFIXES=pref1,pref2 BUCKET_MATCH=1 COMPARE_OBJECT_SIZE=1 node VerifyReplication/index.js' > /tmp/verifyReplication.log
+```shell
+docker run \
+  --net=host \
+  -e 'SRC_ENDPOINT=http://source.s3.com:8000' \
+  -e 'SRC_BUCKET=src-bucket' \
+  -e 'SRC_ACCESS_KEY=src_access_key' \
+  -e 'SRC_SECRET_KEY=src_secret_key' \
+  -e 'DST_ENDPOINT=http://destination.s3.com:8000' \
+  -e 'DST_ACCESS_KEY=dst_access_key' \
+  -e 'DST_SECRET_KEY=dst_secret_key' \
+  -e 'DST_BUCKET=dst-bucket' \
+  -e 'BUCKET_MATCH=1' \
+  -e 'COMPARE_OBJECT_SIZE=1' \
+  -e 'SRC_BUCKET_PREFIXES=pref1,pref2' \
+  registry.scality.com/s3utils/s3utils:latest \
+  node VerifyReplication/index.js
 ```
 
 # UtapiV2 Service Report
