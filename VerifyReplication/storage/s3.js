@@ -63,13 +63,24 @@ function getClient(params) {
      */
     const s3Options = {
         maxRetries: defaults.AWS_SDK_REQUEST_RETRIES,
-        customBackoff: (retryCount, error) => {
-            log.error('awssdk request error', { error, retryCount });
-            // retry with exponential backoff delay capped at 60s max
-            // between retries, and a little added jitter
-            return Math.min(defaults.AWS_SDK_REQUEST_INITIAL_DELAY_MS
-                * 2 ** retryCount, defaults.AWS_SDK_REQUEST_MAX_BACKOFF_LIMIT_MS)
-                * (0.9 + Math.random() * 0.2);
+        retryDelayOptions: {
+            customBackoff: (retryCount, error) => {
+                // retry with exponential backoff delay capped at 60s max
+                // between retries, and a little added jitter
+                const backoff = Math.min(defaults.AWS_SDK_REQUEST_INITIAL_DELAY_MS
+                    * 2 ** retryCount, defaults.AWS_SDK_REQUEST_MAX_BACKOFF_LIMIT_MS)
+                    * (0.9 + Math.random() * 0.2);
+                // show retry errors only if client logs are enabled as this may
+                // increase log size!
+                if (showClientLogsIfAvailable) {
+                    log.error('awssdk request error', {
+                        error,
+                        retryCount,
+                        backoff,
+                    });
+                }
+                return backoff;
+            },
         },
     };
 

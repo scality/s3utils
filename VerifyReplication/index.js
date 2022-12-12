@@ -12,6 +12,7 @@ const status = {
     missingInDstCount: 0,
     sizeMismatchCount: 0,
     replicatedCount: 0,
+    dstFailedMdRetrievalsCount: 0,
     dstBucket: null,
     srcBucket: null,
     prefixFilters: null,

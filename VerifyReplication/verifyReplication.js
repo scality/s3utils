@@ -29,12 +29,14 @@ function verifyObjects(objectList, cb) {
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
             if (err && err.code !== 'NotFound') {
+                ++statusObj.dstFailedMdRetrievalsCount;
                 logger.error('error getting metadata', {
                     error: err,
                     bucket: statusObj.dstBucket,
                     key: dstKey,
                 });
-                return done(err);
+                // log the error and continue processing objects
+                return done();
             }
             if (err && err.code === 'NotFound') {
                 ++statusObj.missingInDstCount;
@@ -106,6 +108,10 @@ function listAndCompare(params, cb) {
                 const listingParams = { ...params, nextContinuationToken };
                 return listAndCompare(listingParams, cb);
             }
+            logger.info('completed listing and compare', {
+                bucket: params.bucket,
+                prefix: params.prefix,
+            });
             return cb();
         });
     });
