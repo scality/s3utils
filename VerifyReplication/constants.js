@@ -7,7 +7,7 @@ module.exports = {
         BUCKET_MATCH: 0,
         COMPARE_OBJECT_SIZE: 0,
         COMPARE_OBJECT_ALL_VERSIONS: 0,
-        AWS_SDK_REQUEST_RETRIES: 100,
+        AWS_SDK_REQUEST_RETRIES: 20,
         AWS_SDK_REQUEST_INITIAL_DELAY_MS: 30,
         AWS_SDK_REQUEST_TIMEOUT: 0, // 0 is infinity, aws default is 2 minutes
         AWS_SDK_REQUEST_MAX_BACKOFF_LIMIT_MS: 60000, // 60 seconds
