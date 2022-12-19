@@ -1,6 +1,6 @@
 {
   "name": "s3utils",
-  "version": "1.13.11",
+  "version": "1.13.12",
   "engines": {
     "node": ">= 16"
   },
@@ -55,6 +55,7 @@
     "eslint-config-scality": "github:scality/Guidelines#8.2.0",
     "eslint-plugin-import": "^2.20.1",
     "eslint-plugin-jest": "^23.6.0",
-    "jest": "^23.6.0"
+    "jest": "^23.6.0",
+    "mongodb-memory-server": "^8.10.2"
   }
 }

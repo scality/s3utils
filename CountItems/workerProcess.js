@@ -1,6 +1,6 @@
 const werelogs = require('werelogs');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
-const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
+const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
 const CountWorker = require('./CountWorker');
 const createMongoParams = require('../utils/createMongoParams');
@@ -16,7 +16,7 @@ const log = new werelogs.Logger('S3Utils::CountItems::Worker');
 const worker = new CountWorker({
     log,
     sendFn: process.send.bind(process),
-    client: new MongoClientInterface(createMongoParams(log)),
+    client: new S3UtilsMongoClient(createMongoParams(log)),
 });
 
 process.on('message', data => worker.handleMessage(data));

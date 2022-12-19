@@ -1,5 +1,7 @@
 const async = require('async');
 const { once } = require('arsenal').jsutil;
+const { validStorageMetricLevels } = require('./utils/constants');
+const { consolidateDataMetrics } = require('./utils/utils');
 
 class CountManager {
     constructor(params) {
@@ -16,6 +18,11 @@ class CountManager {
                 byLocation: {},
             },
             stalled: 0,
+            dataMetrics: {
+                bucket: {},
+                location: {},
+                account: {},
+            },
         };
         this.workerList = [];
         this._setupQueue();
@@ -40,16 +47,18 @@ class CountManager {
     }
 
     _consolidateData(results) {
-        if (!results) return;
+        if (!results) {
+            return;
+        }
         this.store.versions += results.versions;
         this.store.objects += results.objects;
         this.store.stalled += results.stalled;
         if (results.dataManaged
             && results.dataManaged.locations
             && results.dataManaged.total) {
-            const { locations } = results.dataManaged;
-            this.store.dataManaged.total.curr += results.dataManaged.total.curr;
-            this.store.dataManaged.total.prev += results.dataManaged.total.prev;
+            const { locations, total } = results.dataManaged;
+            this.store.dataManaged.total.curr += total.curr;
+            this.store.dataManaged.total.prev += total.prev;
             Object.keys(locations).forEach(site => {
                 if (!this.store.dataManaged.byLocation[site]) {
                     this.store.dataManaged.byLocation[site] = { ...locations[site] };
@@ -60,6 +69,25 @@ class CountManager {
                         += locations[site].prev;
                 }
             });
+        }
+        if (results.dataMetrics
+            && results.dataMetrics.bucket
+            && results.dataMetrics.location
+            && results.dataMetrics.account) {
+            Object.keys(results.dataMetrics).forEach(metricLevel => {
+                // metricLevel can only be 'bucket', 'location' or 'account'
+                if (validStorageMetricLevels.has(metricLevel)) {
+                    Object.keys(results.dataMetrics[metricLevel]).forEach(resourceName => {
+                        // resourceName can be the name of bucket, location or account
+                        this.store.dataMetrics[metricLevel][resourceName] = consolidateDataMetrics(
+                            this.store.dataMetrics[metricLevel][resourceName],
+                            results.dataMetrics[metricLevel][resourceName],
+                        );
+                    });
+                }
+            });
+        } else {
+            this.store.dataMetrics = results.dataMetrics;
         }
     }
 

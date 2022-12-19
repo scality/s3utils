@@ -1,118 +1,166 @@
 const cluster = require('cluster');
 const async = require('async');
 const werelogs = require('werelogs');
-const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 const { BucketInfo, ObjectMD } = require('arsenal').models;
+const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
 
 const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
 const createMongoParams = require('../../utils/createMongoParams');
 const createWorkers = require('../../CountItems/utils/createWorkers');
+const { testBucketMD } = require('../constants');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
 const { MONGODB_REPLICASET } = process.env;
 const dbName = 'countItemsTest';
 
 const expectedResults = {
-    objects: 100,
-    versions: 100,
-    buckets: 10,
+    objects: 90,
+    versions: 60,
+    buckets: 9,
     dataManaged: {
-        total: { curr: 30000, prev: 30000 },
+        total: { curr: 15000, prev: 12000 },
         byLocation: {
-            'us-east-1': { curr: 10000, prev: 10000 },
-            'secondary-location-1': { curr: 10000, prev: 10000 },
-            'secondary-location-2': { curr: 10000, prev: 10000 },
+            'us-east-1': { curr: 9000, prev: 6000 },
+            'secondary-location-1': { curr: 3000, prev: 3000 },
+            'secondary-location-2': { curr: 3000, prev: 3000 },
         },
     },
     stalled: 0,
+    dataMetrics: {
+        account: {
+            [testBucketMD._ownerDisplayName]: {
+                objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 },
+                usedCapacity: { current: 9000, nonCurrent: 6000 },
+            },
+        },
+        bucket: {
+            'test-bucket-0': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+                usedCapacity: { current: 1000, nonCurrent: 0 },
+            },
+            'test-bucket-1': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+                usedCapacity: { current: 1000, nonCurrent: 0 },
+            },
+            'test-bucket-2': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+                usedCapacity: { current: 1000, nonCurrent: 0 },
+            },
+            'test-bucket-3': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+            'test-bucket-4': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+            'test-bucket-5': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+            'test-bucket-6': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+            'test-bucket-7': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+            'test-bucket-8': {
+                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                usedCapacity: { current: 1000, nonCurrent: 1000 },
+            },
+        },
+        location: {
+            'secondary-location-1': {
+                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+            },
+            'secondary-location-2': {
+                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+            },
+            'us-east-1': {
+                objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 }, usedCapacity: { current: 9000, nonCurrent: 6000 },
+            },
+        },
+    },
 };
 
-const expectedBucketList = Array.from(Array(10)).map((_, ind) => ({
+const expectedBucketList = Array.from(Array(9)).map((_, ind) => ({
     name: `test-bucket-${ind}`,
-    location: 'primary-location',
-    isVersioned: true,
-    ownerCanonicalId: 'testowner',
+    location: 'us-east-1',
+    isVersioned: ind >= 3,
+    ownerCanonicalId: testBucketMD._owner,
     ingestion: false,
 }));
 
+const testBuckets = Array.from(Array(9)).map((_, n) => {
+    const bucketName = `test-bucket-${n}`;
+    const bucketMD = {
+        ...testBucketMD,
+        _name: bucketName,
+    };
+    if (n < 3) { // non versioned buckets
+        return BucketInfo.fromObj(bucketMD);
+    }
+    if (n >= 3 && n < 6) { // versioned buckets
+        return BucketInfo.fromObj({ ...bucketMD, _versioningConfiguration: { Status: 'Enabled' } });
+    }
+    return BucketInfo.fromObj({ ...bucketMD, _versioningConfiguration: { Status: 'Suspended' } }); // suspended buckets
+});
+
 function populateMongo(client, callback) {
-    async.series([
-        next => async.timesSeries(10, (n, done) => {
-            const bucketName = `test-bucket-${n}`;
-            const bucketMD = BucketInfo.fromObj({
-                _name: bucketName,
-                _owner: 'testowner',
-                _ownerDisplayName: 'testdisplayname',
-                _creationDate: new Date().toJSON(),
-                _acl: {
-                    Canned: 'private',
-                    FULL_CONTROL: [],
-                    WRITE: [],
-                    WRITE_ACP: [],
-                    READ: [],
-                    READ_ACP: [],
-                },
-                _mdBucketModelVersion: 10,
-                _transient: false,
-                _deleted: false,
-                _serverSideEncryption: null,
-                _versioningConfiguration: { Status: 'Enabled' },
-                _locationConstraint: 'primary-location',
-                _readLocationConstraint: null,
-                _cors: null,
-                _replicationConfiguration: null,
-                _lifecycleConfiguration: null,
-                _uid: '',
-                _isNFS: null,
-                ingestion: null,
-            });
-            async.series([
-                next => client.createBucket(bucketName, bucketMD, logger, next),
-                next => async.timesSeries(10, (m, done) => {
-                    const objName = `test-object-${m}`;
-                    const objMD = new ObjectMD()
-                        .setKey(objName)
-                        .setDataStoreName('us-east-1')
-                        .setContentLength(100)
-                        .setLastModified('2020-01-01T00:00:00.000Z')
-                        .setReplicationInfo({
+    return async.eachSeries(testBuckets, (testBucket, cb) => async.series([
+        next => client.createBucket(testBucket.getName(), testBucket, logger, next),
+        next => async.timesSeries(10, (m, done) => {
+            const objName = `test-object-${m}`;
+            const objMD = new ObjectMD()
+                .setKey(objName)
+                .setDataStoreName('us-east-1')
+                .setContentLength(100)
+                .setLastModified('2020-01-01T00:00:00.000Z')
+                .setOwnerDisplayName(testBucket.getOwnerDisplayName());
+            if (testBucket.getVersioningConfiguration()
+                && testBucket.getVersioningConfiguration().Status === 'Enabled') {
+                objMD.setReplicationInfo({
+                    status: 'COMPLETED',
+                    backends: [
+                        {
                             status: 'COMPLETED',
-                            backends: [
-                                {
-                                    status: 'COMPLETED',
-                                    site: 'secondary-location-1',
-                                },
-                                {
-                                    status: 'COMPLETED',
-                                    site: 'secondary-location-2',
-                                },
-                            ],
-                            content: [],
-                            destination: '',
-                            storageClass: '',
-                            role: '',
-                            storageType: '',
-                            dataStoreVersionId: '',
-                            isNFS: null,
-                        });
-                    async.timesSeries(2, (z, done) => {
-                        client.putObject(
-                            bucketName,
-                            objName,
-                            objMD.getValue(),
-                            {
-                                versionId: null,
-                                versioning: true,
-                            },
-                            logger,
-                            done,
-                        );
-                    }, done);
-                }, next),
-            ], done);
+                            site: 'secondary-location-1',
+                        },
+                        {
+                            status: 'COMPLETED',
+                            site: 'secondary-location-2',
+                        },
+                    ],
+                });
+                return async.timesSeries(2, (z, done2) => client.putObject(
+                    testBucket.getName(),
+                    objName,
+                    objMD.getValue(),
+                    {
+                        versionId: null,
+                        versioning: true,
+                    },
+                    logger,
+                    done2,
+                ), done);
+            }
+            if (testBucket.getVersioningConfiguration()
+                && testBucket.getVersioningConfiguration().Status === 'Suspended') {
+                return async.timesSeries(2, (z, done2) => client.putObject(
+                    testBucket.getName(),
+                    objName,
+                    z === 0 ? objMD.getValue() : { ...objMD.getValue(), isNull: true },
+                    z === 0 ? { versionId: null, versioning: true } : { versionId: null },
+                    logger,
+                    done2,
+                ), done);
+            }
+            return client.putObject(testBucket.getName(), objName, objMD.getValue(), null, logger, done);
         }, next),
-    ], callback);
+    ], cb), callback);
 }
 
 jest.setTimeout(120000);
@@ -133,7 +181,7 @@ describe('CountItems', () => {
             replicationGroupId: 'RG001',
             logger,
         };
-        client = new MongoClientInterface(opts);
+        client = new S3UtilsMongoClient(opts);
         async.series([
             next => client.setup(next),
             next => populateMongo(client, next),
@@ -161,7 +209,7 @@ describe('CountItems', () => {
                     workers: createWorkers(cnt),
                     maxConcurrent: 5,
                 }),
-                client: new MongoClientInterface(createMongoParams(logger)),
+                client: new S3UtilsMongoClient(createMongoParams(logger)),
             });
 
             async.series([

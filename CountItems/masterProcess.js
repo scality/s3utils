@@ -1,6 +1,6 @@
 const werelogs = require('werelogs');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
-const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
+const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
 const CountMaster = require('./CountMaster');
 const CountManager = require('./CountManager');
@@ -31,7 +31,7 @@ const countMaster = new CountMaster({
         workers: createWorkers(numWorkers),
         maxConcurrent: concurrentCursors,
     }),
-    client: new MongoClientInterface(createMongoParams(log)),
+    client: new S3UtilsMongoClient(createMongoParams(log)),
 });
 
 const handleSignal = sig => countMaster.stop(sig, () => process.exit(0));

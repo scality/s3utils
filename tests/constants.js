@@ -11,7 +11,7 @@ module.exports = {
         _name: 'test-bucket',
         _owner: 'test-owner',
         _ownerDisplayName: 'test-name',
-        _creationDate: '',
+        _creationDate: new Date().toJSON(),
         _mdBucketModelVersion: 10,
         _transient: false,
         _deleted: false,
