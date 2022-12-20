@@ -254,9 +254,14 @@ node listFailedObjects testbucket1,testbucket2
 
 # Verify existence of sproxyd keys
 
-This script verifies that all sproxyd keys referenced by objects in S3
-buckets exist on the RING. It can help to identify objects affected by
-the S3C-1959 bug.
+This script verifies that :
+
+1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
+2. sproxyd keys are unique across versions of the same object
+3. object metadata is not an empty JSON object '{}'
+
+It can help to identify objects affected by the S3C-1959 bug (1), or
+one of S3C-2731, S3C-3778 (2), S3C-5987 (3).
 
 The script can also be used to generate block digests from the listing
 results as seen by the leader, for the purpose of finding
@@ -326,7 +331,7 @@ node verifyBucketSproxydKeys.js
 
 * **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
     keys, for a performance benefit - other checks like duplicate keys
-    are still done
+    and missing metadata are still done
 
 * **LISTING_DIGESTS_OUTPUT_DIR**: output listing digests into the
     specified directory (in the LevelDB format)
@@ -360,6 +365,9 @@ Logged fields:
 
 * **haveDupKeys**: number of object versions found with at least one
     sproxyd key shared with another object version
+
+* **haveEmptyMetadata**: number of objects found with an empty metadata
+    blob i.e. `{}`
 
 * **url**: current URL `s3://bucket[/object]` for the current listing
     iteration, can be used to resume a scan from this point passing
@@ -413,6 +421,50 @@ Logged fields:
 
 * **sproxydKey**: sproxyd key that is duplicated between the two
     object versions
+
+```
+object with empty metadata found
+```
+
+This message is reported when an object that has an empty metadata
+blob as its value is found.
+
+Those objects may have been created during an upgrade scenario where
+connectors were upgraded to a S3C version >= 7.4.10.2, but metadata
+stateful nodes were not yet upgraded, resulting in the bug described
+by S3C-5987.
+
+Such objects can normally be safely deleted because they are generated
+only when an "AbortMultipartUpload" operation is executed on the
+object, meaning that the object was the target of an MPU in progress
+that was aborted, and it was the last state of this object (otherwise
+it would have been updated by non-empty metadata).
+
+**Note**: even on versioned buckets, the affected keys are always
+  non-versioned.
+
+Logged fields:
+
+* **objectUrl**: URL of the affected object: `s3://bucket/object`
+
+**How to delete all such objects**:
+
+Assuming `verifyBucketSproxydKeys.log` contains the output of the
+previous run of the verify script, this shell command can be used to
+delete the objects with empty metadata:
+
+```
+JQ_SCRIPT='
+select(.message == "object with empty metadata found") |
+.objectUrl |
+sub("s3://";"http://localhost:9000/default/bucket/")'
+jq -r "${JQ_SCRIPT}" verifyBucketSproxydKeys.log | while read url; do
+    [ "$(curl -s "${url}")" = '{}' ] && {
+        echo "deleting ${url}";
+        curl -XDELETE "${url}" || echo "failed to delete ${url}";
+    } || true
+done
+```
 
 
 # Compare follower's databases against leader view

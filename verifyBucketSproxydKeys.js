@@ -65,9 +65,10 @@ This script verifies that :
 
 1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
 2. sproxyd keys are unique across versions of the same object
+3. object metadata is not an empty JSON object '{}'
 
 It can help to identify objects affected by the S3C-1959 bug (1), or
-either of S3C-2731 or S3C-3778 (2).
+one of S3C-2731, S3C-3778 (2), S3C-5987 (3).
 
 The script can also be used to generate block digests from the listing
 results as seen by the leader, for the purpose of finding
@@ -98,8 +99,8 @@ Optional environment variables:
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     MPU_ONLY: only scan objects uploaded with multipart upload method
     NO_MISSING_KEY_CHECK: do not check for existence of sproxyd keys,
-    for a performance benefit - other checks like duplicate keys are
-    still done
+    for a performance benefit - other checks like duplicate keys and
+    empty metadata are still done
     LISTING_DIGESTS_OUTPUT_DIR: output listing digests into the specified directory (in the LevelDB format)
     LISTING_DIGESTS_BLOCK_SIZE: number of keys in each listing digest block (default ${DEFAULT_LISTING_DIGESTS_BLOCK_SIZE})
 `;
@@ -138,6 +139,7 @@ const status = {
     objectsScanned: 0,
     objectsWithMissingKeys: 0,
     objectsWithDupKeys: 0,
+    objectsWithEmptyMetadata: 0,
     objectsErrors: 0,
     bucketInProgress: null,
     KeyMarker: '',
@@ -191,6 +193,7 @@ function logProgress(message) {
         scanned: status.objectsScanned,
         haveMissingKeys: NO_MISSING_KEY_CHECK ? undefined : status.objectsWithMissingKeys,
         haveDupKeys: status.objectsWithDupKeys,
+        haveEmptyMetadata: status.objectsWithEmptyMetadata,
         errors: status.objectErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
@@ -429,6 +432,16 @@ function listBucketIter(bucket, cb) {
                 }
             }
 
+            if (item.value === '{}') {
+                log.error('object with empty metadata found', {
+                    objectUrl,
+                });
+                status.objectsScanned += 1;
+                status.objectsWithEmptyMetadata += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+
             if (md.isPHD) {
                 // object is a Place Holder Delete (PHD)
                 findDuplicateSproxydKeys.skipVersion();
@@ -606,6 +619,9 @@ function main() {
             }
             if (status.objectsWithDupKeys) {
                 process.exit(102);
+            }
+            if (status.objectsWithEmptyMetadata) {
+                process.exit(104);
             }
             if (status.objectsErrors) {
                 process.exit(103);
