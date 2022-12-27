@@ -1,5 +1,8 @@
 const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
+const { errors } = require('arsenal');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
+
+const METASTORE = '__metastore';
 
 class S3UtilsMongoClient extends MongoClientInterface {
     getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
@@ -237,6 +240,34 @@ class S3UtilsMongoClient extends MongoClientInterface {
             },
             dataMetrics,
         };
+    }
+
+    updateBucketCapacityInfo(bucketName, capacityInfo, log, cb) {
+        const m = this.getCollection(METASTORE);
+        m.findOneAndUpdate({
+            _id: bucketName,
+        }, {
+            $set: {
+                '_id': bucketName,
+                'value.capabilities.VeeamSOSApi.CapacityInfo': {
+                    Capacity: capacityInfo.Capacity,
+                    Available: capacityInfo.Available,
+                    Used: capacityInfo.Used,
+                    LastModified: (new Date()).toISOString(),
+                },
+            },
+        }, {
+            upsert: false,
+        }, err => {
+            if (err) {
+                log.error(
+                    'updateBucketCapacityInfo: error putting bucket CapacityInfo',
+                    { error: err.message, bucketName, capacityInfo },
+                );
+                return cb(errors.InternalError);
+            }
+            return cb();
+        });
     }
 }
 

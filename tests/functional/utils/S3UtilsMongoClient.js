@@ -23,6 +23,35 @@ const variations = [
     { it: '(v1)', vFormat: BucketVersioningKeyFormat.v1 },
 ];
 
+const bucketMD = BucketInfo.fromObj({
+    _name: BUCKET_NAME,
+    _owner: 'testowner',
+    _ownerDisplayName: ACCOUNT_NAME,
+    _creationDate: new Date().toJSON(),
+    _acl: {
+        Canned: 'private',
+        FULL_CONTROL: [],
+        WRITE: [],
+        WRITE_ACP: [],
+        READ: [],
+        READ_ACP: [],
+    },
+    _mdBucketModelVersion: 10,
+    _transient: false,
+    _deleted: false,
+    _serverSideEncryption: null,
+    _versioningConfiguration: null,
+    _locationConstraint: 'us-east-1',
+    _readLocationConstraint: null,
+    _cors: null,
+    _replicationConfiguration: null,
+    _lifecycleConfiguration: null,
+    _uid: '',
+    _isNFS: null,
+    ingestion: null,
+});
+
+
 describe('S3UtilsMongoClient::getObjectMDStats', () => {
     let client;
     let repl;
@@ -44,33 +73,6 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
             .catch(next),
     ], done));
 
-    const bucketMD = BucketInfo.fromObj({
-        _name: BUCKET_NAME,
-        _owner: 'testowner',
-        _ownerDisplayName: ACCOUNT_NAME,
-        _creationDate: new Date().toJSON(),
-        _acl: {
-            Canned: 'private',
-            FULL_CONTROL: [],
-            WRITE: [],
-            WRITE_ACP: [],
-            READ: [],
-            READ_ACP: [],
-        },
-        _mdBucketModelVersion: 10,
-        _transient: false,
-        _deleted: false,
-        _serverSideEncryption: null,
-        _versioningConfiguration: null,
-        _locationConstraint: 'us-east-1',
-        _readLocationConstraint: null,
-        _cors: null,
-        _replicationConfiguration: null,
-        _lifecycleConfiguration: null,
-        _uid: '',
-        _isNFS: null,
-        ingestion: null,
-    });
     const versionedBucketMD = {
         ...bucketMD,
         _versioningConfiguration: {
@@ -675,3 +677,67 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
         });
     });
 });
+
+describe('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
+    let client;
+    let repl;
+
+    beforeAll(async done => {
+        repl = await MongoMemoryReplSet.create(mongoMemoryServerParams);
+        client = new S3UtilsMongoClient({
+            ...createMongoParamsFromMongoMemoryRepl(repl),
+            logger,
+        });
+        return client.setup(done);
+    });
+
+
+    afterAll(done => async.series([
+        next => client.close(next),
+        next => repl.stop()
+            .then(() => next())
+            .catch(next),
+    ], done));
+
+    describe('Should update correctly CapacityInfo attributes of a bucket', () => {
+        variations.forEach(variation => {
+            describe(variation.it, () => {
+                beforeEach(done => {
+                    client.defaultBucketKeyFormat = variation.vFormat;
+                    done();
+                });
+
+                afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
+
+                it(`Should correctly update CapacityInfo attributes ${variation.it}`, done => {
+                    const startTime = new Date();
+                    const capacityInfo = {
+                        Capacity: 30,
+                        Available: 10,
+                        Used: 10,
+                    };
+                    async.series([
+                        next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
+                        next => client.updateBucketCapacityInfo(BUCKET_NAME, capacityInfo, logger, err => {
+                            assert.equal(err, null);
+                            next();
+                        }),
+                        next => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
+                            assert.equal(err, null);
+                            const {
+                                Capacity, Available, Used, LastModified,
+                            } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
+                            assert.strictEqual(Capacity, 30);
+                            assert.strictEqual(Available, 10);
+                            assert.strictEqual(Used, 10);
+                            assert(new Date(LastModified) > startTime);
+                            assert(new Date(LastModified) < new Date());
+                            next();
+                        }),
+                    ], done);
+                });
+            });
+        });
+    });
+});
+
