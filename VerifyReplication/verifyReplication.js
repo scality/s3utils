@@ -15,6 +15,11 @@ let logger = null;
 let sourceStorage = null;
 let sourceClient = null;
 let statusObj = {};
+let skipOlderThan = null;
+
+function skipObjectByLastModified(lastModifiedString) {
+    return skipOlderThan ? (new Date(lastModifiedString) < skipOlderThan) : false;
+}
 
 function verifyObjects(objectList, cb) {
     statusObj.srcListedCount += objectList.length;
@@ -26,6 +31,14 @@ function verifyObjects(objectList, cb) {
             bucket: statusObj.dstBucket,
             key: dstKey,
         };
+
+        // skip if date filter is satisfied
+        const skipObject = skipObjectByLastModified(srcLastModified);
+        if (skipObject) {
+            ++statusObj.skippedByDate;
+            return process.nextTick(done);
+        }
+
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
             if (err && err.code !== 'NotFound') {
@@ -34,6 +47,7 @@ function verifyObjects(objectList, cb) {
                     error: err,
                     bucket: statusObj.dstBucket,
                     key: dstKey,
+                    srcLastModified,
                 });
                 // log the error and continue processing objects
                 return done();
@@ -141,6 +155,8 @@ function verifyReplication(params, cb) {
     bucketMatch = destination.bucketMatch;
     statusObj.srcBucket = source.bucket;
     statusObj.dstBucket = destination.bucket;
+    statusObj.skipOlderThan = verification.skipOlderThan;
+    skipOlderThan = verification.skipOlderThan;
 
     // initial listing params
     const listingParams = {
