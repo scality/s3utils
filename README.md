@@ -1283,6 +1283,12 @@ node VerifyReplication/index.js
 
 * **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if available (enable only for debugging as it may produce a lot of log entries), this may be disregarded if the client (depending on storage type) does not support it
 
+* **SKIP_OLDER_THAN**: skip replication verification of objects whose last modified date is older than this, set this as an ISO date or a number of days e.g.,
+
+  * setting to "2022-11-30T00:00:00Z" skips the verification of objects created or modified before Nov 30th 2022
+  * setting to "30 days" skips the verification of objects created or modified more than 30 days ago
+
+
 ## Output
 
 The output of the script consists of JSON log lines.
@@ -1353,13 +1359,15 @@ The script also logs a progress update (a summary), every 10 seconds by default,
   "time":1670280035601,
   "srcListedCount":492,
   "dstProcessedCount":492,
+  "skippedByDate": 123,
   "missingInDstCount":123,
   "sizeMismatchCount":123,
-  "replicatedCount":246,
-  "dstFailedMdRetrievalsCount":37,
+  "replicatedCount":120,
+  "dstFailedMdRetrievalsCount":3,
   "dstBucket":"dst-bucket",
   "srcBucket":"src-bucket",
   "prefixFilters":["pref1","pref2"],
+  "skipOlderThan": "2022-11-30T00:00:00Z", 
   "level":"info",
   "message":"completed replication verification",
   "hostname":"scality.local",
@@ -1371,6 +1379,7 @@ Description of the properties in the summary/progress update log,
 
 - **srcListedCount** - total number of objects listed from source
 - **dstProcessedCount** - total number of objects checked in destination (includes missing, mismatched & failed)
+- **skippedByDate** - total number of objects skipped verification because of a date filter `SKIP_OLDER_THAN`
 - **missingInDstCount** - total number of objects missing in destination
 - **sizeMismatchCount** - total number of objects with mismtached size in destination
 - **dstFailedMdRetrievalsCount** - total number of failed object metadata retrievals (after retries) from destination
@@ -1394,6 +1403,7 @@ docker run \
   -e 'BUCKET_MATCH=1' \
   -e 'COMPARE_OBJECT_SIZE=1' \
   -e 'SRC_BUCKET_PREFIXES=pref1,pref2' \
+  -e 'SKIP_OLDER_THAN="2022-11-30T00:00:00Z"' \
   registry.scality.com/s3utils/s3utils:latest \
   node VerifyReplication/index.js
 ```

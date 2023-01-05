@@ -4,11 +4,13 @@ const { Logger } = require('werelogs');
 
 const { defaults, mandatoryVars } = require('./constants');
 const { verifyReplication } = require('./verifyReplication');
+const parseOlderThan = require('../utils/parseOlderThan');
 
 const log = new Logger('s3utils:verifyReplication');
 const status = {
     srcListedCount: 0,
     dstProcessedCount: 0,
+    skippedByDate: 0,
     missingInDstCount: 0,
     sizeMismatchCount: 0,
     replicatedCount: 0,
@@ -16,6 +18,7 @@ const status = {
     dstBucket: null,
     srcBucket: null,
     prefixFilters: null,
+    skipOlderThan: null,
 };
 const {
     SRC_ENDPOINT,
@@ -40,6 +43,7 @@ const {
     DST_MD_REQUEST_WORKERS,
     HTTPS_CA_PATH,
     HTTPS_NO_VERIFY,
+    SKIP_OLDER_THAN,
 } = process.env;
 
 const USAGE = `
@@ -77,6 +81,10 @@ Optional environment variables:
     default ${defaults.DESTINATION_MD_REQUEST_WORKERS}
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify the source endpoint
     HTTPS_NO_VERIFY: set to 1 to disable source endpoint certificate check
+    SKIP_OLDER_THAN: skip replication verification of objects whose last modified date is older than this,
+        set this as an ISO date or a number of days e.g.,
+        - setting to "2022-11-30T00:00:00Z" skips the verification of objects created/modified before Nov 30th 2022
+        - setting to "30 days" skips the verification of objects created/modified more than 30 days ago
 `;
 
 /* eslint-disable no-console */
@@ -90,6 +98,14 @@ mandatoryVars.forEach(envVar => {
 
 if (DST_STORAGE_TYPE && !defaults.SUPPORTED_STORAGE_TYPES.includes(DST_STORAGE_TYPE)) {
     console.error(`Unsupported destination storage type ${DST_STORAGE_TYPE}`);
+    console.error(USAGE);
+    process.exit(1);
+}
+
+const skipOlderThan = SKIP_OLDER_THAN ? parseOlderThan(SKIP_OLDER_THAN) : null;
+
+if (skipOlderThan && Number.isNaN(skipOlderThan.getTime())) {
+    console.error('SKIP_OLDER_THAN is not valid');
     console.error(USAGE);
     process.exit(1);
 }
@@ -156,6 +172,7 @@ function main() {
         verification: {
             compareObjectSize,
             compareObjectAllVersions,
+            skipOlderThan,
         },
         status,
         log,
@@ -175,6 +192,7 @@ function main() {
         destinationRequestWorkers,
         showClientLogsIfAvailable,
         delimiter,
+        skipOlderThan: SKIP_OLDER_THAN,
     });
     verifyReplication(params, err => {
         if (err) {
