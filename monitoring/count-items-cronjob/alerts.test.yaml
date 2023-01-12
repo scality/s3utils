@@ -1,0 +1,33 @@
+evaluation_interval: 1m
+rule_files:
+  - alerts.rendered.yaml
+
+tests:
+
+  - name: Count Items CronJob Tests
+    interval: 1m
+    input_series:
+      - series: 'kube_job_status_start_time{job="kube-state-metrics", job_name="artesca-data-ops-count-items-1", namespace="zenko"}'
+        values: '0x121'
+      - series: 'kube_job_status_completion_time{job="kube-state-metrics", job_name="artesca-data-ops-count-items-1", namespace="zenko"}'
+        values: '_x60 3600x61'
+      - series: 'kube_job_status_start_time{job="kube-state-metrics", job_name="artesca-data-ops-count-items-2", namespace="zenko"}'
+        values: '_x60 3600x61'
+      - series: 'kube_job_status_completion_time{job="kube-state-metrics", job_name="artesca-data-ops-count-items-2", namespace="zenko"}'
+        values: '_x121'
+    alert_rule_test:
+      - alertname: CountItemsJobTakingTooLong
+        eval_time: 60m
+        exp_alerts: []
+      - alertname: CountItemsJobTakingTooLong
+        eval_time: 121m
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job_name: artesca-data-ops-count-items-1
+            exp_annotations:
+              description: |
+                Job artesca-data-ops-count-items is taking more than 3600s to complete.
+                This means that consumption information will be delayed
+                and the reported metrics might not be accurate anymore.
+              summary: count-items cronjob takes too long to finish

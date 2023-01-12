@@ -1,0 +1,53 @@
+evaluation_interval: 1m
+rule_files:
+  - alerts.rendered.yaml
+
+tests:
+  - name: Update Bucket Capacity Info CronJob Test Taking Too Long
+    interval: 1m
+    input_series:
+      - series: 'kube_job_status_start_time{job="kube-state-metrics", job_name="artesca-data-ops-update-bucket-capacity-info-1", namespace="zenko"}'
+        values: '0x9'
+      - series: 'kube_job_status_completion_time{job="kube-state-metrics", job_name="artesca-data-ops-update-bucket-capacity-info-1", namespace="zenko"}'
+        values: '_x4 240x5'
+      - series: 'kube_job_status_start_time{job="kube-state-metrics", job_name="artesca-data-ops-update-bucket-capacity-info-2", namespace="zenko"}'
+        values: '_x4 240x5'
+      - series: 'kube_job_status_completion_time{job="kube-state-metrics", job_name="artesca-data-ops-update-bucket-capacity-info-2", namespace="zenko"}'
+        values: '_x9 '
+    alert_rule_test:
+      - alertname: UpdateBucketCapacityJobTakingTooLong
+        eval_time: 4m
+        exp_alerts: []
+      - alertname: UpdateBucketCapacityJobTakingTooLong
+        eval_time: 9m
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job_name: artesca-data-ops-update-bucket-capacity-info-1
+            exp_annotations:
+              description: |
+                Job artesca-data-ops-update-bucket-capacity-info is taking more than 240s to complete.
+                This may cause bucket capacity to be out of date and Veeam SOSAPI avalability as risk.
+              summary: update-bucket-capacity-info cronjob takes too long to finish
+
+  - name: Update Bucket Capacity Info CronJob Test No Success in 10m
+    interval: 1m
+    input_series:
+      - series: 'kube_job_status_completion_time{job="kube-state-metrics", job_name="artesca-data-ops-update-bucket-capacity-info-1", namespace="zenko"}'
+        values: '0x11'
+    alert_rule_test:
+      - alertname: NoSuccessfulUpdateBucketCapacityJobRunIn10m
+        eval_time: 10m
+        exp_alerts: []
+      - alertname: NoSuccessfulUpdateBucketCapacityJobRunIn10m
+        eval_time: 11m
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: artesca-data-ops-update-bucket-capacity-info-1
+            exp_annotations:
+              description: |
+                No successful artesca-data-ops-update-bucket-capacity-info-1
+                job run in the last 600s, will cause bucket capacity to be out of date
+                and Veeam will process all buckets in non-SOSAPI mode.
+              summary: "No successful artesca-data-ops-update-bucket-capacity-info-1 job run, affecting Veeam SOSAPI"

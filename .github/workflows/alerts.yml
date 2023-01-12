@@ -1,0 +1,33 @@
+name: Test alerts
+
+on:
+  push:
+    branches-ignore:
+      - development/**
+      - q/*/**
+
+jobs:
+  run-alert-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Render and test count-items-cronjob
+        uses: scality/action-prom-render-test@1.0.2
+        with:
+          alert_file_path: monitoring/count-items-cronjob/alerts.yaml
+          test_file_path: monitoring/count-items-cronjob/alerts.test.yaml
+          alert_inputs: >-
+            namespace=zenko,count_items_cronjob=artesca-data-ops-count-items,count_items_job_duration_threshold=3600
+          github_token: ${{ secrets.GIT_ACCESS_TOKEN }}
+
+      - name: Render and test update-bucket-capacity-info-cronjob
+        uses: scality/action-prom-render-test@1.0.2
+        with:
+          alert_file_path: monitoring/update-bucket-capacity-info-cronjob/alerts.yaml
+          test_file_path: monitoring/update-bucket-capacity-info-cronjob/alerts.test.yaml
+          alert_inputs: >-
+            namespace=zenko,update_bucket_capacity_info_cronjob=artesca-data-ops-update-bucket-capacity-info,update_bucket_capacity_info_job_duration_threshold=240,update_bucket_capacity_info_success_job_existence_duration_threshold=600
+          github_token: ${{ secrets.GIT_ACCESS_TOKEN }}

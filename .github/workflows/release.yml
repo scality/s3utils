@@ -11,36 +11,25 @@ on:
         default: 'false'
         required: false
 
+env:
+  REGISTRY_NAME: registry.scality.com
+  PROJECT_NAME: ${{ github.event.repository.name }}
+
 jobs:
-  release:
+  build:
+    name: Build and Push
+    uses: ./.github/workflows/build.yml
+    with:
+      namespace: s3utils
+      tag: ${{ github.event.inputs.tag }}
+    secrets: inherit
+
+  github-release:
+    name: Create GitHub Release
     runs-on: ubuntu-latest
+    needs:
+      - build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to Registry
-        uses: docker/login-action@v1
-        with:
-          registry: registry.scality.com
-          username: ${{ secrets.REGISTRY_LOGIN }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: "registry.scality.com/s3utils/s3utils:${{ github.event.inputs.tag }}"
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         env:

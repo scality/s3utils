@@ -1,0 +1,46 @@
+# Variables which should be replaced. Similar to grafana dashboards' __inputs section
+x-inputs:
+  - name: namespace
+    type: constant
+    value: zenko
+  - name: update_bucket_capacity_info_cronjob
+    type: constant
+    value: artesca-data-ops-update-bucket-capacity-info
+  - name: update_bucket_capacity_info_job_duration_threshold
+    type: config
+    value: 240
+  - name: update_bucket_capacity_info_success_job_existence_duration_threshold
+    type: config
+    value: 600
+
+groups:
+  - name: update-bucket-capacity-info-cronjob/alerts.rules
+    rules:
+      - alert: UpdateBucketCapacityJobTakingTooLong
+        expr: |
+          time() -
+          (sum by(job_name) (kube_job_status_failed{job_name=~"${update_bucket_capacity_info_cronjob}.*"})
+          > sum by(job_name) (kube_job_status_completion_time{job_name=~"${update_bucket_capacity_info_cronjob}.*"})
+          or sum by(job_name) (kube_job_status_completion_time{job_name=~"${update_bucket_capacity_info_cronjob}.*"}))
+          > ${update_bucket_capacity_info_job_duration_threshold}
+        labels:
+          severity: warning
+        annotations:
+          description: |
+            Job ${update_bucket_capacity_info_cronjob} is taking more than ${update_bucket_capacity_info_job_duration_threshold}s to complete.
+            This may cause bucket capacity to be out of date and Veeam SOSAPI avalability as risk.
+          summary: update-bucket-capacity-info cronjob takes too long to finish
+
+      - alert: NoSuccessfulUpdateBucketCapacityJobRunIn10m
+        expr: |
+          time() 
+          - max by(job_name) (kube_job_status_completion_time{job_name=~"${update_bucket_capacity_info_cronjob}.*"} ) 
+          > ${update_bucket_capacity_info_success_job_existence_duration_threshold}
+        labels:
+          severity: critical
+        annotations:
+          description: |
+            No successful {{$labels.job_name}}
+            job run in the last ${update_bucket_capacity_info_success_job_existence_duration_threshold}s, will cause bucket capacity to be out of date
+            and Veeam will process all buckets in non-SOSAPI mode.
+          summary: "No successful {{$labels.job_name}} job run, affecting Veeam SOSAPI"

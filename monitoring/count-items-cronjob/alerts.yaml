@@ -1,0 +1,29 @@
+x-inputs:
+  - name: namespace
+    type: constant
+    value: zenko
+  - name: count_items_cronjob
+    type: constant
+    value: artesca-data-ops-count-items
+  - name: count_items_job_duration_threshold
+    type: config
+    value: 3600
+
+groups:
+  - name: count-items-cronjob/alerts.rules
+    rules:
+      - alert: CountItemsJobTakingTooLong
+        Expr: |
+          time() -
+          (sum by(job_name) (kube_job_status_failed{job_name=~"${count_items_cronjob}.*"})
+          > sum by(job_name) (kube_job_status_completion_time{job_name=~"${count_items_cronjob}.*"})
+          or sum by(job_name) (kube_job_status_completion_time{job_name=~"${count_items_cronjob}.*"}))
+          > ${count_items_job_duration_threshold}
+        Labels:
+          severity: warning
+        Annotations:
+          description: |
+            Job ${count_items_cronjob} is taking more than ${count_items_job_duration_threshold}s to complete.
+            This means that consumption information will be delayed
+            and the reported metrics might not be accurate anymore.
+          summary: count-items cronjob takes too long to finish
