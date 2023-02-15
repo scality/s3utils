@@ -8,6 +8,7 @@ class CountManager {
         this.log = params.log;
         this.workers = params.workers;
         this.maxConcurrent = params.maxConcurrent;
+        this.temporaryStore = {};
         this.store = {
             objects: 0,
             versions: 0,
@@ -83,8 +84,24 @@ class CountManager {
                             this.store.dataMetrics[metricLevel][resourceName],
                             results.dataMetrics[metricLevel][resourceName],
                         );
+                        // if metricLevel is account, add the locations details
+                        if (metricLevel === 'account') {
+                            Object.keys((results.dataMetrics[metricLevel][resourceName].locations || {})).forEach(locationName => {
+                                if (!this.temporaryStore[resourceName]) {
+                                    this.temporaryStore[resourceName] = {};
+                                }
+                                this.temporaryStore[resourceName][locationName] = consolidateDataMetrics(
+                                    this.temporaryStore[resourceName][locationName],
+                                    results.dataMetrics[metricLevel][resourceName].locations[locationName],
+                                );
+                            });
+                        }
                     });
                 }
+            });
+            // Add the accounts details for locations from the temporary store
+            Object.keys(this.temporaryStore).forEach(accountName => {
+                this.store.dataMetrics.account[accountName].locations = this.temporaryStore[accountName];
             });
         } else {
             this.store.dataMetrics = results.dataMetrics;

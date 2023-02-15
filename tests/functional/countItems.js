@@ -32,6 +32,17 @@ const expectedResults = {
             [testBucketMD._ownerDisplayName]: {
                 objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 },
                 usedCapacity: { current: 9000, nonCurrent: 6000 },
+                locations: {
+                    'secondary-location-1': {
+                        objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+                    },
+                    'secondary-location-2': {
+                        objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+                    },
+                    'us-east-1': {
+                        objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 }, usedCapacity: { current: 9000, nonCurrent: 6000 },
+                    },
+                },
             },
         },
         bucket: {

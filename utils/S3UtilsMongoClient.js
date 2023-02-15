@@ -87,6 +87,28 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         });
                     }
                 });
+                Object.keys(data.account).forEach(account => {
+                    if (!collRes.account[account].locations) {
+                        collRes.account[account].locations = {};
+                    }
+
+                    Object.keys(data.location).forEach(location => {
+                        if (!collRes.account[account].locations[location]) {
+                            collRes.account[account].locations[location] = {
+                                masterCount: 0,
+                                masterData: 0,
+                                nullCount: 0,
+                                nullData: 0,
+                                versionCount: 0,
+                                versionData: 0,
+                                deleteMarkerCount: 0,
+                            };
+                        }
+                        collRes.account[account].locations[location][targetData] += data.location[location];
+                        collRes.account[account].locations[location][targetCount]++;
+                        collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
+                    });
+                });
             },
             err => {
                 if (err) {
@@ -231,6 +253,38 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 });
             }
         });
+
+        // parse all locations and reflect the data in the account
+        Object.keys((res.account || {})).forEach(account => {
+            if (!dataMetrics.account[account].locations) {
+                dataMetrics.account[account].locations = {};
+            }
+            Object.keys(res.location).forEach(location => {
+                if (!dataMetrics.account[account].locations[location]) {
+                    dataMetrics.account[account].locations[location] = {};
+                }
+                const accountLocation = dataMetrics.account[account].locations[location];
+                if (!accountLocation.usedCapacity) {
+                    accountLocation.usedCapacity = {
+                        current: 0,
+                        nonCurrent: 0,
+                    };
+                }
+                if (!accountLocation.objectCount) {
+                    accountLocation.objectCount = {
+                        current: 0,
+                        nonCurrent: 0,
+                        deleteMarker: 0,
+                    };
+                }
+                accountLocation.usedCapacity.current += dataMetrics.location[location].usedCapacity.current;
+                accountLocation.usedCapacity.nonCurrent += dataMetrics.location[location].usedCapacity.nonCurrent;
+                accountLocation.objectCount.current += dataMetrics.location[location].objectCount.current;
+                accountLocation.objectCount.nonCurrent += dataMetrics.location[location].objectCount.nonCurrent;
+                accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
+            });
+        });
+
         return {
             versions: Math.max(0, totalNonCurrentCount),
             objects: totalCurrentCount,

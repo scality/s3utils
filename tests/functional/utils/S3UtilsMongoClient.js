@@ -156,6 +156,12 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
@@ -232,6 +238,12 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
+                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
@@ -303,6 +315,12 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
                                     usedCapacity: { current: 0, nonCurrent: 20 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
+                                            usedCapacity: { current: 0, nonCurrent: 20 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
@@ -382,6 +400,16 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                        'completed': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
@@ -479,6 +507,16 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                        },
+                                        'completed': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
@@ -603,6 +641,12 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                 [ACCOUNT_NAME]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
+                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {

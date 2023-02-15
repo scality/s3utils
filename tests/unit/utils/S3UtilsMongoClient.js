@@ -139,6 +139,16 @@ describe('S3UtilsMongoClient::_handleResults', () => {
                     account1: {
                         objectCount: { current: 4, deleteMarker: 0, nonCurrent: 0 },
                         usedCapacity: { current: 40, nonCurrent: 0 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 0 },
+                            },
+                            location2: {
+                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 0 },
+                            },
+                        },
                     },
                 },
             },
@@ -179,6 +189,16 @@ describe('S3UtilsMongoClient::_handleResults', () => {
                     account1: {
                         objectCount: { current: 4, deleteMarker: 2, nonCurrent: 0 },
                         usedCapacity: { current: 40, nonCurrent: 20 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 10 },
+                            },
+                            location2: {
+                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 10 },
+                            },
+                        },
                     },
                 },
             },
@@ -690,6 +710,16 @@ describe('S3UtilsMongoClient, tests', () => {
                         testAccount: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
                             usedCapacity: { current: 200, nonCurrent: 200 },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: { current: 0, deleteMarker: 0, nonCurrent: 2 },
+                                    usedCapacity: { current: 0, nonCurrent: 200 },
+                                },
+                                'us-east-1': {
+                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
+                                    usedCapacity: { current: 200, nonCurrent: 200 },
+                                },
+                            },
                         },
                     },
                     bucket: {
@@ -755,6 +785,12 @@ describe('S3UtilsMongoClient, tests', () => {
                         testAccount: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                             usedCapacity: { current: 200, nonCurrent: 0 },
+                            locations: {
+                                'us-east-1': {
+                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                    usedCapacity: { current: 200, nonCurrent: 0 },
+                                },
+                            },
                         },
                     },
                     bucket: {
@@ -836,6 +872,16 @@ describe('S3UtilsMongoClient, tests', () => {
                         testAccount: {
                             objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
                             usedCapacity: { current: 100, nonCurrent: 300 },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
+                                    usedCapacity: { current: 0, nonCurrent: 300 },
+                                },
+                                'us-east-1': {
+                                    objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
+                                    usedCapacity: { current: 100, nonCurrent: 300 },
+                                },
+                            },
                         },
                     },
                     bucket: {

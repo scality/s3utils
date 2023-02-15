@@ -62,6 +62,12 @@ describe('CountItems::CountManager', () => {
                     account1: {
                         objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
                         usedCapacity: { current: 100, nonCurrent: 100 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                                usedCapacity: { current: 100, nonCurrent: 100 },
+                            },
+                        },
                     },
                 },
                 bucket: {
@@ -93,6 +99,12 @@ describe('CountItems::CountManager', () => {
                     account1: {
                         objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
                         usedCapacity: { current: 100, nonCurrent: 100 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                                usedCapacity: { current: 100, nonCurrent: 100 },
+                            },
+                        },
                     },
                 },
                 bucket: {
