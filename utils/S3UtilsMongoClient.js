@@ -1,8 +1,15 @@
 const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
+const { Long } = require('mongodb');
 const { errors } = require('arsenal');
+const async = require('async');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
+const getLocationConfig = require('./locationConfig');
 
 const METASTORE = '__metastore';
+const INFOSTORE = '__infostore';
+const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
+const __COUNT_ITEMS = 'countitems';
+
 
 class S3UtilsMongoClient extends MongoClientInterface {
     getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
@@ -15,9 +22,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 'value.dataStoreName': 1,
                 'value.content-length': 1,
                 'value.versionId': 1,
-                'value.owner-display-name': 1,
+                'value.owner-id': 1,
                 'value.isDeleteMarker': 1,
                 'value.isNull': 1,
+                'value.archive': 1,
             },
         });
         const collRes = {
@@ -29,9 +37,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
         const cmpDate = new Date();
         cmpDate.setHours(cmpDate.getHours() - 1);
 
+        const locationConfig = getLocationConfig(log);
+
         cursor.forEach(
             res => {
-                const { data, error } = this._processEntryData(bucketName, res, isTransient);
+                const { data, error } = this._processEntryData(bucketName, bucketInfo, res, isTransient, locationConfig);
 
                 if (error) {
                     log.error('Failed to process entry data', {
@@ -87,6 +97,28 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         });
                     }
                 });
+                Object.keys(data.account).forEach(account => {
+                    if (!collRes.account[account].locations) {
+                        collRes.account[account].locations = {};
+                    }
+
+                    Object.keys(data.location).forEach(location => {
+                        if (!collRes.account[account].locations[location]) {
+                            collRes.account[account].locations[location] = {
+                                masterCount: 0,
+                                masterData: 0,
+                                nullCount: 0,
+                                nullData: 0,
+                                versionCount: 0,
+                                versionData: 0,
+                                deleteMarkerCount: 0,
+                            };
+                        }
+                        collRes.account[account].locations[location][targetData] += data.location[location];
+                        collRes.account[account].locations[location][targetCount]++;
+                        collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
+                    });
+                });
             },
             err => {
                 if (err) {
@@ -108,13 +140,15 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
     /**
      * @param{string} bucketName -
+     * @param{object} bucketInfo - bucket attributes
      * @param{object} entry -
      * @param{string} entry._id -
      * @param{object} entry.value -
      * @param{boolean} isTransient -
+     * @param{object} locationConfig - locationConfig.json
      * @returns{object.<string, number>} results -
      */
-    _processEntryData(bucketName, entry, isTransient) {
+    _processEntryData(bucketName, bucketInfo, entry, isTransient, locationConfig) {
         if (!bucketName) {
             return {
                 data: {},
@@ -130,13 +164,20 @@ class S3UtilsMongoClient extends MongoClientInterface {
             };
         }
 
+        if (!locationConfig) {
+            return {
+                data: {},
+                error: new Error('empty locationConfig'),
+            };
+        }
+
         const results = {
-            // there will be only one bucket for an object entry
-            bucket: { [bucketName]: size },
-            // there can be multiple locations for an object entry
+            // there will be only one bucket for an object entry, and use `bucketName_creationDate` as key
+            bucket: { [`${bucketName}_${new Date(bucketInfo.getCreationDate()).getTime()}`]: size },
+            // there can be multiple locations for an object entry, and use `locationId` as key
             location: {},
-            // there will be only one account for an object entry
-            account: { [entry.value['owner-display-name']]: size },
+            // there will be only one account for an object entry, and use `accountCanonicalId` as key
+            account: { [entry.value['owner-id']]: size },
         };
 
         if (!isTransient
@@ -150,6 +191,37 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 results.location[rep.site] = size;
             }
         });
+
+        // count in both dataStoreName and cold location if object is restored
+        if (entry.value.archive
+            && entry.value.archive.restoreCompletedAt <= Date.now()
+            && entry.value.archive.restoreWillExpireAt > Date.now()) {
+            entry.value.location.forEach(location => {
+                if (locationConfig[location.dataStoreName]
+                    && locationConfig[location.dataStoreName].isCold) {
+                    if (results.location[location.dataStoreName]) {
+                        results.location[location.dataStoreName] += size;
+                    } else {
+                        results.location[location.dataStoreName] = size;
+                    }
+                }
+            });
+        }
+
+        // use location.objectId as key instead of location name
+        // return error if location is not in locationConfig
+        for (const location of Object.keys(results.location)) {
+            if (locationConfig[location]) {
+                if (locationConfig[location].objectId !== location) {
+                    results.location[locationConfig[location].objectId] = results.location[location];
+                    delete results.location[location];
+                }
+            } else {
+                // ignore location if it is not in locationConfig
+                delete results.location[location];
+            }
+        }
+
         return {
             data: results,
             error: null,
@@ -231,6 +303,38 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 });
             }
         });
+
+        // parse all locations and reflect the data in the account
+        Object.keys((res.account || {})).forEach(account => {
+            if (!dataMetrics.account[account].locations) {
+                dataMetrics.account[account].locations = {};
+            }
+            Object.keys(res.location || {}).forEach(location => {
+                if (!dataMetrics.account[account].locations[location]) {
+                    dataMetrics.account[account].locations[location] = {};
+                }
+                const accountLocation = dataMetrics.account[account].locations[location];
+                if (!accountLocation.usedCapacity) {
+                    accountLocation.usedCapacity = {
+                        current: 0,
+                        nonCurrent: 0,
+                    };
+                }
+                if (!accountLocation.objectCount) {
+                    accountLocation.objectCount = {
+                        current: 0,
+                        nonCurrent: 0,
+                        deleteMarker: 0,
+                    };
+                }
+                accountLocation.usedCapacity.current += dataMetrics.location[location].usedCapacity.current;
+                accountLocation.usedCapacity.nonCurrent += dataMetrics.location[location].usedCapacity.nonCurrent;
+                accountLocation.objectCount.current += dataMetrics.location[location].objectCount.current;
+                accountLocation.objectCount.nonCurrent += dataMetrics.location[location].objectCount.nonCurrent;
+                accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
+            });
+        });
+
         return {
             versions: Math.max(0, totalNonCurrentCount),
             objects: totalCurrentCount,
@@ -267,6 +371,152 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 return cb(errors.InternalError);
             }
             return cb();
+        });
+    }
+
+    static convertNumberToLong(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+            return obj;
+        }
+        const newObj = {};
+        for (const key in obj) {
+            if (typeof obj[key] === 'number') {
+                // convert number to Long
+                newObj[key] = Long.fromNumber(obj[key]);
+            } else {
+                // recursively convert nested object properties to Long
+                newObj[key] = S3UtilsMongoClient.convertNumberToLong(obj[key]);
+            }
+        }
+        return newObj;
+    }
+
+    updateStorageConsumptionMetrics(countItems, dataMetrics, log, cb) {
+        const updatedStorageMetricsList = [
+            { _id: __COUNT_ITEMS, value: countItems },
+            // iterate every resource through dataMetrics and add to updatedStorageMetricsList
+            ...Object.entries(dataMetrics)
+                .filter(([metricLevel]) => validStorageMetricLevels.has(metricLevel))
+                .flatMap(([metricLevel, result]) => Object.entries(result)
+                    .map(([resource, metrics]) => ({
+                        _id: `${metricLevel}_${resource}`,
+                        measuredOn: new Date().toJSON(),
+                        ...S3UtilsMongoClient.convertNumberToLong(metrics),
+                    }))),
+        ];
+        let tempCollection;
+        async.series([
+            next => this.getCollection(INFOSTORE_TMP).drop(err => {
+                if (err && err.codeName !== 'NamespaceNotFound') {
+                    return next(err);
+                }
+                return next();
+            }),
+            next => this.db.createCollection(INFOSTORE_TMP, (err, collection) => {
+                if (err) {
+                    return next(err);
+                }
+                tempCollection = collection;
+                return next();
+            }),
+            next => tempCollection.insertMany(updatedStorageMetricsList, { ordered: false }, next),
+            next => async.retry(
+                3,
+                done => tempCollection.rename(INFOSTORE, { dropTarget: true }, done),
+                err => {
+                    if (err) {
+                        log.error('updateStorageConsumptionMetrics: error renaming temp collection, try again', {
+                            error: err.message,
+                        });
+                        return next(err);
+                    }
+                    return next();
+                },
+            ),
+        ], err => {
+            if (err) {
+                log.error('updateStorageConsumptionMetrics: error updating count items', {
+                    error: err.message,
+                });
+                return cb(errors.InternalError);
+            }
+            return cb();
+        });
+    }
+
+    readStorageConsumptionMetrics(entityName, log, cb) {
+        const i = this.getCollection(INFOSTORE);
+        return async.retry(
+            3,
+            done => i.findOne({
+                _id: entityName,
+            }, done),
+            (err, doc) => {
+                if (err) {
+                    log.error('readStorageConsumptionMetrics: error reading count items', {
+                        error: err.message,
+                    });
+                    return cb(errors.InternalError);
+                }
+                if (!doc) {
+                    return cb(errors.NoSuchEntity);
+                }
+                return cb(null, doc);
+            },
+        );
+    }
+
+    /*
+     * Overwrite the getBucketInfos method to specially handle the cases that
+     * bucket collection exists but bucket is not in metastore collection.
+     * For now, to make the count-items cronjob more robust, we ignore those "bad buckets"
+     */
+    getBucketInfos(log, cb) {
+        const bucketInfos = [];
+        this.db.listCollections().toArray((err, collInfos) => {
+            if (err) {
+                log.error('could not get list of collections', {
+                    method: '_getBucketInfos',
+                    error: err,
+                });
+                return cb(err);
+            }
+            return async.eachLimit(collInfos, 10, (value, next) => {
+                if (this._isSpecialCollection(value.name)) {
+                    // skip
+                    return next();
+                }
+                const bucketName = value.name;
+                // FIXME: there is currently no way of distinguishing
+                // master from versions and searching for VID_SEP
+                // does not work because there cannot be null bytes
+                // in $regex
+                return this.getBucketAttributes(bucketName, log, (err, bucketInfo) => {
+                    if (err) {
+                        if (err.message === 'NoSuchBucket') {
+                            log.debug('bucket does not exist in metastore, ignore it', {
+                                bucketName,
+                            });
+                            return next();
+                        }
+                        log.error('failed to get bucket attributes', {
+                            bucketName,
+                            error: err,
+                        });
+                        return next(errors.InternalError);
+                    }
+                    bucketInfos.push(bucketInfo);
+                    return next();
+                });
+            }, err => {
+                if (err) {
+                    return cb(err);
+                }
+                return cb(null, {
+                    bucketCount: bucketInfos.length,
+                    bucketInfos,
+                });
+            });
         });
     }
 }

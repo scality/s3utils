@@ -10,6 +10,8 @@ const {
     mongoMemoryServerParams,
     createMongoParamsFromMongoMemoryRepl,
 } = require('../../utils/mongoUtils');
+const getLocationConfig = require('../../../utils/locationConfig');
+const { testBucketMD, testAccountCanonicalId, testBucketCreationDate } = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 
@@ -139,6 +141,16 @@ describe('S3UtilsMongoClient::_handleResults', () => {
                     account1: {
                         objectCount: { current: 4, deleteMarker: 0, nonCurrent: 0 },
                         usedCapacity: { current: 40, nonCurrent: 0 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 0 },
+                            },
+                            location2: {
+                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 0 },
+                            },
+                        },
                     },
                 },
             },
@@ -179,6 +191,16 @@ describe('S3UtilsMongoClient::_handleResults', () => {
                     account1: {
                         objectCount: { current: 4, deleteMarker: 2, nonCurrent: 0 },
                         usedCapacity: { current: 40, nonCurrent: 20 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 10 },
+                            },
+                            location2: {
+                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
+                                usedCapacity: { current: 20, nonCurrent: 10 },
+                            },
+                        },
                     },
                 },
             },
@@ -239,8 +261,13 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
         'dataStoreName': 'us-east-1',
         'content-length': 42,
         'versionId': '0123456789abcdefg',
-        'owner-display-name': 'account1',
+        'owner-id': testAccountCanonicalId,
     };
+    const bucketInfo = BucketInfo.fromObj({
+        ...testBucketMD,
+        _name: testBucketName,
+    });
+    const locationConfig = getLocationConfig(logger);
     const tests = [
         [
             'should add content-length to current dataStore but not replication destination '
@@ -261,10 +288,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     },
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
                 error: null,
@@ -289,10 +317,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     },
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_1678284806000`]: 42 },
                     location: { completed: 42 },
                 },
                 error: null,
@@ -317,10 +346,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     },
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
                 error: null,
@@ -345,10 +375,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     },
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42, 'completed': 42 },
                 },
                 error: null,
@@ -383,10 +414,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     },
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: {
                         'completed-1': 42,
                         'completed-2': 42,
@@ -426,10 +458,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     transient: true,
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: {
                         'us-east-1': 42,
                         'completed-1': 42,
@@ -440,16 +473,129 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should return error if content-length is invalid',
+            'should only add content-length to cold location when object is archived',
             testBucketName,
             true,
             {
                 _id: 'testkey6',
                 value: {
                     ...objectMdTemp,
+                    dataStoreName: 'cold-location',
+                    replicationInfo: {
+                        backends: [],
+                    },
+                    location: [{
+                        key: 1,
+                        size: 10,
+                        start: 0,
+                        dataStoreName: 'cold-location',
+                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
+                    }],
+                    archive: { archiveInfo: {} },
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {
+                        'cold-location': 42,
+                    },
+                },
+                error: null,
+            },
+        ],
+        [
+            'should only add content-length to cold location when object is currently being restored',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey6',
+                value: {
+                    ...objectMdTemp,
+                    dataStoreName: 'cold-location',
+                    replicationInfo: {
+                        backends: [],
+                    },
+                    location: [{
+                        key: 1,
+                        size: 10,
+                        start: 0,
+                        dataStoreName: 'cold-location',
+                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
+                    }],
+                    archive: {
+                        archiveInfo: {},
+                        restoreRequestedAt: new Date(Date.now() - 1000),
+                        restoreCompletedAt: null,
+                        restoreWillExpireAt: null,
+                    },
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {
+                        'cold-location': 42,
+                    },
+                },
+                error: null,
+            },
+        ],
+        [
+            'should add content-length to cold storage location and current dataStore '
+            + 'when object is restored',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey6',
+                value: {
+                    ...objectMdTemp,
+                    replicationInfo: {
+                        backends: [],
+                    },
+                    location: [{
+                        key: 1,
+                        size: 10,
+                        start: 0,
+                        dataStoreName: 'cold-location',
+                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
+                    }],
+                    archive: {
+                        archiveInfo: {},
+                        restoreCompletedAt: new Date(Date.now() - 1000),
+                        restoreWillExpireAt: new Date(Date.now() + 1000),
+                    },
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {
+                        'us-east-1': 42,
+                        'cold-location': 42,
+                    },
+                },
+                error: null,
+            },
+        ],
+        [
+            'should return error if content-length is invalid',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey7',
+                value: {
+                    ...objectMdTemp,
                     'content-length': 'not-a-number',
                 },
             },
+            locationConfig,
             {
                 data: {},
                 error: new Error('invalid content length'),
@@ -460,16 +606,17 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             testBucketName,
             true,
             {
-                _id: 'testkey7',
+                _id: 'testkey8',
                 value: {
                     ...objectMdTemp,
                     'content-length': '42',
                 },
             },
+            locationConfig,
             {
                 data: {
-                    account: { account1: 42 },
-                    bucket: { [testBucketName]: 42 },
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
                 error: null,
@@ -480,18 +627,54 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             undefined,
             true,
             {
-                _id: 'testkey8',
+                _id: 'testkey9',
                 value: objectMdTemp,
             },
+            locationConfig,
             {
                 data: {},
                 error: new Error('no bucket name provided'),
             },
         ],
+        [
+            'should return error if locationConfig is empty',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey10',
+                value: objectMdTemp,
+            },
+            null,
+            {
+                data: {},
+                error: new Error('empty locationConfig'),
+            },
+        ],
+        [
+            'should ignore the location if bucket\'s location is not in locationConfig',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey11',
+                value: {
+                    ...objectMdTemp,
+                    dataStoreName: 'not-in-location-config',
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {},
+                },
+                error: null,
+            },
+        ],
     ];
-    tests.forEach(([msg, bucketName, isTransient, params, expected]) => it(msg, () => {
+    tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {
         assert.deepStrictEqual(
-            mongoTestClient._processEntryData(bucketName, params, isTransient),
+            mongoTestClient._processEntryData(bucketName, bucketInfo, params, isTransient, locationConfig),
             expected,
         );
     }));
@@ -499,33 +682,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
 
 function createBucket(client, bucketName, isVersioned, callback) {
     const bucketMD = BucketInfo.fromObj({
+        ...testBucketMD,
         _name: bucketName,
-        _owner: 'testowner',
-        _ownerDisplayName: 'testdisplayname',
-        _creationDate: new Date().toJSON(),
-        _acl: {
-            Canned: 'private',
-            FULL_CONTROL: [],
-            WRITE: [],
-            WRITE_ACP: [],
-            READ: [],
-            READ_ACP: [],
-        },
-        _mdBucketModelVersion: 10,
-        _transient: false,
-        _deleted: false,
-        _serverSideEncryption: null,
         _versioningConfiguration: isVersioned
             ? { Status: 'Enabled' }
             : null,
-        _locationConstraint: 'us-east-1',
-        _readLocationConstraint: null,
-        _cors: null,
-        _replicationConfiguration: null,
-        _lifecycleConfiguration: null,
-        _uid: '',
-        _isNFS: null,
-        ingestion: null,
     });
     client.createBucket(bucketName, bucketMD, logger, callback);
 }
@@ -537,7 +698,7 @@ function uploadObjects(client, bucketName, objectList, callback) {
             .setDataStoreName('us-east-1')
             .setContentLength(100)
             .setLastModified(obj.lastModified)
-            .setOwnerDisplayName(obj.ownerDisplayName)
+            .setOwnerId(obj.ownerId)
             .setIsNull(obj.isNull)
             .setIsDeleteMarker(obj.isDeleteMarker);
         if (obj.repInfo) {
@@ -575,14 +736,14 @@ describe('S3UtilsMongoClient, tests', () => {
         versioning: false,
         versionId: null,
         lastModified: new Date(Date.now()),
-        ownerDisplayName: 'testAccount',
+        ownerId: testAccountCanonicalId,
     };
     const objectMdTemp = {
         name: 'testkey',
         versioning: true,
         versionId: null,
         lastModified: new Date(Date.now()),
-        ownerDisplayName: 'testAccount',
+        ownerId: testAccountCanonicalId,
         repInfo: {
             status: 'COMPLETED',
             backends: [
@@ -660,7 +821,7 @@ describe('S3UtilsMongoClient, tests', () => {
                     {
                         name: 'nullkey',
                         isNull: true,
-                        ownerDisplayName: 'testAccount',
+                        ownerId: testAccountCanonicalId,
                         lastModified: new Date(Date.now() - hr),
                     },
                 ],
@@ -687,13 +848,23 @@ describe('S3UtilsMongoClient, tests', () => {
                 versions: 2,
                 dataMetrics: {
                     account: {
-                        testAccount: {
+                        [testAccountCanonicalId]: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
                             usedCapacity: { current: 200, nonCurrent: 200 },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: { current: 0, deleteMarker: 0, nonCurrent: 2 },
+                                    usedCapacity: { current: 0, nonCurrent: 200 },
+                                },
+                                'us-east-1': {
+                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
+                                    usedCapacity: { current: 200, nonCurrent: 200 },
+                                },
+                            },
                         },
                     },
                     bucket: {
-                        'test-bucket': {
+                        [`test-bucket_${testBucketCreationDate}`]: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
                             usedCapacity: { current: 200, nonCurrent: 200 },
                         },
@@ -752,13 +923,19 @@ describe('S3UtilsMongoClient, tests', () => {
                 versions: 0,
                 dataMetrics: {
                     account: {
-                        testAccount: {
+                        [testAccountCanonicalId]: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                             usedCapacity: { current: 200, nonCurrent: 0 },
+                            locations: {
+                                'us-east-1': {
+                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                    usedCapacity: { current: 200, nonCurrent: 0 },
+                                },
+                            },
                         },
                     },
                     bucket: {
-                        'test-bucket': {
+                        [`test-bucket_${testBucketCreationDate}`]: {
                             objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                             usedCapacity: { current: 200, nonCurrent: 0 },
                         },
@@ -833,13 +1010,23 @@ describe('S3UtilsMongoClient, tests', () => {
                 versions: 2,
                 dataMetrics: {
                     account: {
-                        testAccount: {
+                        [testAccountCanonicalId]: {
                             objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
                             usedCapacity: { current: 100, nonCurrent: 300 },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
+                                    usedCapacity: { current: 0, nonCurrent: 300 },
+                                },
+                                'us-east-1': {
+                                    objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
+                                    usedCapacity: { current: 100, nonCurrent: 300 },
+                                },
+                            },
                         },
                     },
                     bucket: {
-                        'test-bucket': {
+                        [`test-bucket_${testBucketCreationDate}`]: {
                             objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
                             usedCapacity: { current: 100, nonCurrent: 300 },
                         },

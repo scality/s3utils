@@ -1,16 +1,8 @@
 const fs = require('fs');
+const getLocationConfig = require('./locationConfig');
 
 function getIsLocationTransientCb(log, locationConfigFile) {
-    if (!fs.existsSync(locationConfigFile)) {
-        log.info(
-            'location conf file missing, falling back to PENSIEVE coll',
-            { filename: locationConfigFile },
-        );
-        return null;
-    }
-
-    const buf = fs.readFileSync(locationConfigFile);
-    const locationConfig = JSON.parse(buf.toString());
+    const locationConfig = getLocationConfig(log, locationConfigFile);
 
     return function locationIsTransient(locationName, log, cb) {
         if (!locationConfig[locationName]) {

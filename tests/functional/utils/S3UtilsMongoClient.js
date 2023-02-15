@@ -9,13 +9,11 @@ const { versioning } = require('arsenal');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
+const { testBucketMD, testAccountCanonicalId } = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 
 const { BucketVersioningKeyFormat } = versioning.VersioningConstants;
-
-const BUCKET_NAME = 'test-bucket';
-const ACCOUNT_NAME = 'test-account';
 
 
 const variations = [
@@ -23,33 +21,9 @@ const variations = [
     { it: '(v1)', vFormat: BucketVersioningKeyFormat.v1 },
 ];
 
-const bucketMD = BucketInfo.fromObj({
-    _name: BUCKET_NAME,
-    _owner: 'testowner',
-    _ownerDisplayName: ACCOUNT_NAME,
-    _creationDate: new Date().toJSON(),
-    _acl: {
-        Canned: 'private',
-        FULL_CONTROL: [],
-        WRITE: [],
-        WRITE_ACP: [],
-        READ: [],
-        READ_ACP: [],
-    },
-    _mdBucketModelVersion: 10,
-    _transient: false,
-    _deleted: false,
-    _serverSideEncryption: null,
-    _versioningConfiguration: null,
-    _locationConstraint: 'us-east-1',
-    _readLocationConstraint: null,
-    _cors: null,
-    _replicationConfiguration: null,
-    _lifecycleConfiguration: null,
-    _uid: '',
-    _isNFS: null,
-    ingestion: null,
-});
+const bucketMD = BucketInfo.fromObj(testBucketMD);
+const BUCKET_NAME = bucketMD.getName();
+const BUCKET_CREATE_DATE = new Date(bucketMD.getCreationDate()).getTime();
 
 
 describe('S3UtilsMongoClient::getObjectMDStats', () => {
@@ -95,7 +69,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
             'key': 'non-versioned-test-object1',
             'content-length': 10,
             'dataStoreName': 'us-east-1',
-            'owner-display-name': ACCOUNT_NAME,
+            'owner-id': testAccountCanonicalId,
             'replicationInfo': {
                 backends: [],
             },
@@ -153,13 +127,19 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 0,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
                                 },
@@ -194,7 +174,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
             'key': 'versioned-test-object1',
             'content-length': 10,
             'dataStoreName': 'us-east-1',
-            'owner-display-name': ACCOUNT_NAME,
+            'owner-id': testAccountCanonicalId,
             'replicationInfo': {
                 backends: [],
             },
@@ -229,13 +209,19 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 1,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
+                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
                                 },
@@ -300,13 +286,19 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 2,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
                                     usedCapacity: { current: 0, nonCurrent: 20 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
+                                            usedCapacity: { current: 0, nonCurrent: 20 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
                                     usedCapacity: { current: 0, nonCurrent: 20 },
                                 },
@@ -379,13 +371,23 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 0,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                        'completed': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
                                 },
@@ -476,13 +478,23 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 0,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                        },
+                                        'completed': {
+                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
+                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
                                     usedCapacity: { current: 20, nonCurrent: 0 },
                                 },
@@ -566,7 +578,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
             'key': 'test-object1',
             'content-length': 10,
             'dataStoreName': 'us-east-1',
-            'owner-display-name': ACCOUNT_NAME,
+            'owner-id': testAccountCanonicalId,
             'replicationInfo': {
                 backends: [],
             },
@@ -600,13 +612,19 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         versions: 1,
                         dataMetrics: {
                             account: {
-                                [ACCOUNT_NAME]: {
+                                [testAccountCanonicalId]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
+                                    locations: {
+                                        'us-east-1': {
+                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
+                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                        },
+                                    },
                                 },
                             },
                             bucket: {
-                                [BUCKET_NAME]: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
                                     objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
                                     usedCapacity: { current: 20, nonCurrent: 10 },
                                 },
@@ -741,3 +759,80 @@ describe('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
     });
 });
 
+describe('S3UtilsMongoClient::getBucketInfos', () => {
+    let client;
+    let repl;
+
+    beforeAll(async done => {
+        repl = await MongoMemoryReplSet.create(mongoMemoryServerParams);
+        client = new S3UtilsMongoClient({
+            ...createMongoParamsFromMongoMemoryRepl(repl),
+            logger,
+        });
+        return client.setup(done);
+    });
+
+    afterAll(done => async.series([
+        next => client.close(next),
+        next => repl.stop()
+            .then(() => next())
+            .catch(next),
+    ], done));
+
+    describe('Should get correct bucket infos', () => {
+        const buckets = [
+            {
+                ...bucketMD,
+                _name: 'getbucketinfos-bucket1',
+            },
+            {
+                ...bucketMD,
+                _name: 'getbucketinfos-bucket2',
+                _versioningConfiguration: {
+                    Status: 'Enabled',
+                },
+            },
+            {
+                ...bucketMD,
+                _name: 'getbucketinfos-bucket3',
+                _versioningConfiguration: {
+                    Status: 'Suspended',
+                },
+            }];
+        beforeEach(done => async.series([
+            next => client.createBucket(buckets[0]._name, buckets[0], logger, next),
+            next => client.createBucket(buckets[1]._name, buckets[1], logger, next),
+            next => client.createBucket(buckets[2]._name, buckets[2], logger, next),
+        ], done));
+
+        afterEach(done => async.series([
+            next => client.deleteBucket(buckets[0]._name, logger, next),
+            next => client.deleteBucket(buckets[1]._name, logger, next),
+            next => client.deleteBucket(buckets[2]._name, logger, next),
+        ], done));
+
+        it('Should get correct bucket infos', done => client.getBucketInfos(logger, (err, data) => {
+            assert.equal(err, null);
+            assert.strictEqual(data.bucketCount, 3);
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), JSON.stringify(buckets[0]));
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
+            done();
+        }));
+
+        it('Should ignore buckets in collection list but not in metastore', done => {
+            const metastoreCollection = client.getCollection('__metastore');
+            return metastoreCollection.deleteOne({ _id: buckets[0]._name }, err => {
+                assert.equal(err, null);
+                client.getBucketInfos(logger, (err, data) => {
+                    assert.equal(err, null);
+                    assert.strictEqual(data.bucketCount, 2);
+                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), undefined);
+                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
+                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
+                    done();
+                });
+            });
+        });
+    });
+});

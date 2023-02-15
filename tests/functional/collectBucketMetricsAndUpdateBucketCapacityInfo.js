@@ -2,7 +2,7 @@ const async = require('async');
 const werelogs = require('werelogs');
 const assert = require('assert');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
-const { testBucketMD } = require('../constants');
+const { testBucketMD, testBucketCreationDate } = require('../constants');
 const { collectBucketMetricsAndUpdateBucketCapacityInfo } = require('../../DataReport/collectBucketMetricsAndUpdateBucketCapacityInfo');
 
 const logger = new werelogs.Logger('collectBucketMetricsAndUpdateBucketCapacityInfo::Test::Functional');
@@ -58,13 +58,11 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 },
             },
         };
-        client.updateCountItems({
-            dataMetrics: {
-                bucket: {
-                    [testBucketName]: {
-                        usedCapacity: { current: 10, nonCurrent: 10 },
-                        objectCount: { current: 10, nonCurrent: 10 },
-                    },
+        client.updateStorageConsumptionMetrics({}, {
+            bucket: {
+                [`${testBucketName}_${testBucketCreationDate}`]: {
+                    usedCapacity: { current: 10, nonCurrent: 10 },
+                    objectCount: { current: 10, nonCurrent: 10 },
                 },
             },
         }, logger, done);
@@ -185,11 +183,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30;
 
         return async.series([
-            next => client.updateCountItems({
-                dataMetrics: {
-                    bucket: {},
-                },
-            }, logger, next),
+            next => client.updateStorageConsumptionMetrics({}, { bucket: {} }, logger, next),
             next => client.createBucket(testBucketName, {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,

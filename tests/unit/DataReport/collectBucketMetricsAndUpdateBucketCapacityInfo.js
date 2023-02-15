@@ -225,7 +225,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         beforeEach(done => {
             mongoClient = new S3UtilsMongoClient(createMongoParams(logger));
             mongoClient.setup = jest.fn();
-            mongoClient.readCountItems = jest.fn();
+            mongoClient.readStorageConsumptionMetrics = jest.fn();
             mongoClient.getBucketInfos = jest.fn();
             mongoClient.updateBucketCapacityInfo = jest.fn();
             mongoClient.setup.mockImplementation(cb => cb(null));
@@ -234,33 +234,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
 
         afterEach(() => jest.resetAllMocks());
 
-        test('should not pass if mongo readCountItems() returns error', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(new Error('an error occurred during readCountItems')));
-            return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
-                expect(err).toEqual(new Error('an error occurred during readCountItems'));
-                done();
-            });
-        });
-
-        test('should finish directly if no dataMetrics from readCountItems', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {}));
-            return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
-                expect(err).toBeNull();
-                expect(mongoClient.getBucketInfos).toHaveBeenCalledTimes(0);
-                expect(mongoClient.updateBucketCapacityInfo).toHaveBeenCalledTimes(0);
-                done();
-            });
-        });
-
         test('should not pass if mongo getBucketInfos() returns error', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {
-                    dataMetrics: {
-                        bucket: {},
-                    },
-                }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(new Error('error getting bucket list')));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
@@ -270,12 +244,6 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should not pass if mongo updateBucketCapacityInfo() returns error', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {
-                    dataMetrics: {
-                        bucket: {},
-                    },
-                }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {
                     bucketInfos: [BucketInfo.fromObj({
@@ -292,6 +260,8 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                         },
                     })],
                 }));
+            mongoClient.readStorageConsumptionMetrics
+                .mockImplementation((bucketName, log, cb) => cb(null, {}));
             mongoClient.updateBucketCapacityInfo
                 .mockImplementation((bucketName, bucket, log, cb) => cb(new Error('an error occurred during put bucket CapacityInfo attributes')));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
@@ -301,12 +271,6 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with empty bucket', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {
-                    dataMetrics: {
-                        bucket: {},
-                    },
-                }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {
                     bucketInfos: [],
@@ -318,15 +282,9 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with SOSAPI disabled buckets', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {
-                    dataMetrics: {
-                        bucket: {
-                            [testBucketMD._name]: {
-                                usedCapacity: { current: 0, nonCurrent: 0 },
-                            },
-                        },
-                    },
+            mongoClient.readStorageConsumptionMetrics
+                .mockImplementation((bucketName, log, cb) => cb(null, {
+                    usedCapacity: { current: 0, nonCurrent: 0 },
                 }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {
@@ -342,15 +300,9 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with SOSAPI enabled buckets and update bucket md', done => {
-            mongoClient.readCountItems
-                .mockImplementation((log, cb) => cb(null, {
-                    dataMetrics: {
-                        bucket: {
-                            [testBucketMD._name]: {
-                                usedCapacity: { current: 0, nonCurrent: 0 },
-                            },
-                        },
-                    },
+            mongoClient.readStorageConsumptionMetrics
+                .mockImplementation((bucketName, log, cb) => cb(null, {
+                    usedCapacity: { current: 0, nonCurrent: 0 },
                 }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {

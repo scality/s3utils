@@ -1,4 +1,47 @@
 {
+    "us-east-1": {
+        "type": "file",
+        "objectId": "us-east-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "completed": {
+        "type": "file",
+        "objectId": "completed",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "completed-1": {
+        "type": "file",
+        "objectId": "completed-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "completed-2": {
+        "type": "file",
+        "objectId": "completed-2",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "completed-3": {
+        "type": "file",
+        "objectId": "completed-3",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "cold-location": {
+        "type": "dmf",
+        "objectId": "cold-location",
+        "legacyAwsBehavior": true,
+        "isCold": true,
+        "details": {}
+    },
+    "rep-loc-1": {
+        "type": "file",
+        "objectId": "rep-loc-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
     "primary-location": {
         "type": "file",
         "objectId": "primary-location",
@@ -13,7 +56,7 @@
     },
     "secondary-location-2": {
         "type": "file",
-        "objectId": "secondary-location-1",
+        "objectId": "secondary-location-2",
         "legacyAwsBehavior": true,
         "details": {}
     }

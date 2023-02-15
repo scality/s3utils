@@ -44,23 +44,7 @@ function isValidCapacityValue(capacity) {
 }
 
 function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callback) {
-    let bucketMetrics;
     return async.waterfall([
-        next => mongoClient.readCountItems(log, (err, doc) => {
-            if (err) {
-                log.error('an error occurred during readCountItems', {
-                    error: { message: err.message },
-                });
-                return next(err);
-            }
-            if (doc && doc.dataMetrics && doc.dataMetrics.bucket) {
-                bucketMetrics = doc.dataMetrics.bucket;
-            } else {
-                log.info('no buckets metrics in countItems, exit');
-                return callback(null);
-            }
-            return next();
-        }),
         next => mongoClient.getBucketInfos(log, (err, bucketInfos) => {
             if (err) {
                 log.error('error getting bucket list', {
@@ -81,37 +65,43 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
 
                 // get bucket storage used
                 let bucketStorageUsed = -1;
-                if (isValidBucketStorageMetrics(bucketMetrics[bucketName])) {
-                    bucketStorageUsed = bucketMetrics[bucketName].usedCapacity.current
-                            + bucketMetrics[bucketName].usedCapacity.nonCurrent;
-                }
-
-                // read Capacity from bucket._capabilities
-                const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
-
-                let available = -1;
-                let capacity = -1;
-                if (isValidCapacityValue(Capacity)) { // is Capacity value is valid
-                    capacity = Capacity;
-                    // if bucket storage used is valid and capacity is bigger than used
-                    if (bucketStorageUsed !== -1 && (capacity - bucketStorageUsed) >= 0) {
-                        available = capacity - bucketStorageUsed;
-                    }
-                }
-
-                return mongoClient.updateBucketCapacityInfo(bucketName, {
-                    Capacity: capacity,
-                    Available: available,
-                    Used: bucketStorageUsed,
-                }, log, err => {
-                    if (err) {
-                        log.error('an error occurred during put bucket CapacityInfo attributes', {
+                return mongoClient.readStorageConsumptionMetrics(`bucket_${bucketName}_${new Date(bucket.getCreationDate()).getTime()}`, log, (err, doc) => {
+                    if (err && err.message !== 'NoSuchEntity') {
+                        log.error('an error occurred during readStorageConsumptionMetrics', {
                             error: { message: err.message },
-                            bucketName,
                         });
                         return cb(err);
                     }
-                    return cb();
+                    if (isValidBucketStorageMetrics(doc)) {
+                        bucketStorageUsed = doc.usedCapacity.current
+                            + doc.usedCapacity.nonCurrent;
+                    }
+                    // read Capacity from bucket._capabilities
+                    const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
+
+                    let available = -1;
+                    let capacity = -1;
+                    if (isValidCapacityValue(Capacity)) { // is Capacity value is valid
+                        capacity = Capacity;
+                        // if bucket storage used is valid and capacity is bigger than used
+                        if (bucketStorageUsed !== -1 && (capacity - bucketStorageUsed) >= 0) {
+                            available = capacity - bucketStorageUsed;
+                        }
+                    }
+
+                    return mongoClient.updateBucketCapacityInfo(bucketName, {
+                        Capacity: capacity,
+                        Available: available,
+                        Used: bucketStorageUsed,
+                    }, log, err => {
+                        if (err) {
+                            log.error('an error occurred during put bucket CapacityInfo attributes', {
+                                error: { message: err.message },
+                                bucketName,
+                            });
+                        }
+                        return cb(err);
+                    });
                 });
             },
             err => {

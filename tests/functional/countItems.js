@@ -8,13 +8,13 @@ const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
 const createMongoParams = require('../../utils/createMongoParams');
 const createWorkers = require('../../CountItems/utils/createWorkers');
-const { testBucketMD } = require('../constants');
+const { testBucketMD, testAccountCanonicalId, testBucketCreationDate } = require('../constants');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
 const { MONGODB_REPLICASET } = process.env;
 const dbName = 'countItemsTest';
 
-const expectedResults = {
+const expectedCountItems = {
     objects: 90,
     versions: 60,
     buckets: 9,
@@ -27,62 +27,70 @@ const expectedResults = {
         },
     },
     stalled: 0,
-    dataMetrics: {
-        account: {
-            [testBucketMD._ownerDisplayName]: {
+};
+const expectedDataMetrics = {
+    [`account_${testAccountCanonicalId}`]: {
+        objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 },
+        usedCapacity: { current: 9000, nonCurrent: 6000 },
+        locations: {
+            'secondary-location-1': {
+                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 },
+                usedCapacity: { current: 3000, nonCurrent: 3000 },
+            },
+            'secondary-location-2': {
+                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 },
+                usedCapacity: { current: 3000, nonCurrent: 3000 },
+            },
+            'us-east-1': {
                 objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 },
                 usedCapacity: { current: 9000, nonCurrent: 6000 },
             },
         },
-        bucket: {
-            'test-bucket-0': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
-                usedCapacity: { current: 1000, nonCurrent: 0 },
-            },
-            'test-bucket-1': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
-                usedCapacity: { current: 1000, nonCurrent: 0 },
-            },
-            'test-bucket-2': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
-                usedCapacity: { current: 1000, nonCurrent: 0 },
-            },
-            'test-bucket-3': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-            'test-bucket-4': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-            'test-bucket-5': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-            'test-bucket-6': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-            'test-bucket-7': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-            'test-bucket-8': {
-                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                usedCapacity: { current: 1000, nonCurrent: 1000 },
-            },
-        },
-        location: {
-            'secondary-location-1': {
-                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
-            },
-            'secondary-location-2': {
-                objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
-            },
-            'us-east-1': {
-                objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 }, usedCapacity: { current: 9000, nonCurrent: 6000 },
-            },
-        },
+    },
+    [`bucket_test-bucket-0_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+        usedCapacity: { current: 1000, nonCurrent: 0 },
+    },
+    [`bucket_test-bucket-1_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+        usedCapacity: { current: 1000, nonCurrent: 0 },
+    },
+    [`bucket_test-bucket-2_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 0 },
+        usedCapacity: { current: 1000, nonCurrent: 0 },
+    },
+    [`bucket_test-bucket-3_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    [`bucket_test-bucket-4_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    [`bucket_test-bucket-5_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    [`bucket_test-bucket-6_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    [`bucket_test-bucket-7_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    [`bucket_test-bucket-8_${testBucketCreationDate}`]: {
+        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+        usedCapacity: { current: 1000, nonCurrent: 1000 },
+    },
+    'location_secondary-location-1': {
+        objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+    },
+    'location_secondary-location-2': {
+        objectCount: { current: 30, deleteMarker: 0, nonCurrent: 30 }, usedCapacity: { current: 3000, nonCurrent: 3000 },
+    },
+    'location_us-east-1': {
+        objectCount: { current: 90, deleteMarker: 0, nonCurrent: 60 }, usedCapacity: { current: 9000, nonCurrent: 6000 },
     },
 };
 
@@ -119,7 +127,7 @@ function populateMongo(client, callback) {
                 .setDataStoreName('us-east-1')
                 .setContentLength(100)
                 .setLastModified('2020-01-01T00:00:00.000Z')
-                .setOwnerDisplayName(testBucket.getOwnerDisplayName());
+                .setOwnerId(testAccountCanonicalId);
             if (testBucket.getVersioningConfiguration()
                 && testBucket.getVersioningConfiguration().Status === 'Enabled') {
                 objMD.setReplicationInfo({
@@ -219,11 +227,22 @@ describe('CountItems', () => {
                 }),
                 next => client.readCountItems(logger, (err, res) => {
                     expect(err).toBeFalsy();
-                    expect(res).toMatchObject(expectedResults);
+                    expect(res).toMatchObject(expectedCountItems);
                     expect(res.bucketList)
                         .toEqual(expect.arrayContaining(expectedBucketList));
                     return next();
                 }),
+                next => async.eachSeries(
+                    Object.keys(expectedDataMetrics),
+                    (entity, cb) => client.readStorageConsumptionMetrics(entity, logger, (err, res) => {
+                        expect(err).toBeFalsy();
+                        expect(res.usedCapacity).toMatchObject(expectedDataMetrics[entity].usedCapacity);
+                        expect(res.objectCount).toMatchObject(expectedDataMetrics[entity].objectCount);
+                        expect(res.measuredOn).not.toBeNull();
+                        return cb();
+                    }),
+                    () => next(),
+                ),
             ], () => countMaster.stop(null, done));
         },
     );

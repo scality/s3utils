@@ -43,11 +43,6 @@ describe('CountItems::CountManager', () => {
                 byLocation: {},
             },
             stalled: 0,
-            dataMetrics: {
-                account: {},
-                bucket: {},
-                location: {},
-            },
         });
         m._consolidateData({
             versions: 10,
@@ -56,26 +51,6 @@ describe('CountItems::CountManager', () => {
             dataManaged: {
                 total: { curr: 100, prev: 100 },
                 locations: { location1: { curr: 100, prev: 100 } },
-            },
-            dataMetrics: {
-                account: {
-                    account1: {
-                        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                        usedCapacity: { current: 100, nonCurrent: 100 },
-                    },
-                },
-                bucket: {
-                    bucket1: {
-                        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                        usedCapacity: { current: 100, nonCurrent: 100 },
-                    },
-                },
-                location: {
-                    location1: {
-                        objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
-                        usedCapacity: { current: 100, nonCurrent: 100 },
-                    },
-                },
             },
         });
         expect(m.store).toEqual({
@@ -88,11 +63,33 @@ describe('CountItems::CountManager', () => {
                 byLocation: { location1: { curr: 100, prev: 100 } },
             },
             stalled: 10,
+        });
+    });
+
+    test('should update dataMetrics', () => {
+        const workers = createWorkers(1);
+        const m = new CountManager({
+            log: new DummyLogger(),
+            workers,
+            maxConcurrent: 1,
+        });
+        expect(m.dataMetrics).toEqual({
+            account: {},
+            bucket: {},
+            location: {},
+        });
+        m._consolidateData({
             dataMetrics: {
                 account: {
                     account1: {
                         objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
                         usedCapacity: { current: 100, nonCurrent: 100 },
+                        locations: {
+                            location1: {
+                                objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                                usedCapacity: { current: 100, nonCurrent: 100 },
+                            },
+                        },
                     },
                 },
                 bucket: {
@@ -106,6 +103,32 @@ describe('CountItems::CountManager', () => {
                         objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
                         usedCapacity: { current: 100, nonCurrent: 100 },
                     },
+                },
+            },
+        });
+        expect(m.dataMetrics).toEqual({
+            account: {
+                account1: {
+                    objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                    usedCapacity: { current: 100, nonCurrent: 100 },
+                    locations: {
+                        location1: {
+                            objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                            usedCapacity: { current: 100, nonCurrent: 100 },
+                        },
+                    },
+                },
+            },
+            bucket: {
+                bucket1: {
+                    objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                    usedCapacity: { current: 100, nonCurrent: 100 },
+                },
+            },
+            location: {
+                location1: {
+                    objectCount: { current: 10, deleteMarker: 0, nonCurrent: 10 },
+                    usedCapacity: { current: 100, nonCurrent: 100 },
                 },
             },
         });

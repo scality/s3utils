@@ -8,6 +8,7 @@ class CountManager {
         this.log = params.log;
         this.workers = params.workers;
         this.maxConcurrent = params.maxConcurrent;
+        this.temporaryStore = {};
         this.store = {
             objects: 0,
             versions: 0,
@@ -18,11 +19,11 @@ class CountManager {
                 byLocation: {},
             },
             stalled: 0,
-            dataMetrics: {
-                bucket: {},
-                location: {},
-                account: {},
-            },
+        };
+        this.dataMetrics = {
+            bucket: {},
+            location: {},
+            account: {},
         };
         this.workerList = [];
         this._setupQueue();
@@ -79,15 +80,31 @@ class CountManager {
                 if (validStorageMetricLevels.has(metricLevel)) {
                     Object.keys(results.dataMetrics[metricLevel]).forEach(resourceName => {
                         // resourceName can be the name of bucket, location or account
-                        this.store.dataMetrics[metricLevel][resourceName] = consolidateDataMetrics(
-                            this.store.dataMetrics[metricLevel][resourceName],
+                        this.dataMetrics[metricLevel][resourceName] = consolidateDataMetrics(
+                            this.dataMetrics[metricLevel][resourceName],
                             results.dataMetrics[metricLevel][resourceName],
                         );
+                        // if metricLevel is account, add the locations details
+                        if (metricLevel === 'account') {
+                            Object.keys((results.dataMetrics[metricLevel][resourceName].locations || {})).forEach(locationName => {
+                                if (!this.temporaryStore[resourceName]) {
+                                    this.temporaryStore[resourceName] = {};
+                                }
+                                this.temporaryStore[resourceName][locationName] = consolidateDataMetrics(
+                                    this.temporaryStore[resourceName][locationName],
+                                    results.dataMetrics[metricLevel][resourceName].locations[locationName],
+                                );
+                            });
+                        }
                     });
                 }
             });
+            // Add the accounts details for locations from the temporary store
+            Object.keys(this.temporaryStore).forEach(accountName => {
+                this.dataMetrics.account[accountName].locations = this.temporaryStore[accountName];
+            });
         } else {
-            this.store.dataMetrics = results.dataMetrics;
+            this.dataMetrics = results.dataMetrics;
         }
     }
 

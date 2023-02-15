@@ -7,5 +7,5 @@ module.exports = {
     _getIsTransient: jest.fn(),
     getObjectMDStats: jest.fn(),
     getBucketInfos: jest.fn(),
-    updateCountItems: jest.fn(),
+    updateStorageConsumptionMetrics: jest.fn(),
 };

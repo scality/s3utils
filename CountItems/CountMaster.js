@@ -46,7 +46,7 @@ class CountMaster {
                 return next();
             }),
             next => this.manager.start(next),
-            next => this.client.updateCountItems(this.manager.store, this._log, next),
+            next => this.client.updateStorageConsumptionMetrics(this.manager.store, this.manager.dataMetrics, this._log, next),
         ], err => {
             if (err) {
                 this.log.error('error occurred in count items job', {
