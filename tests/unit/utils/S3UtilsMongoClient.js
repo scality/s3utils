@@ -5,15 +5,19 @@ const assert = require('assert');
 const werelogs = require('werelogs');
 const { BucketInfo, ObjectMD } = require('arsenal').models;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { constants } = require('arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const {
     mongoMemoryServerParams,
     createMongoParamsFromMongoMemoryRepl,
 } = require('../../utils/mongoUtils');
 const getLocationConfig = require('../../../utils/locationConfig');
-const { testBucketMD, testAccountCanonicalId, testBucketCreationDate } = require('../../constants');
+const {
+    testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo,
+} = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
+const USERSBUCKET = '__usersbucket';
 
 const mongoTestClient = new S3UtilsMongoClient({});
 
@@ -321,7 +325,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             {
                 data: {
                     account: { [testAccountCanonicalId]: 42 },
-                    bucket: { [`${testBucketName}_1678284806000`]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { completed: 42 },
                 },
                 error: null,
@@ -674,7 +678,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
     ];
     tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {
         assert.deepStrictEqual(
-            mongoTestClient._processEntryData(bucketName, bucketInfo, params, isTransient, locationConfig),
+            mongoTestClient._processEntryData(bucketName, bucketInfo, params, testBucketCreationDate, isTransient, locationConfig),
             expected,
         );
     }));
@@ -1053,6 +1057,17 @@ describe('S3UtilsMongoClient, tests', () => {
         } = testCase;
         return async.waterfall([
             next => createBucket(client, bucketName, isVersioned, err => next(err)),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${bucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ),
             next => uploadObjects(client, bucketName, objectList, err => next(err)),
             next => client.getBucketAttributes(bucketName, logger, next),
             (bucketInfo, next) => client.getObjectMDStats(

@@ -228,6 +228,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             mongoClient.readStorageConsumptionMetrics = jest.fn();
             mongoClient.getBucketInfos = jest.fn();
             mongoClient.updateBucketCapacityInfo = jest.fn();
+            mongoClient.getUsersBucketCreationDate = jest.fn();
             mongoClient.setup.mockImplementation(cb => cb(null));
             return mongoClient.setup(done);
         });
@@ -239,6 +240,31 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 .mockImplementation((log, cb) => cb(new Error('error getting bucket list')));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toEqual(new Error('error getting bucket list'));
+                done();
+            });
+        });
+
+        test('should not pass if mongo getUsersBucketCreationDate() returns error', done => {
+            mongoClient.getBucketInfos
+                .mockImplementation((log, cb) => cb(null, {
+                    bucketInfos: [BucketInfo.fromObj({
+                        ...testBucketMD,
+                        _capabilities: {
+                            VeeamSOSApi: {
+                                SystemInfo: {
+                                    ProtocolCapabilities: {
+                                        CapacityInfo: true,
+                                    },
+                                },
+                                CapacityInfo: {},
+                            },
+                        },
+                    })],
+                }));
+            mongoClient.getUsersBucketCreationDate
+                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(new Error('error getting bucketCreationDate')));
+            return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
+                expect(err).toEqual(new Error('error getting bucketCreationDate'));
                 done();
             });
         });
@@ -260,6 +286,8 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                         },
                     })],
                 }));
+            mongoClient.getUsersBucketCreationDate
+                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(null, new Date().toString()));
             mongoClient.readStorageConsumptionMetrics
                 .mockImplementation((bucketName, log, cb) => cb(null, {}));
             mongoClient.updateBucketCapacityInfo
@@ -320,6 +348,8 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                         },
                     })],
                 }));
+            mongoClient.getUsersBucketCreationDate
+                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(null, new Date().toString()));
             mongoClient.updateBucketCapacityInfo
                 .mockImplementation((bucketName, bucket, log, cb) => cb(null));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {

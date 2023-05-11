@@ -1,12 +1,14 @@
+/* eslint-disable consistent-return */
 const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 const { Long } = require('mongodb');
-const { errors } = require('arsenal');
+const { errors, constants } = require('arsenal');
 const async = require('async');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
 const getLocationConfig = require('./locationConfig');
 
 const METASTORE = '__metastore';
 const INFOSTORE = '__infostore';
+const USERSBUCKET = '__usersbucket';
 const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
 
@@ -39,49 +41,94 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
         const locationConfig = getLocationConfig(log);
 
-        cursor.forEach(
-            res => {
-                const { data, error } = this._processEntryData(bucketName, bucketInfo, res, isTransient, locationConfig);
+        return this.getCollection(USERSBUCKET).find({}, {
+            projection: {
+                'value.creationDate': 1,
+            },
+        }).toArray((err, usersBucketCreationDatesArray) => {
+            if (err) {
+                log.error('Failed to get users bucket creation dates', {
+                    method: 'getObjectMDStats',
+                    error: err,
+                });
+                return callback(err);
+            }
+            const usersBucketCreationDatesMap = usersBucketCreationDatesArray
+                .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
+            return cursor.forEach(
+                res => {
+                    const { data, error } = this._processEntryData(
+                        bucketName,
+                        bucketInfo,
+                        res,
+                        usersBucketCreationDatesMap[`${res.value['owner-id']}${constants.splitter}${bucketName}`],
+                        isTransient,
+                        locationConfig,
+                    );
 
-                if (error) {
-                    log.error('Failed to process entry data', {
-                        method: 'getObjectMDStats',
-                        entry: res,
-                        error,
-                    });
-                }
-
-                let targetCount;
-                let targetData;
-                if (res._id.indexOf('\0') !== -1) {
-                    // versioned item
-                    targetCount = 'versionCount';
-                    targetData = 'versionData';
-
-                    if (res.value.replicationInfo.backends.length > 0
-                        && this._isReplicationEntryStalled(res, cmpDate)) {
-                        stalledCount++;
+                    if (error) {
+                        log.error('Failed to process entry data', {
+                            method: 'getObjectMDStats',
+                            entry: res,
+                            error,
+                        });
+                        return callback(error);
                     }
-                } else if (!!res.value.versionId && !res.value.isNull) {
-                    // master version
-                    // includes current objects in versioned bucket and
-                    // objects uploaded before bucket suspended
-                    targetCount = 'masterCount';
-                    targetData = 'masterData';
-                } else {
-                    // null version
-                    // include current objects in nonversioned bucket and
-                    // objects uploaded after bucket suspended
-                    targetCount = 'nullCount';
-                    targetData = 'nullData';
-                }
-                Object.keys(data).forEach(metricLevel => {
-                    // metricLevel can only be 'bucket', 'location' or 'account'
-                    if (validStorageMetricLevels.has(metricLevel)) {
-                        Object.keys(data[metricLevel]).forEach(resourceName => {
-                            // resourceName can be the name of bucket, location or account
-                            if (!collRes[metricLevel][resourceName]) {
-                                collRes[metricLevel][resourceName] = {
+
+                    let targetCount;
+                    let targetData;
+                    if (res._id.indexOf('\0') !== -1) {
+                        // versioned item
+                        targetCount = 'versionCount';
+                        targetData = 'versionData';
+
+                        if (res.value.replicationInfo.backends.length > 0
+                            && this._isReplicationEntryStalled(res, cmpDate)) {
+                            stalledCount++;
+                        }
+                    } else if (!!res.value.versionId && !res.value.isNull) {
+                        // master version
+                        // includes current objects in versioned bucket and
+                        // objects uploaded before bucket suspended
+                        targetCount = 'masterCount';
+                        targetData = 'masterData';
+                    } else {
+                        // null version
+                        // include current objects in nonversioned bucket and
+                        // objects uploaded after bucket suspended
+                        targetCount = 'nullCount';
+                        targetData = 'nullData';
+                    }
+                    Object.keys(data).forEach(metricLevel => {
+                        // metricLevel can only be 'bucket', 'location' or 'account'
+                        if (validStorageMetricLevels.has(metricLevel)) {
+                            Object.keys(data[metricLevel]).forEach(resourceName => {
+                                // resourceName can be the name of bucket, location or account
+                                if (!collRes[metricLevel][resourceName]) {
+                                    collRes[metricLevel][resourceName] = {
+                                        masterCount: 0,
+                                        masterData: 0,
+                                        nullCount: 0,
+                                        nullData: 0,
+                                        versionCount: 0,
+                                        versionData: 0,
+                                        deleteMarkerCount: 0,
+                                    };
+                                }
+                                collRes[metricLevel][resourceName][targetData] += data[metricLevel][resourceName];
+                                collRes[metricLevel][resourceName][targetCount]++;
+                                collRes[metricLevel][resourceName].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
+                            });
+                        }
+                    });
+                    Object.keys(data.account).forEach(account => {
+                        if (!collRes.account[account].locations) {
+                            collRes.account[account].locations = {};
+                        }
+
+                        Object.keys(data.location).forEach(location => {
+                            if (!collRes.account[account].locations[location]) {
+                                collRes.account[account].locations[location] = {
                                     masterCount: 0,
                                     masterData: 0,
                                     nullCount: 0,
@@ -91,51 +138,29 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                     deleteMarkerCount: 0,
                                 };
                             }
-                            collRes[metricLevel][resourceName][targetData] += data[metricLevel][resourceName];
-                            collRes[metricLevel][resourceName][targetCount]++;
-                            collRes[metricLevel][resourceName].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
+                            collRes.account[account].locations[location][targetData] += data.location[location];
+                            collRes.account[account].locations[location][targetCount]++;
+                            collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
                         });
-                    }
-                });
-                Object.keys(data.account).forEach(account => {
-                    if (!collRes.account[account].locations) {
-                        collRes.account[account].locations = {};
-                    }
-
-                    Object.keys(data.location).forEach(location => {
-                        if (!collRes.account[account].locations[location]) {
-                            collRes.account[account].locations[location] = {
-                                masterCount: 0,
-                                masterData: 0,
-                                nullCount: 0,
-                                nullData: 0,
-                                versionCount: 0,
-                                versionData: 0,
-                                deleteMarkerCount: 0,
-                            };
-                        }
-                        collRes.account[account].locations[location][targetData] += data.location[location];
-                        collRes.account[account].locations[location][targetCount]++;
-                        collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
                     });
-                });
-            },
-            err => {
-                if (err) {
-                    log.error('Error when processing mongo entries', {
-                        method: 'getObjectMDStats',
-                        error: err,
-                    });
-                    return callback(err);
-                }
-                const bucketStatus = bucketInfo.getVersioningConfiguration();
-                const isVer = (bucketStatus && (bucketStatus.Status === 'Enabled'
-                    || bucketStatus.Status === 'Suspended'));
-                const retResult = this._handleResults(collRes, isVer);
-                retResult.stalled = stalledCount;
-                return callback(null, retResult);
-            },
-        );
+                },
+                err => {
+                    if (err) {
+                        log.error('Error when processing mongo entries', {
+                            method: 'getObjectMDStats',
+                            error: err,
+                        });
+                        return callback(err);
+                    }
+                    const bucketStatus = bucketInfo.getVersioningConfiguration();
+                    const isVer = (bucketStatus && (bucketStatus.Status === 'Enabled'
+                        || bucketStatus.Status === 'Suspended'));
+                    const retResult = this._handleResults(collRes, isVer);
+                    retResult.stalled = stalledCount;
+                    return callback(null, retResult);
+                },
+            );
+        });
     }
 
     /**
@@ -144,11 +169,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * @param{object} entry -
      * @param{string} entry._id -
      * @param{object} entry.value -
+     * @param{object} bucketCreationDate -
      * @param{boolean} isTransient -
      * @param{object} locationConfig - locationConfig.json
      * @returns{object.<string, number>} results -
      */
-    _processEntryData(bucketName, bucketInfo, entry, isTransient, locationConfig) {
+    _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
         if (!bucketName) {
             return {
                 data: {},
@@ -170,10 +196,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 error: new Error('empty locationConfig'),
             };
         }
-
         const results = {
             // there will be only one bucket for an object entry, and use `bucketName_creationDate` as key
-            bucket: { [`${bucketName}_${new Date(bucketInfo.getCreationDate()).getTime()}`]: size },
+            // creationDate comes from __userbucket collection
+            bucket: { [`${bucketName}_${new Date(bucketCreationDate).getTime()}`]: size },
             // there can be multiple locations for an object entry, and use `locationId` as key
             location: {},
             // there will be only one account for an object entry, and use `accountCanonicalId` as key
@@ -517,6 +543,27 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     bucketInfos,
                 });
             });
+        });
+    }
+
+    getUsersBucketCreationDate(ownerId, bucketName, log, cb) {
+        const usersBucketCol = this.getCollection(USERSBUCKET);
+        return usersBucketCol.findOne({
+            _id: `${ownerId}${constants.splitter}${bucketName}`,
+        }, {
+            projection: {
+                'value.creationDate': 1,
+            },
+        }, (err, res) => {
+            if (err) {
+                log.error('failed to read bucket entry from __usersbucket', {
+                    bucketName,
+                    ownerId,
+                    error: err,
+                });
+                return cb(err);
+            }
+            return cb(null, res.value.creationDate);
         });
     }
 }

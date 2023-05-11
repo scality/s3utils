@@ -2,17 +2,21 @@ const cluster = require('cluster');
 const async = require('async');
 const werelogs = require('werelogs');
 const { BucketInfo, ObjectMD } = require('arsenal').models;
+const { constants } = require('arsenal');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
 
 const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
 const createMongoParams = require('../../utils/createMongoParams');
 const createWorkers = require('../../CountItems/utils/createWorkers');
-const { testBucketMD, testAccountCanonicalId, testBucketCreationDate } = require('../constants');
+const {
+    testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo,
+} = require('../constants');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
 const { MONGODB_REPLICASET } = process.env;
 const dbName = 'countItemsTest';
+const USERSBUCKET = '__usersbucket';
 
 const expectedCountItems = {
     objects: 90,
@@ -120,6 +124,17 @@ const testBuckets = Array.from(Array(9)).map((_, n) => {
 function populateMongo(client, callback) {
     return async.eachSeries(testBuckets, (testBucket, cb) => async.series([
         next => client.createBucket(testBucket.getName(), testBucket, logger, next),
+        next => client.putObject(
+            USERSBUCKET,
+            `${testBucket.getOwner()}${constants.splitter}${testBucket.getName()}`,
+            testUserBucketInfo.value,
+            {
+                versioning: false,
+                versionId: null,
+            },
+            logger,
+            next,
+        ), // put bucket entry in __usersbucket
         next => async.timesSeries(10, (m, done) => {
             const objName = `test-object-${m}`;
             const objMD = new ObjectMD()

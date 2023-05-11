@@ -8,4 +8,5 @@ module.exports = {
     getObjectMDStats: jest.fn(),
     getBucketInfos: jest.fn(),
     updateStorageConsumptionMetrics: jest.fn(),
+    getUsersBucketCreationDate: jest.fn(),
 };

@@ -1,13 +1,15 @@
 const async = require('async');
 const werelogs = require('werelogs');
 const assert = require('assert');
+const { constants } = require('arsenal');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
-const { testBucketMD, testBucketCreationDate } = require('../constants');
+const { testBucketMD, testBucketCreationDate, testUserBucketInfo } = require('../constants');
 const { collectBucketMetricsAndUpdateBucketCapacityInfo } = require('../../DataReport/collectBucketMetricsAndUpdateBucketCapacityInfo');
 
 const logger = new werelogs.Logger('collectBucketMetricsAndUpdateBucketCapacityInfo::Test::Functional');
 const { MONGODB_REPLICASET } = process.env;
 const dbName = 'collectBucketMetricsAndUpdateBucketCapacityInfoTest';
+const USERSBUCKET = '__usersbucket';
 
 
 describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
@@ -76,6 +78,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.createBucket(testBucketName, {
                 ...testBucketMD,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();
@@ -95,6 +108,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();
@@ -118,6 +142,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();
@@ -141,6 +176,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();
@@ -164,6 +210,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();
@@ -188,6 +245,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 ...testBucketMD,
                 _capabilities: testBucketCapacities,
             }, logger, next),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${testBucketName}`,
+                testUserBucketInfo.value,
+                {
+                    versioning: false,
+                    versionId: null,
+                },
+                logger,
+                next,
+            ), // put bucket entry in __usersbucket
             next => collectBucketMetricsAndUpdateBucketCapacityInfo(client, logger, err => {
                 assert.equal(err, null);
                 next();

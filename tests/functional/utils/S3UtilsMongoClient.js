@@ -4,12 +4,14 @@ const async = require('async');
 const assert = require('assert');
 const werelogs = require('werelogs');
 const { BucketInfo } = require('arsenal').models;
-const { versioning } = require('arsenal');
+const { versioning, constants } = require('arsenal');
 
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
-const { testBucketMD, testAccountCanonicalId } = require('../../constants');
+const {
+    testBucketMD, testAccountCanonicalId, testUserBucketInfo, testBucketCreationDate,
+} = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 
@@ -23,7 +25,8 @@ const variations = [
 
 const bucketMD = BucketInfo.fromObj(testBucketMD);
 const BUCKET_NAME = bucketMD.getName();
-const BUCKET_CREATE_DATE = new Date(bucketMD.getCreationDate()).getTime();
+const USERSBUCKET = '__usersbucket';
+const BUCKET_CREATE_DATE = new Date(testBucketCreationDate).getTime();
 
 
 describe('S3UtilsMongoClient::getObjectMDStats', () => {
@@ -87,6 +90,17 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                             return next();
                         },
                         next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
+                        next => client.putObject(
+                            USERSBUCKET,
+                            `${bucketMD.getOwner()}${constants.splitter}${BUCKET_NAME}`,
+                            testUserBucketInfo.value,
+                            {
+                                versioning: false,
+                                versionId: null,
+                            },
+                            logger,
+                            next,
+                        ), // put bucket entry in __usersbuckets
                         next => client.putObject(
                             BUCKET_NAME,
                             object1Params.key,
