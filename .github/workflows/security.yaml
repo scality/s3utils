@@ -1,0 +1,32 @@
+---
+ name: security
+
+ on:
+   push:
+     branches: [development/*, stabilization/*, hotfix/*]
+   release:
+     types: [published]
+   pull_request:
+     branches: [development/*, stabilization/*, hotfix/*]
+   schedule:
+     - cron: '0 8 * * 1' # Monday - 8am - UTC
+   workflow_dispatch:
+
+ jobs:
+   build:
+     permissions:
+       contents: read
+       packages: write
+     uses: ./.github/workflows/build.yml
+     secrets:
+       REGISTRY_LOGIN: ${{ secrets.REGISTRY_LOGIN }}
+       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+   trivy:
+     needs: build
+     name: Trivy Vulnerability Scan for Code
+     uses: scality/workflows/.github/workflows/trivy.yaml@v1
+     with:
+       name: ${{ github.event.repository.name }}
+       namespace: s3utils-dev
+       registry: registry.scality.com
