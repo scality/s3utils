@@ -18,9 +18,7 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/build.yml
-    secrets:
-      REGISTRY_LOGIN: ${{ secrets.REGISTRY_LOGIN }}
-      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+    secrets: inherit
 
   trivy:
     needs: build
