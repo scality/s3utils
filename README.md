@@ -529,8 +529,8 @@ node followerDiff.js
 
   * Example: `{"1":1234,"4":4567,"6":6789}`
 
-  * This configuration would cause diff entries which bucket/key
-    appear in either of the following to be discarded from the output:
+  * This configuration would cause diff entries of which bucket/key
+    appear in one of the following to be discarded from the output:
 
     * oplog of raft session 1 after cseq=1234
 
@@ -540,13 +540,21 @@ node followerDiff.js
 
     * or any other raft session's oplog at any cseq
 
-## Scan Procedure
+## Scan Procedure with Stable Leader
+
+**Note**: you may use this procedure when leaders are stable,
+  i.e. leader changes are rare in normal circumstances. When leaders
+  are unstable, use the [unstable
+  leader](#scan-procedure-with-unstable-leader) procedure instead.
 
 In order to scan a set of raft sessions to detect discrepancies
 between raft members, you may use the following procedure involving
 the two scan tools
 [verifyBucketSproxydKeys](#verify-existence-of-sproxyd-keys) and
 [followerDiff](#compare-followers-databases-against-leader-view).
+
+Make sure that no leader change occurs from the beginning to the end
+of running this procedure.
 
 The general idea is to compare each follower's view in turn against
 the current leader's view, without disturbing the leader in order to
@@ -717,15 +725,17 @@ raft sessions to be scanned. The result will be passed on to the
 followerDiff command in order to remove false positives due to live
 changes while the script is running.
 
-**Note**: the base admin port specified here is the default value
-defined in `group_vars/all` as `defaults.bucket.repd_base_admin_port`.
-
 ```
-REPD_BASE_ADMIN_PORT=9143
 for RS in $(cat /tmp/rs-to-scan); do
-    echo -n '{"'${RS}'":'
-    curl -s "http://localhost:$((REPD_BASE_ADMIN_PORT + RS))/_/raft/state"
-    echo '}'
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_ADMIN_PORT=$(jq .adminPort ${REPD_CONF})
+            echo -n '{"'${RS}'":'
+            curl -s "http://localhost:${REPD_ADMIN_PORT}/_/raft/state"
+            echo '}'
+        fi
+    done
 done \
 | jq -s 'reduce .[] as $item ({}; . + ($item | map_values(.committed)))' \
 | tee /tmp/rs-cseqs.json
@@ -751,8 +761,15 @@ must be stopped with the following command:
 
 ```
 for RS in $(cat /tmp/rs-to-scan); do
-    docker exec -u root scality-metadata-bucket-repd \
-    supervisorctl -c /conf/supervisor/supervisord-repd.conf stop repd:repd_${RS}
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf stop repd:${REPD_NAME}
+        fi
+    done
 done
 ```
 
@@ -800,8 +817,15 @@ docker run --net=host --rm \
 
 ```
 for RS in $(cat /tmp/rs-to-scan); do
-    docker exec -u root scality-metadata-bucket-repd \
-    supervisorctl -c /conf/supervisor/supervisord-repd.conf start repd:repd_${RS}
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf start repd:${REPD_NAME}
+        fi
+    done
 done
 ```
 
@@ -849,6 +873,403 @@ summary](#compare-followers-databases-against-leader-view).
   efficient to optimize the comparisons, or even useless. If an update
   of the digests database is wanted, it's best to re-create a new one
   from scratch (e.g. by deleting the old digests directory first).
+
+- The current version of the script does not work with Metadata bucket
+  format v1, only with v0. If the need arises, it could be made to
+  work with v1 with some more work.
+
+- The current version of the script does not support internal TLS
+  feature
+
+
+# Compare two followers database sets
+
+The **CompareRaftMembers/compareFollowerDbs** tool compares two sets
+of Metadata leveldb databases, belonging to two different Metadata
+nodes, and outputs the differences to the file path given as the
+DIFF_OUTPUT_FILE environment variable.
+
+In this file, it outputs each key that differs as line-separated JSON
+entries, where each entry can be one of:
+
+- `[{ key, value }, null]`: this key is present on the follower #1 but
+  not on follower #2
+
+- `[null, { key, value }]`: this key is not present on follower #1
+  but is present on follower #2
+
+- `[{ key, value: "{value1}" }, { key, value: "{value2}" }]`: this key
+  has a different value between follower #1 and follower #2: "value1"
+  is the value seen on follower #1 and "value2" the value seen on
+  follower #2.
+
+## Usage
+
+```
+node compareFollowerDbs.js
+```
+
+## Mandatory environment variables
+
+* **DATABASES1**: space-separated list of databases of follower #1 to
+  compare against follower #2
+
+* **DATABASES2**: space-separated list of databases of follower #2 to
+  compare against follower #1
+
+* **DIFF_OUTPUT_FILE**: file path where diff output will be stored
+
+## Optional environment variables
+
+* **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
+
+* **EXCLUDE_FROM_CSEQS**: mapping of raft sessions to filter on, where
+  keys are raft session IDs and values are the cseq value for that
+  raft session. Filtering will be based on all oplog records more
+  recent than the given "cseq" for the raft session. Input diff
+  entries not belonging to one of the declared raft sessions are
+  discarded from the output. The value must be in the following JSON
+  format:
+
+  * `{"rsId":cseq[,"rsId":cseq...]}`
+
+  * Example: `{"1":1234,"4":4567,"6":6789}`
+
+  * This configuration would cause diff entries of which bucket/key
+    appear in one of the following to be discarded from the output:
+
+    * oplog of raft session 1 after cseq=1234
+
+    * or oplog of raft session 4 after cseq=4567
+
+    * or oplog of raft session 6 after cseq=6789
+
+    * or any other raft session's oplog at any cseq
+
+* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint, needed when
+  EXCLUDE_FROM_CSEQS is set (in order to read the Raft oplog)
+
+## Scan Procedure with Unstable Leader
+
+**Note**: you may use this procedure when leaders are unstable,
+i.e. leader changes are frequent or susceptible to happen during the
+duration of the scan procedure. When leaders are stable, it can be
+more practical and efficient to use the [stable
+leader](#scan-procedure-with-stable-leader) procedure instead.
+
+In order to scan a set of raft sessions to detect discrepancies
+between raft members, you may use the following procedure involving
+the scan tool [compareFollowerDbs](#compare-two-followers-database-sets).
+
+The general idea is to compare sets of databases belonging to two
+different followers at a time.
+
+**Note**: Each repd node (including the current leader) has to be
+stopped at some point to copy or read its databases set, then
+restarted. Stopping the leader can have a small temporary impact on
+the traffic.
+
+
+### Define global configuration values
+
+- Choose one node on the system that will be the source from which we
+  will copy the set of leveldb databases to a filesystem location that
+  can be shared with other nodes later on. It can be any one of the
+  Metadata active nodes.
+
+  We will call this node **SourceNode** in the rest of this procedure,
+  and its hostname stored in the environment variable ``SOURCE_NODE``
+  in the provided commands.
+
+- Choose a list of Raft Sessions to scan
+
+  Decide on which raft sessions will be scanned during this run of the
+  procedure. It may be all data Raft Sessions (usually 8 with IDs 1
+  through 8), or a subset.
+
+  We will store this set as a space-separated list of raft session
+  IDs, for example `1 2 3 4 5 6 7 8`, in the environment variable
+  `RAFT_SESSIONS_TO_SCAN` in the provided commands.
+
+- Choose a unique shared filesystem location that:
+
+  - has enough storage space to host Metadata databases of the raft
+    sessions being scanned (from a single node)
+
+  - will be network-accessible from each Metadata node (i.e. contents
+    can be `rsync` from/to Metadata hosts)
+
+  We will save this remote rsync location as
+  `REMOTE_DATABASES_HOST_PATH` environment variable in the provided
+  commands, for example `root@node-with-storage:/path/to/source-node-dbs`
+
+- Choose a filesystem location on each stateful node that has enough
+  storage space to host Metadata databases of the raft sessions being
+  scanned (from a single node) to receive a copy of the remote
+  databases from **SourceNode**. It can be for example a location on
+  the RING spinner disks. We will save this path to the environment
+  variable `LOCAL_DATABASES_PATH`, for example
+  `/scality/disk1/source-node-dbs`.
+
+- `env_host_data` Ansible variable value will be provided as
+  `ENV_HOST_DATA` environment variable in the provided commands.
+
+The following steps will be run as follows:
+
+- **Step Pre-check** is to be run on the supervisor
+
+- **Steps Prep-1 to Prep-4** are to be run on **SourceNode** only
+
+- **Step Scan-1 to Scan-5** are to be run repeatedly for each active
+  stateful host other than **SourceNode**, so four times on most
+  systems
+
+- **Step Results-1** is to be run once at the end of the scan, to
+  gather results
+
+### Pre-check: followers must be up-to-date
+
+On each raft session, check that all followers are up-to-date with the leader.
+
+You may use the following command on the supervisor to check this:
+
+```
+./ansible-playbook -i env/s3config/inventory tooling-playbooks/check-status-metadata.yml
+```
+
+Results are gathered in `/tmp/results.txt`: for all raft sessions,
+make sure that all `committed` values across active `md[x]-cluster[y]`
+members are within less than 100 entries to each other. Ignore values
+of `wsb[x]-cluster[y]` members.
+
+### Step Prep-1: Gather current cseq of each raft session to scan
+
+This step gathers the current cseq value of the **SourceNode** repd
+for all raft sessions to be scanned. The result will be passed on to
+the `compareFollowerDbs` command in order to remove false positives
+due to live changes while the procedure is executed.
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_ADMIN_PORT=$(jq .adminPort ${REPD_CONF})
+            echo -n '{"'${RS}'":'
+            curl -s "http://localhost:${REPD_ADMIN_PORT}/_/raft/state"
+            echo '}'
+        fi
+    done
+done \
+| jq -s 'reduce .[] as $item ({}; . + ($item | map_values(.committed)))' \
+| tee /tmp/rs-cseqs.json
+```
+
+This command should show a result resembling this, mapping raft
+session numbers to latest cseq values, and storing it in
+`/tmp/rs-cseqs.json`:
+
+```
+{
+  "1": 17074,
+  "2": 11121,
+  "3": 15666,
+  "4": 169677
+}
+```
+
+### Step Prep-2: Stop repd processes
+
+In order to be able to copy the databases, repd processes for the
+corresponding raft sessions to scan must be stopped.
+
+It can be done with the following script:
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf stop repd:${REPD_NAME}
+        fi
+    done
+done
+```
+
+In case errors occur, restart the command.
+
+### Step Prep-3: Copy databases to the remote location
+
+Copy the set of LevelDB databases hosting Metadata for the raft
+sessions in `RAFT_SESSIONS_TO_SCAN`, to the remote filesystem location
+defined as `REMOTE_DATABASES_HOST_PATH`.
+
+Assuming **SourceNode** has SSH access to the remote database host, it
+can be done with the following script:
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    echo "copying databases for raft session ${RS} to ${REMOTE_DATABASES_HOST_PATH}"
+    rsync -a ${ENV_HOST_DATA}/scality-metadata-databases-bucket/${RS} ${REMOTE_DATABASES_HOST_PATH}/
+done
+```
+
+In case errors occur, restart the command.
+
+
+### Step Prep-4: Restart repd processes
+
+It can be done with the following script:
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf start repd:${REPD_NAME}
+        fi
+    done
+done
+```
+
+In case errors occur, restart the command.
+
+**Important**: Run the following Scan steps on each stateful node
+  except **SourceNode**.
+
+### Step Scan-1: SSH to next stateful host to scan
+
+SSH to the next stateful host (excluding **SourceNode**) where the
+next scan will run to compare against **SourceNode**.
+
+Example:
+
+```
+ssh root@storage-2
+```
+
+### Step Scan-2: Copy remote databases locally
+
+Copy the set of LevelDB databases previously saved from **SourceNode**
+to the remote location locally.
+
+It can be done with the following script:
+
+```
+rsync -a ${REMOTE_DATABASES_HOST_PATH}/ ${LOCAL_DATABASES_PATH}/
+```
+
+### Step Scan-3: Stop repd processes
+
+In order to be able to scan the databases, repd processes must be
+stopped with the following command:
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf stop repd:${REPD_NAME}
+        fi
+    done
+done
+```
+
+In case errors occur, restart the command.
+
+
+### Step Scan-4: Scan local databases
+
+Run the "CompareRaftMembers/compareFollowerDbs" tool to generate a
+line-separated JSON output file showing all differences found between
+this node's databases and the SourceNode's databases, for the chosen
+list of raft sessions to scan.
+
+Note that the container must mount all metadata databases mountpoints
+in order to have access to all local databases, as well as mount
+`LOCAL_DATABASES_PATH`.
+
+Example command:
+```
+MY_DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
+DATABASE_MASTER_MOUNTPOINT=$(docker inspect scality-metadata-bucket-repd \
+| jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and (contains("/ssd01/") or contains("/ssd1/"))) | .Destination) | .[]')
+
+mkdir -p compareFollowerDbs-results
+docker run --net=host --rm \
+  -e 'BUCKETD_HOSTPORT=localhost:9000' \
+  ${MY_DATABASE_VOLUME_MOUNTS} \
+  -v ${LOCAL_DATABASES_PATH}:/databases2 \
+  -e "DATABASES1_GLOB=$(echo ${RAFT_SESSIONS_TO_SCAN} | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNTPOINT}/RS/0/*)" \
+  -e "DATABASES2_GLOB=$(echo ${RAFT_SESSIONS_TO_SCAN} | tr -d '\n' | xargs -d' ' -IRS echo /databases2/RS/0/*)" \
+  -v "${PWD}/compareFollowerDbs-results:/compareFollowerDbs-results" \
+  -e "DIFF_OUTPUT_FILE=/compareFollowerDbs-results/compareFollowerDbs-results.json" \
+  -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
+  registry.scality.com/s3utils/s3utils:1.13.21 \
+  bash -c 'DATABASES1=$(echo $DATABASES1_GLOB) DATABASES2=$(echo $DATABASES2_GLOB) node CompareRaftMembers/compareFollowerDbs' \
+| tee -a compareFollowerDbs.log
+
+```
+
+**Note**: the tool will refuse to override an existing diff output
+  file. If you need to re-run the command, first delete the output
+  file or give another path as DIFF_OUTPUT_FILE.
+
+### Step Scan-5: Restart stopped repd processes
+
+```
+for RS in ${RAFT_SESSIONS_TO_SCAN}; do
+    for REPD_CONF in ${ENV_HOST_DATA}/scality-metadata-bucket/conf/repd_*.json; do
+        REPD_RS=$(jq .raftSessionId ${REPD_CONF})
+        if [ $RS = $REPD_RS ]; then
+            REPD_CONF_FILE=$(basename ${REPD_CONF})
+            REPD_NAME=${REPD_CONF_FILE%%.json}
+            docker exec -u root scality-metadata-bucket-repd \
+            supervisorctl -c /conf/supervisor/supervisord-repd.conf start repd:${REPD_NAME}
+        fi
+    done
+done
+```
+
+In case errors occur, restart the command.
+
+**If there are more active stateful hosts to scan, continue with
+[Step Scan-1](#step-scan-1-ssh-to-next-stateful-host-to-scan-1) on the next
+active stateful host.**
+
+### Step Results-1: Gather results
+
+Finally, once all scans have been done on all active stateful hosts
+except **SourceNode**, gather all diff results for later analysis.
+
+For example:
+
+```
+for HOST in storage-2 storage-3 storage-4 storage-5; do
+    scp -r ${USER}@${HOST}:compareFollowerDbs-results ./compareFollowerDbs-results.${HOST}
+done
+```
+
+At this point, each results file contains a newline-separated set of
+JSON entries describing each difference found on each of the servers
+against **SourceNode**, for the databases used by each repd process on
+each node. This output is meant to be passed on to the [repair
+script](#repair-objects-affected-by-raft-divergence) to actually
+repair the divergences. More details on the output format can be found
+in the [tool's description
+summary](#compare-followers-databases-against-leader-view).
+
+### Caveats
 
 - The current version of the script does not work with Metadata bucket
   format v1, only with v0. If the need arises, it could be made to
