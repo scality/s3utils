@@ -51,6 +51,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          provenance: false
           push: true
           tags: "${{ env.REGISTRY_NAME }}/${{ env.NAMESPACE }}/${{ env.PROJECT_NAME }}:${{ env.TAG }}"
           cache-from: type=gha
