@@ -7,7 +7,7 @@ x-inputs:
     value: artesca-data-ops-count-items
   - name: count_items_job_duration_threshold
     type: config
-    value: 3600
+    value: 86400
 
 groups:
   - name: count-items-cronjob/alerts.rules

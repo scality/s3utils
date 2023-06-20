@@ -20,7 +20,7 @@ jobs:
           alert_file_path: monitoring/count-items-cronjob/alerts.yaml
           test_file_path: monitoring/count-items-cronjob/alerts.test.yaml
           alert_inputs: >-
-            namespace=zenko,count_items_cronjob=artesca-data-ops-count-items,count_items_job_duration_threshold=3600
+            namespace=zenko,count_items_cronjob=artesca-data-ops-count-items,count_items_job_duration_threshold=86400
           github_token: ${{ secrets.GIT_ACCESS_TOKEN }}
 
       - name: Render and test update-bucket-capacity-info-cronjob
