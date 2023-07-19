@@ -621,7 +621,7 @@ docker run \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
 -e 'NO_MISSING_KEY_CHECK=1' \
-registry.scality.com/s3utils/s3utils:1.13.3 \
+registry.scality.com/s3utils/s3utils:1.13.23 \
 node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
@@ -792,17 +792,17 @@ DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 DATABASE_MASTER_MOUNTPOINT=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and (contains("/ssd01/") or contains("/ssd1/"))) | .Destination) | .[]')
 
-mkdir -p followerDiff-results
+mkdir -p scan-results
 docker run --net=host --rm \
   -e 'BUCKETD_HOSTPORT=localhost:9000' \
   ${DATABASE_VOLUME_MOUNTS} \
   -e "DATABASES_GLOB=$(cat /tmp/rs-to-scan | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNTPOINT}/RS/0/*)" \
   -v "${PWD}/followerDiff-digests:/digests" \
   -e "LISTING_DIGESTS_INPUT_DIR=/digests" \
-  -v "${PWD}/followerDiff-results:/followerDiff-results" \
-  -e "DIFF_OUTPUT_FILE=/followerDiff-results/followerDiff-results.json" \
+  -v "${PWD}/scan-results:/scan-results" \
+  -e "DIFF_OUTPUT_FILE=/scan-results/scan-results.json" \
   -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
-  registry.scality.com/s3utils/s3utils:1.13.3 \
+  registry.scality.com/s3utils/s3utils:1.13.23 \
   bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
 | tee -a followerDiff.log
 
@@ -838,13 +838,13 @@ active stateful host.**
 ### Step Results-1: Gather results
 
 Finally, once all scans have been done on all active stateful hosts,
-gather all diff results for later analysis.
+gather all diff results for later analysis or [repair](#repair-procedure).
 
 For example:
 
 ```
 for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
-    scp -r ${USER}@${HOST}:followerDiff-results ./followerDiff-results.${HOST}
+    scp -r ${USER}@${HOST}:scan-results ./scan-results.${HOST}
 done
 ```
 
@@ -1018,7 +1018,7 @@ The following steps will be run as follows:
 
 - **Step Pre-check** is to be run on the supervisor
 
-- **Steps Prep-1 to Prep-4** are to be run on **SourceNode** only
+- **Steps Prep-1 to Prep-5** are to be run on **SourceNode** only
 
 - **Step Scan-1 to Scan-5** are to be run repeatedly for each active
   stateful host other than **SourceNode**, so four times on most
@@ -1078,7 +1078,21 @@ session numbers to latest cseq values, and storing it in
 }
 ```
 
-### Step Prep-2: Stop repd processes
+### Step Prep-2: Copy cseqs file to other nodes
+
+Copy the file just created on **SourceNode** to each other node that
+will be scanned.
+
+Assuming **SourceNode** is `storage-1` and there are 5 nodes to scan,
+this command would copy the file to each of the other 4 nodes:
+
+```
+for NODE in storage-2 storage-3 storage-4 storage-5; do
+    scp /tmp/rs-cseqs.json root@${NODE}:/tmp/
+done
+```
+
+### Step Prep-3: Stop repd processes
 
 In order to be able to copy the databases, repd processes for the
 corresponding raft sessions to scan must be stopped.
@@ -1101,7 +1115,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Prep-3: Copy databases to the remote location
+### Step Prep-4: Copy databases to the remote location
 
 Copy the set of LevelDB databases hosting Metadata for the raft
 sessions in `RAFT_SESSIONS_TO_SCAN`, to the remote filesystem location
@@ -1120,7 +1134,7 @@ done
 In case errors occur, restart the command.
 
 
-### Step Prep-4: Restart repd processes
+### Step Prep-5: Restart repd processes
 
 It can be done with the following script:
 
@@ -1205,17 +1219,17 @@ MY_DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 DATABASE_MASTER_MOUNTPOINT=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket") and (contains("/ssd01/") or contains("/ssd1/"))) | .Destination) | .[]')
 
-mkdir -p compareFollowerDbs-results
+mkdir -p scan-results
 docker run --net=host --rm \
   -e 'BUCKETD_HOSTPORT=localhost:9000' \
   ${MY_DATABASE_VOLUME_MOUNTS} \
   -v ${LOCAL_DATABASES_PATH}:/databases2 \
   -e "DATABASES1_GLOB=$(echo ${RAFT_SESSIONS_TO_SCAN} | tr -d '\n' | xargs -d' ' -IRS echo ${DATABASE_MASTER_MOUNTPOINT}/RS/0/*)" \
   -e "DATABASES2_GLOB=$(echo ${RAFT_SESSIONS_TO_SCAN} | tr -d '\n' | xargs -d' ' -IRS echo /databases2/RS/0/*)" \
-  -v "${PWD}/compareFollowerDbs-results:/compareFollowerDbs-results" \
-  -e "DIFF_OUTPUT_FILE=/compareFollowerDbs-results/compareFollowerDbs-results.json" \
+  -v "${PWD}/scan-results:/scan-results" \
+  -e "DIFF_OUTPUT_FILE=/scan-results/scan-results.json" \
   -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
-  registry.scality.com/s3utils/s3utils:1.13.21 \
+  registry.scality.com/s3utils/s3utils:1.13.23 \
   bash -c 'DATABASES1=$(echo $DATABASES1_GLOB) DATABASES2=$(echo $DATABASES2_GLOB) node CompareRaftMembers/compareFollowerDbs' \
 | tee -a compareFollowerDbs.log
 
@@ -1250,13 +1264,14 @@ active stateful host.**
 ### Step Results-1: Gather results
 
 Finally, once all scans have been done on all active stateful hosts
-except **SourceNode**, gather all diff results for later analysis.
+except **SourceNode**, gather all diff results for later analysis
+or [repair](#repair-procedure).
 
 For example:
 
 ```
 for HOST in storage-2 storage-3 storage-4 storage-5; do
-    scp -r ${USER}@${HOST}:compareFollowerDbs-results ./compareFollowerDbs-results.${HOST}
+    scp -r ${USER}@${HOST}:scan-results ./scan-results.${HOST}
 done
 ```
 
@@ -1373,8 +1388,10 @@ logs, looking for "ManualRepair" status):
 ## Repair Procedure
 
 To repair a set of objects with inconsistencies, first make sure that
-you ran the [scan procedure](#scan-procedure) and got results ready
-from `followerDiff-results.[host]` directories.
+you ran one of the scan procedures (with [stable
+leader](#scan-procedure-with-stable-leader) or [unstable
+leader](#scan-procedure-with-unstable-leader)) and got results ready
+from `scan-results.[host]` directories.
 
 ### Example Repair Command
 
@@ -1384,12 +1401,12 @@ practice to get a sense of what the script will attempt to do before
 executing it for real, looking at the logs first):
 
 ```
-cat followerDiff-results.storage-{1..5}/followerDiff-results.jsonl | \
+cat scan-results.storage-{1..5}/scan-results.jsonl | \
 docker run -i --net=host --rm \
   -e "BUCKETD_HOSTPORT=localhost:9000" \
   -e "SPROXYD_HOSTPORT=localhost:8181" \
   -e "DRY_RUN=1" \
-  registry.scality.com/s3utils/s3utils:1.13.3 \
+  registry.scality.com/s3utils/s3utils:1.13.23 \
   node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
@@ -1397,11 +1414,11 @@ If results make sense, it can be executed without the "DRY_RUN"
 option to execute the possible automatic repairs, if any:
 
 ```
-cat followerDiff-results.storage-{1..5}/followerDiff-results.jsonl | \
+cat scan-results.storage-{1..5}/scan-results.jsonl | \
 docker run -i --net=host --rm \
   -e "BUCKETD_HOSTPORT=localhost:9000" \
   -e "SPROXYD_HOSTPORT=localhost:8181" \
-  registry.scality.com/s3utils/s3utils:1.13.3 \
+  registry.scality.com/s3utils/s3utils:1.13.23 \
   node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
