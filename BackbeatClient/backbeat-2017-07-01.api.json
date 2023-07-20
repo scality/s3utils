@@ -713,6 +713,55 @@
                 }
             }
         },
+        "GenerateVersionId": {
+            "http": {
+                "method": "PUT",
+                "requestUri": "/_/backbeat/generateversionid/{Bucket}/{Key+}"
+            },
+            "input": {
+                "type": "structure",
+                "required": [
+                    "Bucket",
+                    "Key"
+                ],
+                "members": {
+                    "Bucket": {
+                        "location": "uri",
+                        "locationName": "Bucket"
+                    },
+                    "Key": {
+                        "location": "uri",
+                        "locationName": "Key"
+                    },
+                    "ContentLength": {
+                        "location": "header",
+                        "locationName": "Content-Length",
+                        "type": "long"
+                    },
+                    "ContentMD5": {
+                        "location": "header",
+                        "locationName": "Content-MD5"
+                    },
+                    "Body": {
+                        "type": "blob"
+                    },
+                    "ReplicationContent": {
+                        "location": "header",
+                        "locationName": "x-scal-replication-content",
+                        "type": "string"
+                    }
+                },
+                "payload": "Body"
+            },
+            "output": {
+                "type": "structure",
+                "members": {
+                    "versionId": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "GetMetadata": {
             "http": {
                 "method": "GET",

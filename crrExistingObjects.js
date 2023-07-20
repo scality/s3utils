@@ -133,6 +133,7 @@ function _objectShouldBeUpdated(objMD) {
 
 function _markObjectPending(bucket, key, versionId, storageClass,
     repConfig, cb) {
+    console.log('marking object pending', { bucket, key, versionId })
     let objMD;
     let skip = false;
     return waterfall([
@@ -148,6 +149,12 @@ function _markObjectPending(bucket, key, versionId, storageClass,
                 skip = true;
                 return next();
             }
+            console.log({
+                objMD,
+                versionID: objMD.versionId,
+                hasVersionId: !!objMD.versionId,
+            })
+
             if (objMD.versionId) {
                 // The object already has an *internal* versionId,
                 // which exists when the object has been put on
@@ -165,10 +172,9 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             // will be able to create a versioned key for this object,
             // so that replication can happen. The externally visible
             // version will stay "null".
-            return bb.putMetadata({
+            return bb.generateVersionId({
                 Bucket: bucket,
                 Key: key,
-                VersionId: versionId,
                 ContentLength: Buffer.byteLength(mdRes.Body),
                 Body: mdRes.Body,
             }, (err, putRes) => {
