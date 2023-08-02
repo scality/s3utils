@@ -165,10 +165,9 @@ function _markObjectPending(bucket, key, versionId, storageClass,
             // will be able to create a versioned key for this object,
             // so that replication can happen. The externally visible
             // version will stay "null".
-            return bb.putMetadata({
+            return bb.generateVersionId({
                 Bucket: bucket,
                 Key: key,
-                VersionId: versionId,
                 ContentLength: Buffer.byteLength(mdRes.Body),
                 Body: mdRes.Body,
             }, (err, putRes) => {
