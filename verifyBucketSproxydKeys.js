@@ -140,6 +140,7 @@ const status = {
     objectsWithMissingKeys: 0,
     objectsWithDupKeys: 0,
     objectsWithEmptyMetadata: 0,
+    objectsWithDupVersionIds: 0,
     objectsErrors: 0,
     bucketInProgress: null,
     KeyMarker: '',
@@ -194,6 +195,7 @@ function logProgress(message) {
         haveMissingKeys: NO_MISSING_KEY_CHECK ? undefined : status.objectsWithMissingKeys,
         haveDupKeys: status.objectsWithDupKeys,
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
+        haveDupVersionIds: status.objectsWithDupVersionIds,
         errors: status.objectErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
@@ -416,6 +418,30 @@ function listBucketIter(bucket, cb) {
 
             const md = JSON.parse(item.value);
             if (vidSepPos === -1) {
+                const reVersionIds = /"versionId":"([^"]*)"/g;
+                const versionIds = [];
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    const reVersionIdMatch = reVersionIds.exec(item.value);
+                    if (!reVersionIdMatch) {
+                        break;
+                    }
+                    versionIds.push(reVersionIdMatch[1]);
+                }
+                if (versionIds.length > 1) {
+                    const versionedKey = `${item.key}\0${versionIds[0]}`;
+                    const versionedKeyUrl = getObjectURL(bucket, versionedKey);
+                    log.error('object master metadata with duplicate "versionId" field found', {
+                        objectUrl,
+                        firstVersionId: versionIds[0],
+                        versionedKeyUrl,
+                    });
+                    status.objectsWithDupVersionIds += 1;
+                    // replace with the (assumed legit) first version
+                    // ID to allow correct skipping of version keys
+                    // eslint-disable-next-line prefer-destructuring
+                    md.versionId = versionIds[0];
+                }
                 lastMasterKey = item.key;
                 lastMasterVersionId = md.versionId;
                 if (md.versionId) {
