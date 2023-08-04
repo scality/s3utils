@@ -3,7 +3,7 @@ const async = require('async');
 const readline = require('readline');
 const { Logger } = require('werelogs');
 const {
-    fetchObjectMetadata,
+    httpRequest,
     putObjectMetadata,
 } = require('./repairDuplicateVersionsSuite');
 
@@ -11,7 +11,15 @@ const log = new Logger('s3utils:repairDuplicateVersionIds');
 
 const {
     OBJECT_REPAIR_BUCKETD_HOSTPORT,
+    OBJECT_REPAIR_TLS_KEY_PATH,
+    OBJECT_REPAIR_TLS_CERT_PATH,
+    OBJECT_REPAIR_TLS_CA_PATH,
 } = process.env;
+
+const useHttps = (OBJECT_REPAIR_TLS_KEY_PATH !== undefined
+                  && OBJECT_REPAIR_TLS_KEY_PATH !== ''
+                  && OBJECT_REPAIR_TLS_CERT_PATH !== undefined
+                  && OBJECT_REPAIR_TLS_CERT_PATH !== '');
 
 const USAGE = `
 repairDuplicateVersionIds.js
@@ -51,9 +59,12 @@ const objectsToRepair = [];
 
 const status = {
     logLinesRead: 0,
+    objectsSkipped: 0,
     objectsRepaired: 0,
     objectsErrors: 0,
 };
+
+const errorMetadataUpdated = new Error('metadata updated');
 
 function logProgress(message) {
     log.info(message, { ...status, objectsToRepair: objectsToRepair.length });
@@ -93,9 +104,26 @@ function readVerifyLog(cb) {
     });
 }
 
+function fetchRawObjectMetadata(objectUrl, cb) {
+    if (!objectUrl.startsWith('s3://')) {
+        return cb(new Error(`malformed object URL ${objectUrl}: must start with "s3://"`));
+    }
+    const bucketAndObject = objectUrl.slice(5);
+    const url = `${useHttps ? 'https' : 'http'}://${OBJECT_REPAIR_BUCKETD_HOSTPORT}/default/bucket/${bucketAndObject}`;
+    return httpRequest('GET', url, null, (err, res) => {
+        if (err) {
+            return cb(err);
+        }
+        if (res.statusCode !== 200) {
+            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+        }
+        return cb(null, res.body);
+    });
+}
+
 function repairObject(objInfo, cb) {
     async.waterfall([
-        next => fetchObjectMetadata(objInfo.objectUrl, (err, md) => {
+        next => fetchRawObjectMetadata(objInfo.objectUrl, (err, md) => {
             if (err) {
                 log.error('error fetching object location', {
                     objectUrl: objInfo.objectUrl,
@@ -105,10 +133,32 @@ function repairObject(objInfo, cb) {
             }
             return next(null, md);
         }),
-        (md, next) => {
+        (rawMD, next) => {
+            const reVersionIds = /"versionId":"([^"]*)"/g;
+            const versionIds = [];
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const reVersionIdMatch = reVersionIds.exec(rawMD);
+                if (!reVersionIdMatch) {
+                    break;
+                }
+                versionIds.push(reVersionIdMatch[1]);
+            }
+            if (versionIds.length < 2) {
+                log.info('skipping repair: master key has no more duplicate "versionId"', {
+                    objectUrl: objInfo.objectUrl,
+                    versionId: versionIds.length > 0 ? versionIds[0] : undefined,
+                });
+                return next(errorMetadataUpdated);
+            }
+            const md = JSON.parse(rawMD);
+            // use "versionId" from the parsed metadata instead of
+            // `objInfo.firstVersionId`, since it may have changed
+            // since the scan ran
+            //
             // eslint-disable-next-line no-param-reassign
-            md.versionId = objInfo.firstVersionId;
-            putObjectMetadata(objInfo.objectUrl, md, err => {
+            [md.versionId] = versionIds;
+            return putObjectMetadata(objInfo.objectUrl, md, err => {
                 if (err) {
                     log.error('error putting object metadata to master key', {
                         objectUrl: objInfo.objectUrl,
@@ -119,27 +169,35 @@ function repairObject(objInfo, cb) {
                 return next(null, md);
             });
         },
-        (md, next) => putObjectMetadata(objInfo.versionedKeyUrl, md, err => {
-            if (err) {
-                log.error('error putting object metadata to versioned key', {
+        (md, next) => {
+            const versionedKeyUrl = `${objInfo.objectUrl}${encodeURIComponent(`\0${md.versionId}`)}`;
+            putObjectMetadata(versionedKeyUrl, md, err => {
+                if (err) {
+                    log.error('error putting object metadata to versioned key', {
+                        objectUrl: objInfo.objectUrl,
+                        versionedKeyUrl,
+                        error: { message: err.message },
+                    });
+                    return next(err);
+                }
+                return next(null, md);
+            });
+        },
+    ], (err, md) => {
+        if (err) {
+            if (err === errorMetadataUpdated) {
+                status.objectsSkipped += 1;
+            } else {
+                log.error('an error occurred repairing object', {
                     objectUrl: objInfo.objectUrl,
-                    versionedKeyUrl: objInfo.versionedKeyUrl,
                     error: { message: err.message },
                 });
-                return next(err);
+                status.objectsErrors += 1;
             }
-            return next();
-        }),
-    ], err => {
-        if (err) {
-            log.error('an error occurred repairing object', {
-                objectUrl: objInfo.objectUrl,
-                error: { message: err.message },
-            });
-            status.objectsErrors += 1;
         } else {
             log.info('repaired object metadata', {
                 objectUrl: objInfo.objectUrl,
+                versionId: md.versionId,
             });
             status.objectsRepaired += 1;
         }
