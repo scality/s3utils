@@ -1527,6 +1527,43 @@ we suggest to disable those operations on the clients during the time
 the script is running (or alternatively, disable all writes), to avoid
 any such risk.
 
+
+# Repair object metadata with duplicate 'versionId' field
+
+This script repairs object versions that have a duplicate versionId
+field in the master key and a missing version key, in particular due
+to bug S3C-7861 (CRR with incompatible S3C versions between source and
+target).
+
+The repair action consists of fetching the source metadata from the
+master key, fixing the JSON versionId field to be the first versionId
+present in the binary blob (assumed to be the original one, hence
+correct), then copying it to both the master key and a new version
+key.
+
+## Usage
+
+```
+node repairDuplicateVersionIds.js
+```
+
+## Standard Input
+
+The standard input must be fed with the JSON logs output by the
+verifyBucketSproxydKeys.js s3utils script. This script only processes
+the log entries containing the message 'object master metadata with
+duplicate "versionId" field found' and ignores other entries.
+
+## Mandatory environment variables
+
+* **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+
+## Example
+
+```
+cat /tmp/verifyBucketSproxydKeys.log | docker run -i registry.scality.com/s3utils/s3utils:1.13.24 bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 node repairDuplicateVersionIds.js' > /tmp/repairDuplicateVersionIds.log
+```
+
 # Cleanup Noncurrent Versions
 
 This script removes noncurrent versions and current/noncurrent delete
