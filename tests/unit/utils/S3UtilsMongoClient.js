@@ -522,13 +522,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     replicationInfo: {
                         backends: [],
                     },
-                    location: [{
-                        key: 1,
-                        size: 10,
-                        start: 0,
-                        dataStoreName: 'cold-location',
-                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
-                    }],
                     archive: {
                         archiveInfo: {},
                         restoreRequestedAt: new Date(Date.now() - 1000),
@@ -558,21 +551,15 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 _id: 'testkey6',
                 value: {
                     ...objectMdTemp,
-                    replicationInfo: {
+                    'replicationInfo': {
                         backends: [],
                     },
-                    location: [{
-                        key: 1,
-                        size: 10,
-                        start: 0,
-                        dataStoreName: 'cold-location',
-                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
-                    }],
-                    archive: {
+                    'archive': {
                         archiveInfo: {},
                         restoreCompletedAt: new Date(Date.now() - 1000),
                         restoreWillExpireAt: new Date(Date.now() + 1000),
                     },
+                    'x-amz-storage-class': 'cold-location',
                 },
             },
             locationConfig,

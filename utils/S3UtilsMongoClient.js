@@ -28,6 +28,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 'value.isDeleteMarker': 1,
                 'value.isNull': 1,
                 'value.archive': 1,
+                'value.x-amz-storage-class': 1,
             },
         });
         const collRes = {
@@ -222,16 +223,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
         if (entry.value.archive
             && entry.value.archive.restoreCompletedAt <= Date.now()
             && entry.value.archive.restoreWillExpireAt > Date.now()) {
-            entry.value.location.forEach(location => {
-                if (locationConfig[location.dataStoreName]
-                    && locationConfig[location.dataStoreName].isCold) {
-                    if (results.location[location.dataStoreName]) {
-                        results.location[location.dataStoreName] += size;
-                    } else {
-                        results.location[location.dataStoreName] = size;
-                    }
+            const coldLocation = entry.value['x-amz-storage-class'];
+            if (coldLocation && coldLocation !== entry.value.dataStoreName) {
+                if (results.location[coldLocation]) {
+                    results.location[coldLocation] += size;
+                } else {
+                    results.location[coldLocation] = size;
                 }
-            });
+            }
         }
 
         // use location.objectId as key instead of location name
