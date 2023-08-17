@@ -29,6 +29,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 'value.isNull': 1,
                 'value.archive': 1,
                 'value.x-amz-storage-class': 1,
+                'value.isPHD': 1,
             },
         });
         const collRes = {
@@ -73,7 +74,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             entry: res,
                             error,
                         });
-                        return callback(error);
+                        return;
+                    }
+
+                    if (Object.keys(data).length === 0) {
+                        // Skipping entry, esp. in case of PHD
+                        return;
                     }
 
                     let targetCount;
@@ -173,7 +179,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * @param{object} bucketCreationDate -
      * @param{boolean} isTransient -
      * @param{object} locationConfig - locationConfig.json
-     * @returns{object.<string, number>} results -
+     * @returns{object} results -
      */
     _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
         if (!bucketName) {
@@ -181,6 +187,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 data: {},
                 error: new Error('no bucket name provided'),
             };
+        }
+
+        if (entry.value.isPHD && !entry.value.hasOwnProperty('content-length')) {
+            // In some case, PHD are re-created form scratch and do not hold any information
+            // (when deleting a delete marker which is the latest version). This should be very
+            // transient (they should be cleaned after 5 seconds), but should not create any
+            // error.
+            return { data: {}, error: null };
         }
 
         const size = Number.parseInt(entry.value['content-length'], 10);

@@ -662,6 +662,23 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 error: null,
             },
         ],
+        [
+            'should ignore PHD',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey12',
+                value: {
+                    versionId: '0123456789abcdefg',
+                    isPHD: true,
+                },
+            },
+            locationConfig,
+            {
+                data: {},
+                error: null,
+            },
+        ],
     ];
     tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {
         assert.deepStrictEqual(
