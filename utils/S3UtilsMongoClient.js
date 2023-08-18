@@ -77,8 +77,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         return;
                     }
 
-                    if (Object.keys(data).length === 0) {
+                    if (!data) {
                         // Skipping entry, esp. in case of PHD
+                        log.info('Skipping entry', {
+                            method: 'getObjectMDStats',
+                            entry: res,
+                        });
                         return;
                     }
 
@@ -183,10 +187,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
      */
     _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
         if (!bucketName) {
-            return {
-                data: {},
-                error: new Error('no bucket name provided'),
-            };
+            return { error: new Error('no bucket name provided') };
         }
 
         if (entry.value.isPHD && !entry.value.hasOwnProperty('content-length')) {
@@ -194,22 +195,16 @@ class S3UtilsMongoClient extends MongoClientInterface {
             // (when deleting a delete marker which is the latest version). This should be very
             // transient (they should be cleaned after 5 seconds), but should not create any
             // error.
-            return { data: {}, error: null };
+            return {};
         }
 
         const size = Number.parseInt(entry.value['content-length'], 10);
         if (Number.isNaN(size)) {
-            return {
-                data: {},
-                error: new Error('invalid content length'),
-            };
+            return { error: new Error('invalid content length') };
         }
 
         if (!locationConfig) {
-            return {
-                data: {},
-                error: new Error('empty locationConfig'),
-            };
+            return { error: new Error('empty locationConfig') };
         }
         const results = {
             // there will be only one bucket for an object entry, and use `bucketName_creationDate` as key
@@ -261,10 +256,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             }
         }
 
-        return {
-            data: results,
-            error: null,
-        };
+        return { data: results };
     }
 
     _handleResults(res, isVersioned) {
