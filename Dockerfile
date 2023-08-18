@@ -1,4 +1,4 @@
-ARG NODE_VERSION=16.20-bullseye-slim
+ARG NODE_VERSION=16.20.2-bullseye-slim
 
 # Use separate builder to retrieve & build node modules
 FROM node:${NODE_VERSION} AS builder
