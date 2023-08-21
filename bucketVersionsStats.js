@@ -18,6 +18,8 @@ const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
 const { HTTPS_CA_PATH } = process.env;
 const { HTTPS_NO_VERIFY } = process.env;
+const { OLDER_THAN } = process.env;
+const VERBOSE = !!process.env.VERBOSE;
 const AWS_SDK_REQUEST_RETRIES = 100;
 const AWS_SDK_REQUEST_INITIAL_DELAY_MS = 30;
 
@@ -45,6 +47,8 @@ Optional environment variables:
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
+    OLDER_THAN: only count versions older than this date (format: YYYY-MM-DD or <number of seconds>s)
+    VERBOSE: set to a non-empty value to enable logging of individual version info
 `;
 
 // We accept console statements for usage purpose
@@ -57,6 +61,21 @@ Optional environment variables:
     }
 });
 const s3EndpointIsHttps = ENDPOINT.startsWith('https:');
+
+let _OLDER_THAN_TIMESTAMP;
+if (OLDER_THAN) {
+    if (OLDER_THAN.endsWith('s')) {
+        _OLDER_THAN_TIMESTAMP = Date.now() - Number.parseInt(OLDER_THAN, 10) * 1000;
+    } else {
+        _OLDER_THAN_TIMESTAMP = Date.parse(OLDER_THAN);
+    }
+    if (Number.isNaN(_OLDER_THAN_TIMESTAMP)) {
+        console.error('Invalid OLDER_THAN value, must be either a date in ISO 8601 format or a number of seconds suffixed with "s"');
+        console.error(USAGE);
+        process.exit(1);
+    }
+    _OLDER_THAN_TIMESTAMP = new Date(_OLDER_THAN_TIMESTAMP);
+}
 
 /* eslint-enable no-console */
 log.info('Start listing bucket for gathering versions statistics', {
@@ -171,9 +190,22 @@ function listBucket(bucket, cb) {
                     return done(err);
                 }
                 for (const version of data.Versions) {
+                    if (_OLDER_THAN_TIMESTAMP && new Date(version.LastModified) > _OLDER_THAN_TIMESTAMP) {
+                        continue;
+                    }
                     const statObj = version.IsLatest ? stats.current : stats.noncurrent;
                     statObj.count += 1;
                     statObj.size += version.Size || 0;
+                    if (VERBOSE) {
+                        log.info('version info', {
+                            bucket: BUCKET,
+                            key: version.Key,
+                            versionId: version.VersionId,
+                            isLatest: version.IsLatest,
+                            lastModified: version.LastModified,
+                            size: version.Size,
+                        });
+                    }
                 }
                 NextKeyMarker = data.NextKeyMarker;
                 NextVersionIdMarker = data.NextVersionIdMarker;
