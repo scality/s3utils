@@ -6,6 +6,8 @@ const { doWhilst } = require('async');
 
 const { Logger } = require('werelogs');
 
+const parseOlderThan = require('./utils/parseOlderThan');
+
 const log = new Logger('s3utils::bucketVersionsStats');
 const { ENDPOINT } = process.env;
 const { ACCESS_KEY } = process.env;
@@ -64,17 +66,12 @@ const s3EndpointIsHttps = ENDPOINT.startsWith('https:');
 
 let _OLDER_THAN_TIMESTAMP;
 if (OLDER_THAN) {
-    if (OLDER_THAN.endsWith('s')) {
-        _OLDER_THAN_TIMESTAMP = Date.now() - Number.parseInt(OLDER_THAN, 10) * 1000;
-    } else {
-        _OLDER_THAN_TIMESTAMP = Date.parse(OLDER_THAN);
-    }
-    if (Number.isNaN(_OLDER_THAN_TIMESTAMP)) {
+    _OLDER_THAN_TIMESTAMP = parseOlderThan(OLDER_THAN);
+    if (Number.isNaN(_OLDER_THAN_TIMESTAMP.getTime())) {
         console.error('Invalid OLDER_THAN value, must be either a date in ISO 8601 format or a number of seconds suffixed with "s"');
         console.error(USAGE);
         process.exit(1);
     }
-    _OLDER_THAN_TIMESTAMP = new Date(_OLDER_THAN_TIMESTAMP);
 }
 
 /* eslint-enable no-console */
