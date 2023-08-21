@@ -49,8 +49,12 @@ Optional environment variables:
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
-    OLDER_THAN: only count versions older than this date (format: YYYY-MM-DD or <number of seconds>s)
     VERBOSE: set to a non-empty value to enable logging of individual version info
+    OLDER_THAN: only count versions older than this date
+        set this as an ISO date, a number of days, or a number of seconds e.g.,
+        - setting to "2022-11-30T00:00:00Z" counts objects created/modified before Nov 30th 2022
+        - setting to "30 days" counts objects created/modified more than 30 days ago
+        - setting to "30 seconds" counts objects created/modified more than 30 seconds ago
 `;
 
 // We accept console statements for usage purpose
@@ -68,7 +72,7 @@ let _OLDER_THAN_TIMESTAMP;
 if (OLDER_THAN) {
     _OLDER_THAN_TIMESTAMP = parseOlderThan(OLDER_THAN);
     if (Number.isNaN(_OLDER_THAN_TIMESTAMP.getTime())) {
-        console.error('Invalid OLDER_THAN value, must be either a date in ISO 8601 format or a number of seconds suffixed with "s"');
+        console.error('OLDER_THAN is not valid');
         console.error(USAGE);
         process.exit(1);
     }
