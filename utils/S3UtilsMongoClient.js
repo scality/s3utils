@@ -190,11 +190,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
             return { error: new Error('no bucket name provided') };
         }
 
-        if (entry.value.isPHD && !entry.value.hasOwnProperty('content-length')) {
-            // In some case, PHD are re-created form scratch and do not hold any information
-            // (when deleting a delete marker which is the latest version). This should be very
-            // transient (they should be cleaned after 5 seconds), but should not create any
-            // error.
+        if (entry.value.isPHD) {
+            // PHD are created transiently in place of a master when it is deleted, until
+            // they get replaced with the "new" master. They may either hold no information
+            // (and cannot be processed) or information related to the earlier master (and
+            // thus not correct): so best to just ignore them.
             return {};
         }
 
