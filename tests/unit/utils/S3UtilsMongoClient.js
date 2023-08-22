@@ -299,7 +299,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
-                error: null,
             },
         ],
         [
@@ -328,7 +327,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { completed: 42 },
                 },
-                error: null,
             },
         ],
         [
@@ -357,7 +355,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
-                error: null,
             },
         ],
         [
@@ -386,7 +383,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42, 'completed': 42 },
                 },
-                error: null,
             },
         ],
         [
@@ -429,7 +425,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         'completed-3': 42,
                     },
                 },
-                error: null,
             },
         ],
         [
@@ -473,7 +468,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         'completed-2': 42,
                     },
                 },
-                error: null,
             },
         ],
         [
@@ -507,7 +501,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         'cold-location': 42,
                     },
                 },
-                error: null,
             },
         ],
         [
@@ -522,13 +515,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     replicationInfo: {
                         backends: [],
                     },
-                    location: [{
-                        key: 1,
-                        size: 10,
-                        start: 0,
-                        dataStoreName: 'cold-location',
-                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
-                    }],
                     archive: {
                         archiveInfo: {},
                         restoreRequestedAt: new Date(Date.now() - 1000),
@@ -546,7 +532,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         'cold-location': 42,
                     },
                 },
-                error: null,
             },
         ],
         [
@@ -558,21 +543,15 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 _id: 'testkey6',
                 value: {
                     ...objectMdTemp,
-                    replicationInfo: {
+                    'replicationInfo': {
                         backends: [],
                     },
-                    location: [{
-                        key: 1,
-                        size: 10,
-                        start: 0,
-                        dataStoreName: 'cold-location',
-                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
-                    }],
-                    archive: {
+                    'archive': {
                         archiveInfo: {},
                         restoreCompletedAt: new Date(Date.now() - 1000),
                         restoreWillExpireAt: new Date(Date.now() + 1000),
                     },
+                    'x-amz-storage-class': 'cold-location',
                 },
             },
             locationConfig,
@@ -585,7 +564,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         'cold-location': 42,
                     },
                 },
-                error: null,
             },
         ],
         [
@@ -600,10 +578,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 },
             },
             locationConfig,
-            {
-                data: {},
-                error: new Error('invalid content length'),
-            },
+            { error: new Error('invalid content length') },
         ],
         [
             'should correctly process entry with string typed content-length',
@@ -623,7 +598,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: { 'us-east-1': 42 },
                 },
-                error: null,
             },
         ],
         [
@@ -635,10 +609,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 value: objectMdTemp,
             },
             locationConfig,
-            {
-                data: {},
-                error: new Error('no bucket name provided'),
-            },
+            { error: new Error('no bucket name provided') },
         ],
         [
             'should return error if locationConfig is empty',
@@ -649,10 +620,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                 value: objectMdTemp,
             },
             null,
-            {
-                data: {},
-                error: new Error('empty locationConfig'),
-            },
+            { error: new Error('empty locationConfig') },
         ],
         [
             'should ignore the location if bucket\'s location is not in locationConfig',
@@ -672,8 +640,21 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: {},
                 },
-                error: null,
             },
+        ],
+        [
+            'should ignore PHD',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey12',
+                value: {
+                    versionId: '0123456789abcdefg',
+                    isPHD: true,
+                },
+            },
+            locationConfig,
+            {},
         ],
     ];
     tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {

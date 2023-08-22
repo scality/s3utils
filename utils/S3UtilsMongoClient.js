@@ -28,6 +28,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 'value.isDeleteMarker': 1,
                 'value.isNull': 1,
                 'value.archive': 1,
+                'value.x-amz-storage-class': 1,
+                'value.isPHD': 1,
             },
         });
         const collRes = {
@@ -72,7 +74,16 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             entry: res,
                             error,
                         });
-                        return callback(error);
+                        return;
+                    }
+
+                    if (!data) {
+                        // Skipping entry, esp. in case of PHD
+                        log.info('Skipping entry', {
+                            method: 'getObjectMDStats',
+                            entry: res,
+                        });
+                        return;
                     }
 
                     let targetCount;
@@ -172,29 +183,28 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * @param{object} bucketCreationDate -
      * @param{boolean} isTransient -
      * @param{object} locationConfig - locationConfig.json
-     * @returns{object.<string, number>} results -
+     * @returns{object} results -
      */
     _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
         if (!bucketName) {
-            return {
-                data: {},
-                error: new Error('no bucket name provided'),
-            };
+            return { error: new Error('no bucket name provided') };
+        }
+
+        if (entry.value.isPHD && !entry.value.hasOwnProperty('content-length')) {
+            // In some case, PHD are re-created form scratch and do not hold any information
+            // (when deleting a delete marker which is the latest version). This should be very
+            // transient (they should be cleaned after 5 seconds), but should not create any
+            // error.
+            return {};
         }
 
         const size = Number.parseInt(entry.value['content-length'], 10);
         if (Number.isNaN(size)) {
-            return {
-                data: {},
-                error: new Error('invalid content length'),
-            };
+            return { error: new Error('invalid content length') };
         }
 
         if (!locationConfig) {
-            return {
-                data: {},
-                error: new Error('empty locationConfig'),
-            };
+            return { error: new Error('empty locationConfig') };
         }
         const results = {
             // there will be only one bucket for an object entry, and use `bucketName_creationDate` as key
@@ -222,16 +232,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
         if (entry.value.archive
             && entry.value.archive.restoreCompletedAt <= Date.now()
             && entry.value.archive.restoreWillExpireAt > Date.now()) {
-            entry.value.location.forEach(location => {
-                if (locationConfig[location.dataStoreName]
-                    && locationConfig[location.dataStoreName].isCold) {
-                    if (results.location[location.dataStoreName]) {
-                        results.location[location.dataStoreName] += size;
-                    } else {
-                        results.location[location.dataStoreName] = size;
-                    }
+            const coldLocation = entry.value['x-amz-storage-class'];
+            if (coldLocation && coldLocation !== entry.value.dataStoreName) {
+                if (results.location[coldLocation]) {
+                    results.location[coldLocation] += size;
+                } else {
+                    results.location[coldLocation] = size;
                 }
-            });
+            }
         }
 
         // use location.objectId as key instead of location name
@@ -248,10 +256,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             }
         }
 
-        return {
-            data: results,
-            error: null,
-        };
+        return { data: results };
     }
 
     _handleResults(res, isVersioned) {
