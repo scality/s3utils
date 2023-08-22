@@ -24,4 +24,8 @@ describe('parseOlderThan', () => {
         const d = parseOlderThan('30 days');
         expect(d.toISOString()).toEqual('2022-06-14T00:00:00.000Z');
     });
+    test('as 30 seconds past the current date', () => {
+        const d = parseOlderThan('30 seconds');
+        expect(d.toISOString()).toEqual('2022-07-13T23:59:30.000Z');
+    });
 });
