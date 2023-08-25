@@ -6,6 +6,8 @@ const { doWhilst } = require('async');
 
 const { Logger } = require('werelogs');
 
+const parseOlderThan = require('./utils/parseOlderThan');
+
 const log = new Logger('s3utils::bucketVersionsStats');
 const { ENDPOINT } = process.env;
 const { ACCESS_KEY } = process.env;
@@ -18,6 +20,8 @@ const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
 const { HTTPS_CA_PATH } = process.env;
 const { HTTPS_NO_VERIFY } = process.env;
+const { OLDER_THAN } = process.env;
+const VERBOSE = !!process.env.VERBOSE;
 const AWS_SDK_REQUEST_RETRIES = 100;
 const AWS_SDK_REQUEST_INITIAL_DELAY_MS = 30;
 
@@ -45,6 +49,12 @@ Optional environment variables:
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
+    VERBOSE: set to a non-empty value to enable logging of individual version info
+    OLDER_THAN: only count versions older than this date
+        set this as an ISO date, a number of days, or a number of seconds e.g.,
+        - setting to "2022-11-30T00:00:00Z" counts objects created/modified before Nov 30th 2022
+        - setting to "30 days" counts objects created/modified more than 30 days ago
+        - setting to "30 seconds" counts objects created/modified more than 30 seconds ago
 `;
 
 // We accept console statements for usage purpose
@@ -57,6 +67,16 @@ Optional environment variables:
     }
 });
 const s3EndpointIsHttps = ENDPOINT.startsWith('https:');
+
+let _OLDER_THAN_TIMESTAMP;
+if (OLDER_THAN) {
+    _OLDER_THAN_TIMESTAMP = parseOlderThan(OLDER_THAN);
+    if (Number.isNaN(_OLDER_THAN_TIMESTAMP.getTime())) {
+        console.error('OLDER_THAN is not valid');
+        console.error(USAGE);
+        process.exit(1);
+    }
+}
 
 /* eslint-enable no-console */
 log.info('Start listing bucket for gathering versions statistics', {
@@ -171,9 +191,22 @@ function listBucket(bucket, cb) {
                     return done(err);
                 }
                 for (const version of data.Versions) {
+                    if (_OLDER_THAN_TIMESTAMP && new Date(version.LastModified) > _OLDER_THAN_TIMESTAMP) {
+                        continue;
+                    }
                     const statObj = version.IsLatest ? stats.current : stats.noncurrent;
                     statObj.count += 1;
                     statObj.size += version.Size || 0;
+                    if (VERBOSE) {
+                        log.info('version info', {
+                            bucket: BUCKET,
+                            key: version.Key,
+                            versionId: version.VersionId,
+                            isLatest: version.IsLatest,
+                            lastModified: version.LastModified,
+                            size: version.Size,
+                        });
+                    }
                 }
                 NextKeyMarker = data.NextKeyMarker;
                 NextVersionIdMarker = data.NextVersionIdMarker;

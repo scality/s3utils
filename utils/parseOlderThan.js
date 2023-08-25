@@ -16,6 +16,11 @@ function parseOlderThan(olderThan) {
         cutoff.setDate(cutoff.getDate() - numberOfDays);
         return cutoff;
     }
+    const numberOfSecsMatch = /^([0-9]+) seconds?$/.exec(olderThan);
+    if (numberOfSecsMatch) {
+        const numberOfMs = Number.parseInt(numberOfSecsMatch[1], 10) * 1000;
+        return new Date(Date.now() - numberOfMs);
+    }
     return new Date(olderThan);
 }
 
