@@ -184,20 +184,20 @@ function _listObjectVersions(bucket, KeyMarker, VersionIdMarker, cb) {
         VersionIdMarker,
     });
 
-    req.on('httpDone', (res) => {
-        const parser = new xml2js.Parser();
-        parser.parseString(res.httpResponse.body, (err, data) => {
-            console.log( {data });
-        });
-    });
+    // req.on('httpDone', (res) => {
+    //     const parser = new xml2js.Parser();
+    //     parser.parseString(res.httpResponse.body, (err, data) => {
+    //         console.log( {data });
+    //     });
+    // });
 
-    req.on('success', (res) => {
-        cb(null, res.data)
-    });
+    // req.on('success', (res) => {
+    //     cb(null, res.data)
+    // });
 
-    req.on('error', (err) => {
-        cb(err)
-    });
+    // req.on('error', (err) => {
+    //     cb(err)
+    // });
 
     return req.send();
 
