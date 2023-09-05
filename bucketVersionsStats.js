@@ -3,6 +3,7 @@ const { http, https } = require('httpagent');
 
 const AWS = require('aws-sdk');
 const { doWhilst } = require('async');
+const xml2js = require('xml2js');
 
 const { Logger } = require('werelogs');
 
@@ -22,6 +23,7 @@ const { HTTPS_CA_PATH } = process.env;
 const { HTTPS_NO_VERIFY } = process.env;
 const { OLDER_THAN } = process.env;
 const VERBOSE = !!process.env.VERBOSE;
+const SKIP_PARSE_ERRORS = !!process.env.SKIP_PARSE_ERRORS;
 const AWS_SDK_REQUEST_RETRIES = 100;
 const AWS_SDK_REQUEST_INITIAL_DELAY_MS = 30;
 
@@ -166,13 +168,135 @@ const logProgressInterval = setInterval(
 );
 
 function _listObjectVersions(bucket, KeyMarker, VersionIdMarker, cb) {
-    return s3.listObjectVersions({
+    // return s3.listObjectVersions({
+    //     Bucket: bucket,
+    //     MaxKeys: LISTING_LIMIT,
+    //     Prefix: TARGET_PREFIX,
+    //     KeyMarker,
+    //     VersionIdMarker,
+    // }, cb);
+
+    const req = s3.listObjectVersions({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
         KeyMarker,
         VersionIdMarker,
-    }, cb);
+    });
+
+    req.on('httpDone', (res) => {
+        const parser = new xml2js.Parser();
+        parser.parseString(res.httpResponse.body, (err, data) => {
+            console.log( {data });
+        });
+    });
+
+    req.on('success', (res) => {
+        cb(null, res.data)
+    });
+
+    req.on('error', (err) => {
+        cb(err)
+    });
+
+    return req.send();
+
+
+
+    req.on('httpDone', (res) => {
+        if (res.error) {
+            return cb(res.error);
+        }
+
+        if (res.httpResponse.statusCode !== 200) {
+            return cb(new Error(`unexpected status code ${res.httpResponse.statusCode}`));
+        }
+
+        const parser = new xml2js.Parser();
+        parser.parseString(res.httpResponse.body, (err, data) => {
+            // console.log(JSON.stringify({ data }, null, 4))
+            if (err) {
+                log.error('error parsing xml response', {
+                    error: err,
+                });
+
+                return cb(err);
+            }
+
+            const versions = [];
+            for (const version of data.ListVersionsResult.Version) {
+                const parsedVersion = {
+                    Key: version.Key[0],
+                    VersionId: version.VersionId[0],
+                    IsLatest: version.IsLatest[0] === 'true',
+                }
+
+                const lm = new Date(version.LastModified[0]);
+                if (Number.isNaN(lm.getTime())) {
+                    log.error('error parsing last-modified date', {
+                        bucket: BUCKET,
+                        key: version.Key[0],
+                        versionId: version.VersionId[0],
+                        lastModified: version.LastModified[0],
+                    });
+
+                    if (SKIP_PARSE_ERRORS) {
+                        continue;
+                    }
+
+                    return cb(new Error('error parsing last-modified dates'));
+                }
+
+                parsedVersion.LastModified = lm;
+
+                if (version.Size.length) {
+                    const size = Number.parseInt(version.Size[0], 10);
+                    if (Number.isNaN(size)) {
+                        log.error('error parsing size', {
+                            bucket: BUCKET,
+                            key: version.Key,
+                            versionId: version.VersionId,
+                            size: version.Size,
+                        });
+                        return cb(new Error('error parsing size'));
+                    }
+                    parsedVersion.Size = size;
+                } else {
+                    parsedVersion.Size = 0;
+                }
+
+                versions.push(parsedVersion);
+            }
+
+            if (versions.length === 0) {
+                return cb(new Error('no versions found'));
+            }
+
+            console.log({ versions })
+
+            const listing = {
+                NextKeyMarker: versions[versions.length - 1].Key,
+                NextVersionIdMarker: versions[versions.length - 1].VersionId,
+                Versions: versions,
+            }
+
+
+            console.log({ versions })
+
+
+            console.log({ listing })
+
+            setTimeout(() => {
+                return cb(null, listing);
+            }, 1000);
+
+        });
+    });
+
+    // req.on('complete', () => {
+    // });
+
+    req.send();
 }
 
 
@@ -184,6 +308,7 @@ function listBucket(bucket, cb) {
             KeyMarker = NextKeyMarker;
             VersionIdMarker = NextVersionIdMarker;
             _listObjectVersions(bucket, KeyMarker, VersionIdMarker, (err, data) => {
+                console.log({data})
                 if (err) {
                     log.error('error listing object versions', {
                         error: err,
