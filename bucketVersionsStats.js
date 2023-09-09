@@ -191,8 +191,21 @@ function listBucket(bucket, cb) {
                     return done(err);
                 }
                 for (const version of data.Versions) {
-                    if (_OLDER_THAN_TIMESTAMP && new Date(version.LastModified) > _OLDER_THAN_TIMESTAMP) {
-                        continue;
+                    if (_OLDER_THAN_TIMESTAMP) {
+                        const lastModified = new Date(version.LastModified);
+                        if (Number.isNaN(lastModified.getTime())) {
+                            log.warn('version has invalid LastModified', {
+                                bucket: BUCKET,
+                                key: version.Key,
+                                versionId: version.VersionId,
+                                lastModified: version.LastModified,
+                            });
+                            continue;
+                        }
+
+                        if (lastModified > _OLDER_THAN_TIMESTAMP) {
+                            continue;
+                        }
                     }
                     const statObj = version.IsLatest ? stats.current : stats.noncurrent;
                     statObj.count += 1;
