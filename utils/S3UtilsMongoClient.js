@@ -43,7 +43,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
         const locationConfig = getLocationConfig(log);
 
-        return this.getCollection(USERSBUCKET).find({}, {
+        return this.getCollection('__usersbucket').find({}, {
             projection: {
                 'value.creationDate': 1,
             },
