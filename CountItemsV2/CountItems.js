@@ -12,7 +12,6 @@ const createMongoParams = require('../utils/createMongoParams');
 const METASTORE_COLLECTION = '__metastore';
 const INFOSTORE = '__infostore';
 
-// TODO connect to redis to periodically save the progress/checkpoint
 class CountItems {
     /**
      * Constructor, initializes the MongoDB client
@@ -52,11 +51,6 @@ class CountItems {
 
         // Detect object deletion
         this.watcher = null;
-
-        // the number of replicas is mapped with an algorithm to
-        // dynamically handle a subset of all buckets, while
-        // ensuring that all buckets are being processed
-        // TODO
     }
 
     refresh() {
@@ -185,8 +179,6 @@ class CountItems {
     resetPool() {
         this.log.info('Resetting pool...');
         this.lastRefreshDate = new Date();
-        // for each entry, remove the metrics and set
-        // isFirst to true
         for (const bucketName in this.pool) {
             this.pool[bucketName].metrics = {};
             this.pool[bucketName].first = true;
@@ -197,14 +189,11 @@ class CountItems {
     async listAllBuckets(onlySelectSOSAPIEnabledBuckets = false) {
         this.log.info('Listing all buckets...');
         const collection = this.db.getCollection(METASTORE_COLLECTION);
-
         // Store the current bucket list to later compare it with the previous list
         const currentBucketList = {};
-
         return new Promise((resolve, reject) => {
             const cursor = collection.find({});
             let i = 0;
-
             cursor.each((err, doc) => {
                 i++;
                 if (err) {
@@ -214,25 +203,20 @@ class CountItems {
                     reject(err);
                     return;
                 }
-
                 if (!doc) {
                     // At this point, we've processed all documents. Time to check for added/deleted buckets.
                     this.syncPoolWithBucketList(currentBucketList);
                     resolve();
                     return;
                 }
-
                 this.log.info('Listing all buckets: cursor processing...', {
                     bucketNumber: i,
                     bucketId: doc._id,
                 });
-
                 // Assuming the bucket name is stored in `doc._id`
                 const bucketName = doc._id;
-
                 // Update the current bucket list
                 currentBucketList[bucketName] = true;
-
                 // Add the bucket to the async pool if not already present
                 if (!this.pool[bucketName]) {
                     this.pool[bucketName] = {
@@ -253,20 +237,18 @@ class CountItems {
      */
     syncPoolWithBucketList(currentBucketList) {
         // Detect new buckets and remove deleted ones
-        for (const [bucketName, value] of Object.entries(this.previousBucketList)) {
+        for (const [bucketName] of Object.entries(this.previousBucketList)) {
             if (!currentBucketList[bucketName]) {
                 // Bucket has been deleted
                 this.log.info(`Bucket ${bucketName} has been deleted.`);
                 delete this.pool[bucketName];
             }
         }
-
-        for (const [bucketName, value] of Object.entries(currentBucketList)) {
+        for (const [bucketName] of Object.entries(currentBucketList)) {
             if (!this.previousBucketList[bucketName]) {
                 this.log.info(`New bucket ${bucketName} detected.`);
             }
         }
-
         // Update the previousBucketList to the current state for the next iteration
         this.previousBucketList = currentBucketList;
     }
@@ -367,7 +349,6 @@ class CountItems {
             // We cannot use the linearizable read concern as we read from the secondaries,
             // so we need to first get the last sync date of the secondary, and adapt
             // the query 'last-modified' filter based on that.
-            // Also handle where only one primary is up
             let lastSyncedTimestamp = new Date();
             lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
             lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
@@ -388,9 +369,6 @@ class CountItems {
                     reason: err,
                 });
             }
-
-            // add to the set of bulked checkpoints, the current bucket name with
-            // the filter used, +1s
             this.bulkedCheckpoints[bucketName] = lastSyncedTimestamp;
 
             // Step 2: Setup collection and checkpoint
@@ -430,6 +408,7 @@ class CountItems {
                         'value.content-length': 1,
                         'value.isNull': 1,
                         'value.isMaster': 1,
+                        'value.isDeleteMarker ': 1,
                     },
                 },
                 {
@@ -456,6 +435,9 @@ class CountItems {
                         isVersioned: {
                             $cond: [{ $ne: [{ $indexOfBytes: ["$_id", "\0"] }, -1] }, 1, 0],
                         },
+                        isDeleteMarker: {
+                            $cond: [{ $eq: [{ $ifNull: ["$value.isDeleteMarker", null] }, true] }, 1, 0],
+                        },
                         contentLength: "$value.content-length",
                     }
                 },
@@ -468,6 +450,7 @@ class CountItems {
                         masterCount: { $sum: "$isMaster" },
                         nullCount: { $sum: '$isNull' },
                         versionCount: { $sum: '$isVersioned' },
+                        deleteMarkerCount: { $sum: '$isDeleteMarker' },
                     }
                 }
             ], { allowDiskUse: true });
@@ -481,6 +464,7 @@ class CountItems {
                 masterCount: result?.[0]?.masterCount || 0,
                 nullCount: result?.[0]?.nullCount || 0,
                 versionCount: result?.[0]?.versionCount || 0,
+                deleteMarkerCount: result?.[0]?.deleteMarkerCount || 0,
             };
 
             // return the computed metrics as a single object holding all the data
@@ -512,6 +496,7 @@ class CountItems {
     }
 
     consolidateResults(bucketName, result) {
+        // TODO rework with actual metrics computations
         const updateMetrics = (target, source) => {
             if (!target) return;
             for (const key in source.metrics) {
@@ -537,24 +522,20 @@ class CountItems {
 
         for (const currentBucketName in this.pool) {
             const bucketInfo = this.pool[currentBucketName];
-
             if (!accountMetrics[bucketInfo.doc.value.ownerDisplayName]) {
                 accountMetrics[bucketInfo.doc.value.ownerDisplayName] = { metrics: {} };
             }
             updateMetrics(accountMetrics[bucketInfo.doc.value.ownerDisplayName], bucketInfo);
-
             if (!locationMetrics[bucketInfo.doc.value.locationConstraint]) {
                 locationMetrics[bucketInfo.doc.value.locationConstraint] = { metrics: {} };
             }
             updateMetrics(locationMetrics[bucketInfo.doc.value.locationConstraint], bucketInfo);
-
             if (!bucketMetrics[currentBucketName]) {
                 bucketMetrics[currentBucketName] = { metrics: {} };
             }
             updateMetrics(bucketMetrics[currentBucketName], bucketInfo);
         }
-
-        console.log(bucketMetrics);//JSON.stringify({ accountMetrics, locationMetrics, bucketMetrics }));
+        console.log(bucketMetrics);
     }
 
     /**
@@ -562,14 +543,11 @@ class CountItems {
      * The documents whose bucketName is in the pool (after the first successful run)
      * are the eligible events. In this case, simply substract the values
      * from the associated and known metrics.
-     * 
+     * @returns {Promise} - resolves to the checkpoint value
      */
     changeStreamListenDeletion() {
         const dbClient = this.db.client.db(this.db.database);
-
         // filter of operation type with fullDocument.value.deleted set to true
-        // if mongodb version is reported to be >= 6.0, use the preimage feature
-        // to get the full document before the update
         let watcher = dbClient.watch([{
             $match: {
                 'operationType': 'update',
@@ -602,30 +580,29 @@ class CountItems {
                 type = 'nullData';
                 typeCount = 'nullCount';
             }
-            // do not process object if last modified date is after the current
+            // Do not process object if last modified date is after the current
             // scan date.
             if (change.updateDescription.updatedFields.value['last-modified'] >
                 this.bulkedCheckpoints[change.ns.coll]) {
                 return;
             }
+            // Process the sizes
             this.pool[change.ns.coll].metrics[type] = Math.max(0, this.pool[change.ns.coll].metrics[type] - size);
+            // Process the counts
             this.pool[change.ns.coll].metrics[typeCount] = Math.max(0, this.pool[change.ns.coll].metrics[typeCount] - 1);
         });
 
         // Listen for errors
         watcher.on('error', (error) => {
             this.log.error('Error in change stream', { error });
-
             // Close the errored change stream
             watcher.close();
-
             // Recreate the watcher
             watcher = dbClient.watch([{
                 $match: {
                     'fullDocument.value.deleted': true,
                 },
             }]);
-
             // Since the watcher is recreated, we need to set up the event handlers again
             watcher.removeAllListeners();
             watcher.on('change', this.changeStreamListenDeletion.bind(this));
@@ -639,4 +616,3 @@ module.exports = CountItems;
 // todo:
 // - fix secondary optime check
 // - detect object replacement
-// detect delete markers for the counts
