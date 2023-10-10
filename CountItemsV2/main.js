@@ -18,6 +18,9 @@ const config = {
     maxRetries: MAX_CONNECT_RETRIES,
     maxConcurrentOperations: MAX_CONCURRENT_OPERATIONS,
     mongoDBSupportsPreImages: process.env.MONGODB_SUPPORTS_PREIMAGES === 'true',
+    lastModifiedLagSeconds: Number.parseInt(process.env.LAST_MODIFIED_LAG_SECONDS, 10) || 0,
+    refreshFrequencySeconds: Number.parseInt(process.env.REFRESH_FREQUENCY_SECONDS, 10) || 86400,
+    sleepDurationSecondsBetweenRounds: Number.parseInt(process.env.SLEEP_DURATION_SECONDS_BETWEEN_ROUNDS, 10) || 2,
 }
 const worker = new CountItems(config, log);
 worker.work();

@@ -34,6 +34,9 @@ class CountItems {
 
         this.maxConcurrentBucketProcessing = config.maxConcurrentOperations || 10;
         this.mongoDBSupportsPreImages = config.mongoDBSupportsPreImages || false;
+        this.lastModifiedLagSeconds = config.lastModifiedLagSeconds || 1;
+        this.refreshFrequencySeconds = config.refreshFrequencySeconds || 86400;
+        this.sleepDurationSecondsBetweenRounds = config.sleepDurationSecondsBetweenRounds || 2;
 
         // bulkedCheckpoints ia sn object used to store all buckets and
         // associated checkpoints, and writen using bulk to mongodb
@@ -120,6 +123,7 @@ class CountItems {
         await this.connectWithRetries();
         // Initialize the ChangeStream
         this.changeStreamListenDeletion();
+        this.resetPool();
         let stop = false;
         let startTime;
         while (!stop) {
@@ -165,8 +169,27 @@ class CountItems {
             // then compute all metrics and save them
             await this.aggregateResults();
             this.log.info(`Round completed in ${process.hrtime(startTime)[0]}s. Restarting in 2 seconds...`);
-            // await sleep 2 seconds
-            await new Promise(r => setTimeout(r, 2000));
+            // Sleep between two round to avoid overloading the cluster
+            await new Promise(r => setTimeout(r, this.sleepDurationSecondsBetweenRounds * 1000));
+            // Periodically flush all data according to the configuration
+            if (new Date() - this.lastRefreshDate > this.refreshFrequencySeconds * 1000) {
+                this.resetPool();
+            }
+        }
+    }
+
+    /**
+     * Periodically, the service performs a full refresh of the pool,
+     * to ensure no deviation with the truth.
+     */
+    resetPool() {
+        this.log.info('Resetting pool...');
+        this.lastRefreshDate = new Date();
+        // for each entry, remove the metrics and set
+        // isFirst to true
+        for (const bucketName in this.pool) {
+            this.pool[bucketName].metrics = {};
+            this.pool[bucketName].first = true;
         }
     }
 
@@ -345,16 +368,25 @@ class CountItems {
             // so we need to first get the last sync date of the secondary, and adapt
             // the query 'last-modified' filter based on that.
             // Also handle where only one primary is up
-            let lastSyncedTimestamp = new Date().toISOString();
+            let lastSyncedTimestamp = new Date();
+            lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
+            lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
+
             try {
                 const replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
                 const secondaryInfo = replStatus.members.find(member => member.self);
-                lastSyncedTimestamp = new Date(secondaryInfo.optime.ts.getTime() * 1000).toISOString();
+                if (!secondaryInfo) {
+                    this.log.warn('No secondary member found in replica set');
+                    return;
+                }
+                const unixTimeInSeconds = secondaryInfo.optime.ts.high_;
+                lastSyncedTimestamp = new Date(unixTimeInSeconds * 1000);
+                lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
+                lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
             } catch (err) {
                 this.log.warn('Error while getting secondary optime', {
                     reason: err,
                 });
-                // Default to the current time
             }
 
             // add to the set of bulked checkpoints, the current bucket name with
@@ -394,27 +426,35 @@ class CountItems {
                 },
                 {
                     $project: {
+                        _id: 1,
+                        'value.content-length': 1,
+                        'value.isNull': 1,
+                        'value.isMaster': 1,
+                    },
+                },
+                {
+                    $project: {
                         isMaster: {
                             $cond: [
                                 {
                                     $and: [
                                         { $eq: [{ $indexOfBytes: ["$_id", "\0"] }, -1] },
-                                        { $eq: ["$value.isNull", false] }]
+                                        {
+                                            $or: [
+                                                { $eq: [{ $ifNull: ["$value.isNull", null] }, false] },
+                                                { $eq: [{ $ifNull: ["$value.isNull", null] }, null] }
+                                            ],
+                                        },
+                                    ],
                                 },
-                                1, 0]
+                                1, 0
+                            ]
                         },
                         isNull: {
-                            $cond: [{ $eq: ["$value.isNull", true] }, 1, 0]
+                            $cond: [{ $eq: ["$value.isNull", true] }, 1, 0],
                         },
                         isVersioned: {
-                            $cond: [{ $ne: [{ $indexOfBytes: ["$_id", "\0"] }, -1] }, 1, 0]
-                        },
-                        isMaster2: {
-                            $cond: [{
-                                $and: [
-                                    {},
-                                    { $ne: ["$value.isNull", true] }]
-                            }, 1, 0]
+                            $cond: [{ $ne: [{ $indexOfBytes: ["$_id", "\0"] }, -1] }, 1, 0],
                         },
                         contentLength: "$value.content-length",
                     }
@@ -422,15 +462,15 @@ class CountItems {
                 {
                     $group: {
                         _id: null,
-                        masterData: { $sum: { $multiply: [{ $add: ["$isMaster", "$isMaster2"] }, "$contentLength"] } },
+                        masterData: { $sum: { $multiply: ['$isMaster', '$contentLength'] } },
                         nullData: { $sum: { $multiply: ['$isNull', '$contentLength'] } },
                         versionData: { $sum: { $multiply: ['$isVersioned', '$contentLength'] } },
-                        masterCount: { $sum: { $add: ["$isMaster", "$isMaster2"] } },
+                        masterCount: { $sum: "$isMaster" },
                         nullCount: { $sum: '$isNull' },
                         versionCount: { $sum: '$isVersioned' },
                     }
                 }
-            ]);
+            ], { allowDiskUse: true });
 
             // wait till the aggregation is done
             const result = await operation.toArray();
@@ -514,7 +554,7 @@ class CountItems {
             updateMetrics(bucketMetrics[currentBucketName], bucketInfo);
         }
 
-        console.log(JSON.stringify({ accountMetrics, locationMetrics, bucketMetrics }));
+        console.log(bucketMetrics);//JSON.stringify({ accountMetrics, locationMetrics, bucketMetrics }));
     }
 
     /**
@@ -599,5 +639,4 @@ module.exports = CountItems;
 // todo:
 // - fix secondary optime check
 // - detect object replacement
-// - better way of detecting object being deletec but not yet in the computed metrics?
-// - periodically flush all metrics of buckets
+// detect delete markers for the counts
