@@ -1,0 +1,15 @@
+{
+    "us-east-1": {
+        "type": "file",
+        "objectId": "us-east-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    },
+    "mem": {
+        "type": "file",
+        "objectId": "us-east-1",
+        "legacyAwsBehavior": true,
+        "details": {}
+    }
+}
+

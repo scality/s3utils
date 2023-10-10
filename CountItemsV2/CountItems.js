@@ -5,12 +5,22 @@
  * resources, and reducing by a factor of 4.7 the collection
  * duration as compared with the CountItemsV1.
  */
-
+/* eslint-disable no-await-in-loop */
+/* eslint-disable no-promise-executor-return */
+const { errors, constants } = require('arsenal');
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 const createMongoParams = require('../utils/createMongoParams');
+const getLocationConfig = require('../utils/locationConfig');
+const { validStorageMetricLevels } = require('../CountItems/utils/constants');
 
+const locationConfig = getLocationConfig(this.log);
 const METASTORE_COLLECTION = '__metastore';
 const INFOSTORE = '__infostore';
+const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
+const __COUNT_ITEMS = 'countitems';
+
+// Null location as set for delete markers
+const INTERNAL_NULL_LOCATION = '___internal_null_location___';
 
 class CountItems {
     /**
@@ -20,7 +30,7 @@ class CountItems {
      * @param {Object} config.maxRetries - max number of mongodb conneciton retries
      * @param {werelogs} log - logger
      */
-    constructor(config, log, numberOfReplicas = 1) {
+    constructor(config, log) {
         this.db = new S3UtilsMongoClient(createMongoParams(log));
         this.log = log;
         this.connected = false;
@@ -36,6 +46,20 @@ class CountItems {
         this.lastModifiedLagSeconds = config.lastModifiedLagSeconds || 1;
         this.refreshFrequencySeconds = config.refreshFrequencySeconds || 86400;
         this.sleepDurationSecondsBetweenRounds = config.sleepDurationSecondsBetweenRounds || 2;
+
+        // Backward compatibility
+        this.store = {
+            objects: 0,
+            versions: 0,
+            bucketList: [],
+            dataManaged: {
+                total: {
+                    curr: 0,
+                    prev: 0,
+                },
+                byLocation: [],
+            },
+        };
 
         // bulkedCheckpoints ia sn object used to store all buckets and
         // associated checkpoints, and writen using bulk to mongodb
@@ -58,10 +82,10 @@ class CountItems {
      * @returns {undefined}
      */
     refresh() {
-        if (this.db?.client) {
+        if (this.db && this.db.client) {
             this.connected = this.db.client.isConnected();
         } else {
-            this.connected = false
+            this.connected = false;
         }
     }
 
@@ -69,8 +93,8 @@ class CountItems {
      * Connects to MongoDB, with retries.
      * @returns {Promise} - resolves when the connection is established
      */
-    async connectWithRetries() {
-        this.refresh(); // Assuming this refreshes the connection state
+    connectWithRetries() {
+        this.refresh();
 
         if (this.connected) {
             this.log.debug('MongoClient is already connected. Skipping setup.');
@@ -78,45 +102,32 @@ class CountItems {
         }
 
         let retries = 0;
-        const delay = 2000; // Delay in milliseconds between retries
+        const delay = 2000;
 
-        return new Promise(async (resolve, reject) => {
-            while (!this.connected && retries < this.maxRetries) {
-                try {
-                    await new Promise((innerResolve, innerReject) => {
-                        this.db.setup(err => {
-                            if (err) {
-                                this.log.error('Error connecting to MongoDB', {
-                                    error: err,
-                                    retryCount: retries,
-                                });
-                                return innerReject(err);
-                            }
-                            this.connected = true;
-                            return innerResolve();
-                        });
-                    });
-
-                    this.log.debug('Successfully connected to MongoDB.');
-                    resolve();
-                    return;
-
-                } catch (err) {
-                    retries += 1;
-                    if (retries < this.maxRetries) {
-                        this.log.error(`Retrying connection to MongoDB. Attempt ${retries} of ${this.maxRetries}.`, {
-                            error: err,
-                        });
-                        await new Promise(r => setTimeout(r, delay));
-                    } else {
-                        this.log.error('Max retries reached. Could not connect to MongoDB.', {
-                            error: err,
-                        });
-                        reject(new Error('Max retries reached'));
-                        return;
-                    }
+        return new Promise((resolve, reject) => {
+            const tryConnect = () => {
+                if (retries >= this.maxRetries) {
+                    this.log.error('Max retries reached. Could not connect to MongoDB.');
+                    return reject(new Error('Max retries reached'));
                 }
-            }
+
+                return this.db.setup(err => {
+                    if (err) {
+                        retries += 1;
+                        this.log.error('Error connecting to MongoDB', {
+                            error: err,
+                            retryCount: retries,
+                        });
+
+                        setTimeout(() => tryConnect(), delay);
+                    } else {
+                        this.connected = true;
+                        this.log.debug('Successfully connected to MongoDB.');
+                        resolve();
+                    }
+                });
+            };
+            tryConnect();
         });
     }
 
@@ -130,8 +141,9 @@ class CountItems {
         // Initialize the ChangeStream
         this.changeStreamListenDeletion();
         this.resetPool();
-        let stop = false;
+        const stop = false;
         let startTime;
+
         while (!stop) {
             startTime = process.hrtime();
             this.log.info('Starting a new round...');
@@ -149,15 +161,15 @@ class CountItems {
                 const bucketInfo = this.pool[bucketName];
                 if (bucketInfo && !bucketInfo.ongoing) {
                     bucketInfo.ongoing = true;
-                    const promise = this.processBucket(bucketName, bucketInfo.doc.value.ownerDisplayName, bucketInfo.doc.value.locationConstraint, bucketInfo.first)
-                        .then((result) => {
+                    const promise = this.processBucket(bucketName, bucketInfo.doc.value.ownerDisplayName, bucketInfo.doc.value.locationConstraint, bucketInfo.doc.value.transient, bucketInfo.first)
+                        .then(result => {
                             bucketInfo.first = false;
                             this.consolidateResults(bucketName, result);
                             this.log.info(`Successfully processed bucket: ${bucketName}`, result);
                             bucketInfo.ongoing = false;
                             promises.splice(promises.indexOf(promise), 1);
                         })
-                        .catch((err) => {
+                        .catch(err => {
                             // Force refresh the full bucket in case of error
                             bucketInfo.first = true;
                             this.log.error(`Error processing bucket: ${bucketName}`, { error: err });
@@ -193,15 +205,17 @@ class CountItems {
         this.log.info('Resetting pool...');
         this.lastRefreshDate = new Date();
         for (const bucketName in this.pool) {
-            this.pool[bucketName].metrics = {};
-            this.pool[bucketName].first = true;
+            if (Object.hasOwn(this.pool, bucketName)) {
+                this.pool[bucketName].metrics = {};
+                this.pool[bucketName].first = true;
+            }
         }
     }
 
     /**
      * Checks whether the bucket has the SOS CapacityInfo enabled
      * @param {object} bucketInfo - bucket metadata
-     * @returns {boolean} - whether the bucket has the SOS CapacityInfo enabled 
+     * @returns {boolean} - whether the bucket has the SOS CapacityInfo enabled
      */
     isSOSCapacityInfoEnabled(bucketInfo) {
         return !!(bucketInfo._capabilities
@@ -216,7 +230,7 @@ class CountItems {
      * Lists all buckets in the METASTORE collection, and
      * updates the pool accordingly.
      * @param {boolean} onlySelectSOSAPIEnabledBuckets - whether to only select buckets with SOSAPI enabled
-     * @returns 
+     * @returns {Promise} - resolves when the bucket list is complete
      */
     async listAllBuckets(onlySelectSOSAPIEnabledBuckets = false) {
         this.log.info('Listing all buckets...');
@@ -244,12 +258,15 @@ class CountItems {
                 if (onlySelectSOSAPIEnabledBuckets && doc && doc.value && !this.isSOSCapacityInfoEnabled(doc.value)) {
                     return;
                 }
+                const bucketName = doc._id;
+                if (bucketName.includes('..bucket')) {
+                    return;
+                }
                 this.log.info('Listing all buckets: cursor processing...', {
                     bucketNumber: i,
-                    bucketId: doc._id,
+                    bucketName,
                 });
                 // Assuming the bucket name is stored in `doc._id`
-                const bucketName = doc._id;
                 // Update the current bucket list
                 currentBucketList[bucketName] = true;
                 // Add the bucket to the async pool if not already present
@@ -268,7 +285,7 @@ class CountItems {
     /**
      * Compares the current bucket list with the previous one, and
      * updates the pool accordingly.
-     * @param {array} currentBucketList
+     * @param {array} currentBucketList - current bucket list
      * @returns {undefined}
      */
     syncPoolWithBucketList(currentBucketList) {
@@ -303,21 +320,20 @@ class CountItems {
         const collection = this.db.getCollection(METASTORE_COLLECTION);
         // find the document whose _id matches the bucket name
         // and get the propery `metrics_checkpoint` as a date string
-        return new Promise((resolve, reject) =>
-            collection.findOne({ _id: bucketName }, (err, doc) => {
-                if (err) {
-                    // by default, we restart from scratch, in case of error
-                    this.log.error('Error while retrieving checkpoint', {
-                        error: err,
-                        bucketName,
-                    });
-                    return resolve(0);
-                }
-                if (!doc) {
-                    return resolve(0);
-                }
-                return resolve(doc.value.metrics_checkpoint);
-            }));
+        return new Promise((resolve, reject) => collection.findOne({ _id: bucketName }, (err, doc) => {
+            if (err) {
+                // by default, we restart from scratch, in case of error
+                this.log.error('Error while retrieving checkpoint', {
+                    error: err,
+                    bucketName,
+                });
+                return resolve(0);
+            }
+            if (!doc) {
+                return resolve(0);
+            }
+            return resolve(doc.value.metrics_checkpoint);
+        }));
     }
 
     /**
@@ -343,7 +359,7 @@ class CountItems {
                     },
                 });
             });
-            bulk.execute((err, result) => {
+            return bulk.execute((err, result) => {
                 if (err) {
                     this.log.error('Error while bulk updating checkpoints', {
                         error: err,
@@ -353,7 +369,7 @@ class CountItems {
                 this.log.debug('Bulked checkpoints updated', {
                     result,
                 });
-                resolve();
+                return resolve();
             });
         });
     }
@@ -365,7 +381,7 @@ class CountItems {
      * objects, and will return a formatted object with all the metrics
      * for the current bucket and associated account/location, for later
      * processing.
-     * 
+     *
      * The function also accepts a filter, named `last-modified` set as an index,
      * used to limit the number of scanned entries between two scan runs. In this case, a
      * $match is added to the aggregation, on this field, to ensure the objects are
@@ -373,18 +389,23 @@ class CountItems {
      * @param {string} bucketName - name of the bucket
      * @param {string} accountName - name of the account
      * @param {string} bucketLocation - location of the bucket
+     * @param {boolean} isTransient - whether this is a transient bucket
      * @param {boolean} isFirstRun - whether this is the first run for this bucket
      * @returns {Promise} - resolves to the metrics object
      */
-    async processBucket(bucketName, accountName, bucketLocation, isFirstRun = false) {
+    async processBucket(bucketName, accountName, bucketLocation, isTransient, isFirstRun = false) {
         this.log.info('Processing bucket...', {
             bucketName,
             accountName,
             bucketLocation,
             isFirstRun,
         });
+        const replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
+        const secondaryInfo = replStatus.members.find(member => member.self);
+        const checkpoint = await this.getCheckpoint(bucketName);
+
         // TODO exclude user..bucket entries
-        return new Promise(async (resolve, reject) => {
+        const result = await new Promise((resolve, reject) => {
             // Step 1: Get the last replicated optime timestamp from the secondary
             // The reason is that we read from secondaries, and there is no consistency
             // guarantee that the data is replicated to all secondaries at the same time.
@@ -396,11 +417,8 @@ class CountItems {
             lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
 
             try {
-                const replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
-                const secondaryInfo = replStatus.members.find(member => member.self);
                 if (!secondaryInfo) {
-                    this.log.warn('No secondary member found in replica set');
-                    return;
+                    throw new Error('No secondary member found in replica set');
                 }
                 const unixTimeInSeconds = secondaryInfo.optime.ts.high_;
                 lastSyncedTimestamp = new Date(unixTimeInSeconds * 1000);
@@ -422,7 +440,6 @@ class CountItems {
                 return reject(new Error('Bucket not found in pool'));
             }
             const collection = this.db.getCollection(bucketName);
-            const checkpoint = await this.getCheckpoint(bucketName);
 
             // Step 3: Set the aggregation filter
             let filter = {
@@ -431,11 +448,11 @@ class CountItems {
             // for the first run, we exclude all objects starting Date.now()
             if (isFirstRun) {
                 filter = {
-                    'value.last-modified': { $lt: lastSyncedTimestamp }
+                    'value.last-modified': { $lt: lastSyncedTimestamp },
                 };
             } else {
                 filter = {
-                    'value.last-modified': { $gte: checkpoint, $lt: lastSyncedTimestamp }
+                    'value.last-modified': { $gte: checkpoint, $lt: lastSyncedTimestamp },
                 };
             }
 
@@ -447,76 +464,115 @@ class CountItems {
                 {
                     $project: {
                         _id: 1,
-                        'value.content-length': 1,
-                        'value.isNull': 1,
-                        'value.isMaster': 1,
-                        'value.isDeleteMarker ': 1,
+                        dataStoreName: {
+                            $cond: [
+                                {
+                                    $or: [
+                                        { $eq: [isTransient, true] },
+                                        { $ne: ['$value.replicationInfo.status', 'COMPLETED'] },
+                                    ],
+                                },
+                                '$value.location.dataStoreName',
+                                '$value.replicationInfo.backends.site',
+                            ],
+                        },
+                        coldLocation: {
+                            $cond: [
+                                {
+                                    // detection of deleted restored objects is done by the changestream,
+                                    // so we can compute these objects as others.
+                                    $and: [
+                                        { $eq: ['$value.archive', true] },
+                                        { $lte: ['$value.archive.restoreCompletedAt', lastSyncedTimestamp] },
+                                        { $gt: ['$value.archive.restoreWillExpireAt', lastSyncedTimestamp] },
+                                        { $ne: ['$value["x-amz-storage-class"]', '$value.location.dataStoreName'] },
+                                    ],
+                                },
+                                '$value["x-amz-storage-class"]', // Cold storage location
+                                null,
+                            ],
+                        },
+                        contentLength: {
+                            $cond: [{ $eq: ['$value.isPHD', true] }, 0, '$value.content-length'],
+                        },
+                        isNull: {
+                            $cond: [{ $eq: ['$value.isPHD', true] }, 0,
+                                { $cond: [{ $eq: ['$value.isNull', true] }, 1, 0] }],
+                        },
+                        isMaster: {
+                            $cond: [
+                                { $eq: ['$value.isPHD', true] }, 0,
+                                {
+                                    $cond: [
+                                        {
+                                            $and: [
+                                                { $eq: [{ $indexOfBytes: ['$_id', '\0'] }, -1] },
+                                                {
+                                                    $or: [
+                                                        { $eq: [{ $ifNull: ['$value.isNull', null] }, false] },
+                                                        { $eq: [{ $ifNull: ['$value.isNull', null] }, null] },
+                                                    ],
+                                                },
+                                            ],
+                                        },
+                                        1, 0,
+                                    ],
+                                },
+                            ],
+                        },
+                        isVersioned: {
+                            $cond: [{ $eq: ['$value.isPHD', true] }, 0,
+                                { $cond: [{ $ne: [{ $indexOfBytes: ['$_id', '\0'] }, -1] }, 1, 0] }],
+                        },
+                        isDeleteMarker: {
+                            $cond: [{ $eq: ['$value.isPHD', true] }, 0,
+                                { $cond: [{ $eq: ['$value.isDeleteMarker', true] }, 1, 0] }],
+                        },
                     },
                 },
                 {
-                    $project: {
-                        isMaster: {
-                            $cond: [
-                                {
-                                    $and: [
-                                        { $eq: [{ $indexOfBytes: ["$_id", "\0"] }, -1] },
-                                        {
-                                            $or: [
-                                                { $eq: [{ $ifNull: ["$value.isNull", null] }, false] },
-                                                { $eq: [{ $ifNull: ["$value.isNull", null] }, null] }
-                                            ],
-                                        },
-                                    ],
-                                },
-                                1, 0
-                            ]
-                        },
-                        isNull: {
-                            $cond: [{ $eq: ["$value.isNull", true] }, 1, 0],
-                        },
-                        isVersioned: {
-                            $cond: [{ $ne: [{ $indexOfBytes: ["$_id", "\0"] }, -1] }, 1, 0],
-                        },
-                        isDeleteMarker: {
-                            $cond: [{ $eq: [{ $ifNull: ["$value.isDeleteMarker", null] }, true] }, 1, 0],
-                        },
-                        contentLength: "$value.content-length",
-                    }
-                },
-                {
                     $group: {
-                        _id: null,
+                        _id: {
+                            $ifNull: [
+                                { $ifNull: ['$coldLocation', '$dataStoreName'] },
+                                INTERNAL_NULL_LOCATION,
+                            ],
+                        },
                         masterData: { $sum: { $multiply: ['$isMaster', '$contentLength'] } },
                         nullData: { $sum: { $multiply: ['$isNull', '$contentLength'] } },
                         versionData: { $sum: { $multiply: ['$isVersioned', '$contentLength'] } },
-                        masterCount: { $sum: "$isMaster" },
+                        masterCount: { $sum: '$isMaster' },
                         nullCount: { $sum: '$isNull' },
                         versionCount: { $sum: '$isVersioned' },
                         deleteMarkerCount: { $sum: '$isDeleteMarker' },
-                    }
-                }
+                    },
+                },
             ], { allowDiskUse: true });
 
-            // wait till the aggregation is done
-            const result = await operation.toArray();
-            const metrics = {
-                masterData: result?.[0]?.masterData || 0,
-                nullData: result?.[0]?.nullData || 0,
-                versionData: result?.[0]?.versionData || 0,
-                masterCount: result?.[0]?.masterCount || 0,
-                nullCount: result?.[0]?.nullCount || 0,
-                versionCount: result?.[0]?.versionCount || 0,
-                deleteMarkerCount: result?.[0]?.deleteMarkerCount || 0,
-            };
-
-            // return the computed metrics as a single object holding all the data
-            return resolve({
-                accountName,
-                bucketName,
-                bucketLocation,
-                metrics: metrics,
-            });
+            return resolve(operation.toArray());
         });
+        // compute metrics for each location
+        const metrics = {};
+        result.forEach(_metricsForLocation => {
+            if (!metrics[_metricsForLocation._id]) {
+                metrics[_metricsForLocation._id] = {};
+            }
+            metrics[_metricsForLocation._id].masterData = _metricsForLocation.masterData || 0;
+            metrics[_metricsForLocation._id].nullData = _metricsForLocation.nullData || 0;
+            metrics[_metricsForLocation._id].versionData = _metricsForLocation.versionData || 0;
+            metrics[_metricsForLocation._id].masterCount = _metricsForLocation.masterCount || 0;
+            metrics[_metricsForLocation._id].nullCount = _metricsForLocation.nullCount || 0;
+            metrics[_metricsForLocation._id].versionCount = _metricsForLocation.versionCount || 0;
+            metrics[_metricsForLocation._id].deleteMarkerCount = _metricsForLocation.deleteMarkerCount || 0;
+        });
+
+        // return the computed metrics as a single object holding all the data
+        return new Promise(resolve => resolve({
+            accountName,
+            bucketName,
+            bucketLocation,
+            metrics,
+        }));
     }
 
     /**
@@ -527,7 +583,62 @@ class CountItems {
      * @returns {Promise} - resolves when the aggregation is complete
      */
     async aggregateResults() {
-        this.log.info('Aggregating results...');
+        try {
+            this.log.info('Aggregating results...');
+            const dataMetrics = this.aggregateMetrics();
+            // eslint-disable-next-line no-console
+            console.log(JSON.stringify(dataMetrics), this.store);
+            const updatedStorageMetricsList = [
+                { _id: __COUNT_ITEMS, value: this.store },
+                ...Object.entries(dataMetrics)
+                    .filter(([metricLevel]) => validStorageMetricLevels.has(metricLevel))
+                    .flatMap(([metricLevel, result]) => Object.entries(result)
+                        .map(([resource, metrics]) => ({
+                            _id: `${metricLevel}_${resource}`,
+                            measuredOn: new Date().toJSON(),
+                            ...S3UtilsMongoClient.convertNumberToLong(metrics),
+                        }))),
+            ];
+
+            // Step 1: Drop the collection
+            try {
+                await this.db.getCollection(INFOSTORE_TMP).drop();
+            } catch (err) {
+                if (err.codeName !== 'NamespaceNotFound') {
+                    throw err;
+                }
+            }
+
+            // Step 2: Create a new collection
+            const tempCollection = await this.db.db.createCollection(INFOSTORE_TMP);
+
+            // Step 3: Insert many documents into the collection
+            await tempCollection.insertMany(updatedStorageMetricsList, { ordered: false });
+
+            // Step 4: Rename the collection
+            let renameError = null;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    await tempCollection.rename(INFOSTORE, { dropTarget: true });
+                    renameError = null;
+                    break;
+                } catch (err) {
+                    renameError = err;
+                    this.log.error('updateStorageConsumptionMetrics: error renaming temp collection, try again', {
+                        error: err.message,
+                    });
+                }
+            }
+
+            if (renameError) {
+                throw renameError;
+            }
+        } catch (err) {
+            this.log.error('updateStorageConsumptionMetrics: error updating count items', {
+                error: err.message,
+            });
+            throw errors.InternalError;
+        }
     }
 
     /**
@@ -550,11 +661,15 @@ class CountItems {
      * @returns {undefined}
      */
     consolidateResults(bucketName, result) {
-        // TODO rework with actual metrics computations
         const updateMetrics = (target, source) => {
-            if (!target) return;
-            for (const key in source.metrics) {
-                target.metrics[key] = (target.metrics[key] || 0) + source.metrics[key];
+            if (!target) {
+                return;
+            }
+            for (const key in source) {
+                if (Object.hasOwn(source, key)) {
+                    // eslint-disable-next-line no-param-reassign
+                    target[key] = (target[key] || 0) + source[key];
+                }
             }
         };
 
@@ -568,28 +683,143 @@ class CountItems {
             return;
         }
 
-        updateMetrics(this.pool[bucketName], result);
-
-        const accountMetrics = {};
-        const locationMetrics = {};
-        const bucketMetrics = {};
-
-        for (const currentBucketName in this.pool) {
-            const bucketInfo = this.pool[currentBucketName];
-            if (!accountMetrics[bucketInfo.doc.value.ownerDisplayName]) {
-                accountMetrics[bucketInfo.doc.value.ownerDisplayName] = { metrics: {} };
+        // For each metric location, sum the metrics
+        for (const location in result.metrics) {
+            if (!Object.hasOwn(result.metrics, location)) {
+                continue;
             }
-            updateMetrics(accountMetrics[bucketInfo.doc.value.ownerDisplayName], bucketInfo);
-            if (!locationMetrics[bucketInfo.doc.value.locationConstraint]) {
-                locationMetrics[bucketInfo.doc.value.locationConstraint] = { metrics: {} };
+            const objectId = locationConfig[location] ? locationConfig[location].objectId : null;
+            // No location config must be ignored
+            if (!objectId && location !== INTERNAL_NULL_LOCATION) {
+                this.log.warn('No location config found for location', { location });
+                continue;
             }
-            updateMetrics(locationMetrics[bucketInfo.doc.value.locationConstraint], bucketInfo);
-            if (!bucketMetrics[currentBucketName]) {
-                bucketMetrics[currentBucketName] = { metrics: {} };
+            // Initialize metrics object for objectId if it doesn't exist
+            if (!this.pool[bucketName].metrics[objectId]) {
+                this.pool[bucketName].metrics[objectId] = {};
             }
-            updateMetrics(bucketMetrics[currentBucketName], bucketInfo);
+            // If there was an old location with the same objectId, we need to consolidate
+            if (this.pool[bucketName].metrics[location] && objectId !== location) {
+                updateMetrics(this.pool[bucketName].metrics[objectId], this.pool[bucketName].metrics[location]);
+                delete this.pool[bucketName].metrics[location];
+            }
+            // Update metrics
+            updateMetrics(this.pool[bucketName].metrics[objectId], result.metrics[location]);
         }
-        console.log(bucketMetrics);
+    }
+
+    /**
+     * Aggregates the metrics for each bucket, location and account.
+     *
+     * @returns {object} - the aggregated metrics
+     */
+    aggregateMetrics() {
+        const result = {
+            bucket: {},
+            location: {},
+            account: {},
+        };
+
+        let totalObjects = 0;
+        let totalVersions = 0;
+        let totalCurrent = 0;
+        let totalNonCurrent = 0;
+
+        for (const [bucketName, bucketData] of Object.entries(this.pool)) {
+            const { doc: { value: { owner, locationConstraint } }, metrics } = bucketData;
+            const isVersioned = !!((bucketData.doc.value.versioningConfiguration
+                && bucketData.doc.value.versioningConfiguration.Status === 'Enabled'));
+
+            // Initialize if not already
+            if (!result.bucket[bucketName]) {
+                result.bucket[bucketName] = {
+                    usedCapacity: { current: 0, nonCurrent: 0 },
+                    objectCount: { current: 0, nonCurrent: 0, deleteMarker: 0 },
+                };
+            }
+            if (!result.location[locationConstraint]) {
+                result.location[locationConstraint] = {
+                    usedCapacity: { current: 0, nonCurrent: 0 },
+                    objectCount: { current: 0, nonCurrent: 0, deleteMarker: 0 },
+                };
+            }
+            if (!result.account[owner]) {
+                result.account[owner] = {
+                    usedCapacity: { current: 0, nonCurrent: 0 },
+                    objectCount: { current: 0, nonCurrent: 0, deleteMarker: 0 },
+                    locations: {},
+                };
+            }
+
+            // Aggregate metrics
+            for (const [_, metric] of Object.entries(metrics)) {
+                const {
+                    masterData, nullData, versionData, masterCount, nullCount, versionCount, deleteMarkerCount,
+                } = metric;
+                const currentData = masterData + nullData;
+                const currentCount = masterCount + nullCount;
+                const nonCurrentData = isVersioned ? versionData - masterData : 0;
+                const nonCurrentCount = isVersioned ? versionCount - masterCount - deleteMarkerCount : 0;
+                totalObjects += (currentCount + nonCurrentCount);
+                totalVersions += (nonCurrentCount + deleteMarkerCount); // TODO: is a delete marker a version? depends on requirements.
+                totalCurrent += currentData;
+                totalNonCurrent += nonCurrentData;
+
+                // Aggregate bucket metrics
+                result.bucket[bucketName].usedCapacity.current += currentData;
+                result.bucket[bucketName].objectCount.current += currentCount;
+                if (isVersioned) {
+                    result.bucket[bucketName].usedCapacity.nonCurrent += nonCurrentData;
+                    result.bucket[bucketName].objectCount.nonCurrent += nonCurrentCount;
+                    result.bucket[bucketName].objectCount.deleteMarker += deleteMarkerCount;
+                }
+
+                // Aggregate location metrics
+                result.location[locationConstraint].usedCapacity.current += currentData;
+                result.location[locationConstraint].objectCount.current += currentCount;
+                if (isVersioned) {
+                    result.location[locationConstraint].usedCapacity.nonCurrent += nonCurrentData;
+                    result.location[locationConstraint].objectCount.nonCurrent += nonCurrentCount;
+                    result.location[locationConstraint].objectCount.deleteMarker += deleteMarkerCount;
+                }
+
+                // Aggregate account metrics
+                if (!result.account[owner].locations[locationConstraint]) {
+                    result.account[owner].locations[locationConstraint] = {
+                        usedCapacity: { current: 0, nonCurrent: 0 },
+                        objectCount: { current: 0, nonCurrent: 0, deleteMarker: 0 },
+                    };
+                }
+                result.account[owner].usedCapacity.current += currentData;
+                result.account[owner].objectCount.current += currentCount;
+                if (isVersioned) {
+                    result.account[owner].usedCapacity.nonCurrent += nonCurrentData;
+                    result.account[owner].objectCount.nonCurrent += nonCurrentCount;
+                    result.account[owner].objectCount.deleteMarker += deleteMarkerCount;
+                }
+            }
+        }
+
+        // compute this.store
+        this.store.objects = totalObjects;
+        this.store.versions = totalVersions;
+        this.store.bucketList = Object.keys(this.pool).map(bucketName => ({
+            name: bucketName,
+            location: this.pool[bucketName].doc.value.locationConstraint,
+            isVersioned: !!((this.pool[bucketName].doc.value.versioningConfiguration
+                && this.pool[bucketName].doc.value.versioningConfiguration.Status === 'Enabled')),
+            ownerCanonicalId: this.pool[bucketName].doc.value.owner,
+            ingestion: !!this.pool[bucketName].doc.value.ingestion,
+        }));
+        this.store.dataManaged.total.curr = totalCurrent;
+        this.store.dataManaged.total.prev = totalNonCurrent;
+        this.store.dataManaged.byLocation = Object.keys(result.location).map(location => ({
+            location,
+            curr: result.location[location].usedCapacity.current,
+            prev: result.location[location].usedCapacity.current + result.location[location].usedCapacity.nonCurrent,
+        }));
+
+        return result;
     }
 
     /**
@@ -610,7 +840,7 @@ class CountItems {
         }]);
 
         // Listen for changes
-        watcher.on('change', (change) => {
+        watcher.on('change', change => {
             // ignore unknown buckets: they are yet to be processed
             if (!this.pool[change.ns.coll]) {
                 return;
@@ -625,9 +855,9 @@ class CountItems {
                 type = 'versionData';
                 typeCount = 'versionCount';
             } else if (
-                !change.updateDescription.updatedFields.value.versionId ||
-                (!!change.updateDescription.updatedFields.value.versionId &&
-                    !change.updateDescription.updatedFields.value.isNull)) {
+                !change.updateDescription.updatedFields.value.versionId
+                || (!!change.updateDescription.updatedFields.value.versionId
+                    && !change.updateDescription.updatedFields.value.isNull)) {
                 type = 'masterData';
                 typeCount = 'masterCount';
             } else {
@@ -636,8 +866,8 @@ class CountItems {
             }
             // Do not process object if last modified date is after the current
             // scan date.
-            if (change.updateDescription.updatedFields.value['last-modified'] >
-                this.bulkedCheckpoints[change.ns.coll]) {
+            if (change.updateDescription.updatedFields.value['last-modified']
+                > this.bulkedCheckpoints[change.ns.coll]) {
                 return;
             }
             // Process the sizes
@@ -647,7 +877,7 @@ class CountItems {
         });
 
         // Listen for errors
-        watcher.on('error', (error) => {
+        watcher.on('error', error => {
             this.log.error('Error in change stream', { error });
             // Close the errored change stream
             watcher.close();
