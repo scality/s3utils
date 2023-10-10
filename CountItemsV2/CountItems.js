@@ -53,6 +53,10 @@ class CountItems {
         this.watcher = null;
     }
 
+    /**
+     * Refreshes the connection state.
+     * @returns {undefined}
+     */
     refresh() {
         if (this.db?.client) {
             this.connected = this.db.client.isConnected();
@@ -61,6 +65,10 @@ class CountItems {
         }
     }
 
+    /**
+     * Connects to MongoDB, with retries.
+     * @returns {Promise} - resolves when the connection is established
+     */
     async connectWithRetries() {
         this.refresh(); // Assuming this refreshes the connection state
 
@@ -112,6 +120,10 @@ class CountItems {
         });
     }
 
+    /**
+     * Main function, starts the worker.
+     * @returns {undefined}
+     */
     async work() {
         this.log.info('Starting worker...');
         await this.connectWithRetries();
@@ -175,6 +187,7 @@ class CountItems {
     /**
      * Periodically, the service performs a full refresh of the pool,
      * to ensure no deviation with the truth.
+     * @returns {undefined}
      */
     resetPool() {
         this.log.info('Resetting pool...');
@@ -185,7 +198,26 @@ class CountItems {
         }
     }
 
+    /**
+     * Checks whether the bucket has the SOS CapacityInfo enabled
+     * @param {object} bucketInfo - bucket metadata
+     * @returns {boolean} - whether the bucket has the SOS CapacityInfo enabled 
+     */
+    isSOSCapacityInfoEnabled(bucketInfo) {
+        return !!(bucketInfo._capabilities
+            && bucketInfo._capabilities.VeeamSOSApi
+            && bucketInfo._capabilities.VeeamSOSApi.SystemInfo
+            && bucketInfo._capabilities.VeeamSOSApi.SystemInfo.ProtocolCapabilities
+            && bucketInfo._capabilities.VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo === true
+            && bucketInfo._capabilities.VeeamSOSApi.CapacityInfo);
+    }
 
+    /**
+     * Lists all buckets in the METASTORE collection, and
+     * updates the pool accordingly.
+     * @param {boolean} onlySelectSOSAPIEnabledBuckets - whether to only select buckets with SOSAPI enabled
+     * @returns 
+     */
     async listAllBuckets(onlySelectSOSAPIEnabledBuckets = false) {
         this.log.info('Listing all buckets...');
         const collection = this.db.getCollection(METASTORE_COLLECTION);
@@ -207,6 +239,9 @@ class CountItems {
                     // At this point, we've processed all documents. Time to check for added/deleted buckets.
                     this.syncPoolWithBucketList(currentBucketList);
                     resolve();
+                    return;
+                }
+                if (onlySelectSOSAPIEnabledBuckets && doc && doc.value && !this.isSOSCapacityInfoEnabled(doc.value)) {
                     return;
                 }
                 this.log.info('Listing all buckets: cursor processing...', {
@@ -233,7 +268,8 @@ class CountItems {
     /**
      * Compares the current bucket list with the previous one, and
      * updates the pool accordingly.
-     * @param {array} currentBucketList 
+     * @param {array} currentBucketList
+     * @returns {undefined}
      */
     syncPoolWithBucketList(currentBucketList) {
         // Detect new buckets and remove deleted ones
@@ -287,6 +323,7 @@ class CountItems {
     /**
      * Same as getCheckpoint, but here we bulk all the writes to mongodb
      * based on the current dictionnary
+     * @returns {Promise} - resolves to the checkpoint value
      */
     setCheckPoints() {
         this.log.info('Setting checkpoints...', {
@@ -333,6 +370,11 @@ class CountItems {
      * used to limit the number of scanned entries between two scan runs. In this case, a
      * $match is added to the aggregation, on this field, to ensure the objects are
      * $gt the provided value;
+     * @param {string} bucketName - name of the bucket
+     * @param {string} accountName - name of the account
+     * @param {string} bucketLocation - location of the bucket
+     * @param {boolean} isFirstRun - whether this is the first run for this bucket
+     * @returns {Promise} - resolves to the metrics object
      */
     async processBucket(bucketName, accountName, bucketLocation, isFirstRun = false) {
         this.log.info('Processing bucket...', {
@@ -482,11 +524,16 @@ class CountItems {
      * Metrics for each location, each account and each bucket.
      * This function aggregates all the data and dynamically saves the values
      * in the INFOSTORE collection.
+     * @returns {Promise} - resolves when the aggregation is complete
      */
     async aggregateResults() {
         this.log.info('Aggregating results...');
     }
 
+    /**
+     * Recreates the change stream watcher, in case of error.
+     * @returns {undefined}
+     */
     _recreateWatcher() {
         this.watcher = this.db.watch([{
             $match: {
@@ -495,6 +542,13 @@ class CountItems {
         }]);
     }
 
+    /**
+     * Consolidates the results of the aggregation, and computes the
+     * final metrics for each location, each account and each bucket.
+     * @param {string} bucketName - name of the bucket
+     * @param {object} result - result of the aggregation
+     * @returns {undefined}
+     */
     consolidateResults(bucketName, result) {
         // TODO rework with actual metrics computations
         const updateMetrics = (target, source) => {
