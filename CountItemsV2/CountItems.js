@@ -263,16 +263,23 @@ class CountItems {
                 if (onlySelectSOSAPIEnabledBuckets && doc && doc.value && !this.isSOSCapacityInfoEnabled(doc.value)) {
                     continue;
                 }
-                const bucketName = `${doc._id}_${new Date(doc.value.creationDate).getTime()}`;
-                if (bucketName.includes('..bucket') || bucketName.startsWith('mpuShadowBucket')) {
+                if (doc._id.includes('..bucket') || doc._id.startsWith('mpuShadowBucket')) {
                     continue;
                 }
                 this.log.info('Listing all buckets: cursor processing...', {
                     bucketNumber: i,
-                    bucketName,
+                    bucketName: doc._id,
                 });
                 // Retrieve dynamic createdDate from __userbucket collection
                 const userBucketDoc = await userBucketCollection.findOne({ _id: `${doc.value.owner}..|..${doc._id}` });
+                // if userBucketDoc is null, ignore and proceed to next
+                if (!userBucketDoc) {
+                    this.log.warn('userBucketDoc is null', {
+                        bucketName: doc._id,
+                    });
+                    continue;
+                }
+                const bucketName = `${doc._id}_${new Date(userBucketDoc.value.creationDate).getTime()}`;
                 if (userBucketDoc) {
                     // Update the creationDate in the current document
                     doc.value.creationDate = userBucketDoc.createdDate;
