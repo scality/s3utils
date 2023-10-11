@@ -28,7 +28,7 @@
   "dependencies": {
     "@senx/warp10": "^1.1.2",
     "JSONStream": "^1.3.5",
-    "arsenal": "git+https://github.com/scality/arsenal#8.1.78",
+    "arsenal": "git+https://github.com/scality/arsenal#8.1.113",
     "async": "^2.6.4",
     "aws-sdk": "^2.1005.0",
     "bucketclient": "git+https://github.com/scality/bucketclient#8.1.5",
