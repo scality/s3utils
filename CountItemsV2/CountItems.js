@@ -4,6 +4,13 @@
  * offloading the processing work to MongoDB, saving computing
  * resources, and reducing by a factor of 4.7 the collection
  * duration as compared with the CountItemsV1.
+ * Current limitations:
+ * - Object replacement cannot be detected due to the lack
+ *   of events in the oplog. Adding another call in arsenal
+ *   can solve this issue, with performance impact, otherwise,
+ *   starting MongoDB v6.0, the "pre-image" feature can be
+ *   enabled specifically on non versioned buckets to solve
+ *   the limitation.
  */
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-promise-executor-return */
@@ -15,6 +22,7 @@ const { validStorageMetricLevels } = require('../CountItems/utils/constants');
 
 const locationConfig = getLocationConfig(this.log);
 const METASTORE_COLLECTION = '__metastore';
+const USERBUCKET_COLLECTION = '__usersbucket';
 const INFOSTORE = '__infostore';
 const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
@@ -244,51 +252,49 @@ class CountItems {
     async listAllBuckets(onlySelectSOSAPIEnabledBuckets = false) {
         this.log.info('Listing all buckets...');
         const collection = this.db.getCollection(METASTORE_COLLECTION);
+        const userBucketCollection = this.db.getCollection(USERBUCKET_COLLECTION);
         // Store the current bucket list to later compare it with the previous list
         const currentBucketList = {};
-        return new Promise((resolve, reject) => {
+        try {
             const cursor = collection.find({});
             let i = 0;
-            cursor.each((err, doc) => {
+            for await (const doc of cursor) {
                 i++;
-                if (err) {
-                    this.log.error('Error while listing buckets', {
-                        error: err,
-                    });
-                    reject(err);
-                    return;
-                }
-                if (!doc) {
-                    // At this point, we've processed all documents. Time to check for added/deleted buckets.
-                    this.syncPoolWithBucketList(currentBucketList);
-                    resolve();
-                    return;
-                }
                 if (onlySelectSOSAPIEnabledBuckets && doc && doc.value && !this.isSOSCapacityInfoEnabled(doc.value)) {
-                    return;
+                    continue;
                 }
-                const bucketName = doc._id;
-                if (bucketName.includes('..bucket')) {
-                    return;
+                const bucketName = `${doc._id}_${new Date(doc.value.creationDate).getTime()}`;
+                if (bucketName.includes('..bucket') || bucketName.startsWith('mpuShadowBucket')) {
+                    continue;
                 }
                 this.log.info('Listing all buckets: cursor processing...', {
                     bucketNumber: i,
                     bucketName,
                 });
-                // Assuming the bucket name is stored in `doc._id`
-                // Update the current bucket list
-                currentBucketList[bucketName] = true;
-                // Add the bucket to the async pool if not already present
-                if (!this.pool[bucketName]) {
-                    this.pool[bucketName] = {
-                        doc,
-                        ongoing: false,
-                        metrics: {},
-                        first: true,
-                    };
+                // Retrieve dynamic createdDate from __userbucket collection
+                const userBucketDoc = await userBucketCollection.findOne({ _id: `${doc.value.owner}..|..${doc._id}` });
+                if (userBucketDoc) {
+                    // Update the creationDate in the current document
+                    doc.value.creationDate = userBucketDoc.createdDate;
+                    // Update the current bucket list
+                    currentBucketList[bucketName] = true;
+                    // Add the bucket to the async pool if not already present
+                    if (!this.pool[bucketName]) {
+                        this.pool[bucketName] = {
+                            doc,
+                            ongoing: false,
+                            metrics: {},
+                            first: true,
+                        };
+                    }
                 }
-            });
-        });
+            }
+            // At this point, we've processed all documents. Time to check for added/deleted buckets.
+            this.syncPoolWithBucketList(currentBucketList);
+        } catch (err) {
+            this.log.error('Error while listing buckets', { error: err });
+            throw err;
+        }
     }
 
     /**
@@ -409,56 +415,24 @@ class CountItems {
             bucketLocation,
             isFirstRun,
         });
-        // TODO handle mongos
-        let replStatus;
-        let secondaryInfo;
-        try {
-            replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
-            secondaryInfo = replStatus.members.find(member => member.self);
-        } catch (err) {
-            this.log.warn('Error while getting replSetGetStatus', {
-                reason: err,
-            });
-        }
         const checkpoint = await this.getCheckpoint(bucketName);
         let lastSyncedTimestamp = new Date();
+        lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
+        lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
 
-        // TODO exclude user..bucket entries
         const result = await new Promise((resolve, reject) => {
-            // Step 1: Get the last replicated optime timestamp from the secondary
-            // The reason is that we read from secondaries, and there is no consistency
-            // guarantee that the data is replicated to all secondaries at the same time.
-            // We cannot use the linearizable read concern as we read from the secondaries,
-            // so we need to first get the last sync date of the secondary, and adapt
-            // the query 'last-modified' filter based on that.
-            lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
-            lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
-
-            try {
-                if (!secondaryInfo) {
-                    throw new Error('No secondary member found in replica set');
-                }
-                const unixTimeInSeconds = secondaryInfo.optime.ts.high_;
-                lastSyncedTimestamp = new Date(unixTimeInSeconds * 1000);
-                lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
-                lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
-            } catch (err) {
-                this.log.warn('Error while getting secondary optime', {
-                    reason: err,
-                });
-            }
-
-            // Step 2: Setup collection and checkpoint
+            // Step 1: Setup collection and checkpoint
             // We get the current bucket status from the pool;
+            // extract what's before '_' in the bucket name
             if (!this.pool[bucketName]) {
                 this.log.error('Bucket not found in pool', {
                     bucketName,
                 });
                 return reject(new Error('Bucket not found in pool'));
             }
-            const collection = this.db.getCollection(bucketName);
+            const collection = this.db.getCollection(bucketName.split('_')[0]);
 
-            // Step 3: Set the aggregation filter
+            // Step 2: Set the aggregation filter
             let filter = {
                 'value.last-modified': { $gt: checkpoint },
             };
@@ -473,7 +447,7 @@ class CountItems {
                 };
             }
 
-            // Step 4: Run the aggregation pipeline
+            // Step 3: Run the aggregation pipeline
             const operation = collection.aggregate([
                 {
                     $match: filter,
@@ -571,7 +545,7 @@ class CountItems {
             return resolve(operation.toArray());
         });
 
-        // compute metrics for each location
+        // Steep 4: compute metrics for each location
         const metrics = {};
         result.forEach(_metricsForLocation => {
             if (!metrics[_metricsForLocation._id]) {
@@ -588,7 +562,6 @@ class CountItems {
 
         this.bulkedCheckpoints[bucketName] = lastSyncedTimestamp;
 
-        // return the computed metrics as a single object holding all the data
         return new Promise(resolve => resolve({
             accountName,
             bucketName,
@@ -713,7 +686,10 @@ class CountItems {
             const objectId = locationConfig[location] ? locationConfig[location].objectId : null;
             // No location config must be ignored
             if (!objectId && !location.startsWith(INTERNAL_NULL_LOCATION)) {
-                this.log.warn('No location config found for location', { location });
+                this.log.warn('No location config found for location', {
+                    location,
+                    bucketName,
+                });
                 continue;
             }
             let realLocation = location;
@@ -858,6 +834,9 @@ class CountItems {
      * @returns {Promise} - resolves to the checkpoint value
      */
     changeStreamListenDeletion() {
+        this.log.debug('Creating the change stream watcher...', {
+            db: this.db.database,
+        });
         const dbClient = this.db.client.db(this.db.database);
         // filter of operation type with fullDocument.value.deleted set to true
         let watcher = dbClient.watch([{
@@ -869,13 +848,15 @@ class CountItems {
 
         // Listen for changes
         watcher.on('change', change => {
-            // ignore unknown buckets: they are yet to be processed
-            if (!this.pool[change.ns.coll]) {
-                return;
-            }
             this.log.debug('Change stream event', {
                 change,
             });
+            // find the pool entry that is starting with change.ns.coll_
+            const bucketNameForMetrics = Object.keys(this.pool).find(bucketName => bucketName.startsWith(`${change.ns.coll}_`));
+            // ignore unknown buckets: they are yet to be processed
+            if (!bucketNameForMetrics) {
+                return;
+            }
             const size = change.updateDescription.updatedFields.value['content-length'];
             let type;
             let typeCount;
@@ -895,7 +876,7 @@ class CountItems {
             // Do not process object if last modified date is after the current
             // scan date.
             if (change.updateDescription.updatedFields.value['last-modified']
-                > this.bulkedCheckpoints[change.ns.coll]) {
+                > this.bulkedCheckpoints[bucketNameForMetrics]) {
                 return;
             }
             if (!change.updateDescription.updatedFields.value.location || !Array.isArray(change.updateDescription.updatedFields.value.location)) {
@@ -906,17 +887,17 @@ class CountItems {
                 const location = locationConfig[_location.dataStoreName] ? locationConfig[_location.dataStoreName].objectId : null;
                 // Check to avoid race conditions, while the bucket was processed from Mongo
                 // but not yet in the service.
-                if (!this.pool[change.ns.coll].metrics[location]) {
+                if (!this.pool[bucketNameForMetrics].metrics[location]) {
                     return;
                 }
-                if (!this.pool[change.ns.coll].metrics[location][type]) {
-                    this.pool[change.ns.coll].metrics[location][type] = 0;
-                    this.pool[change.ns.coll].metrics[location][typeCount] = 0;
+                if (!this.pool[bucketNameForMetrics].metrics[location][type]) {
+                    this.pool[bucketNameForMetrics].metrics[location][type] = 0;
+                    this.pool[bucketNameForMetrics].metrics[location][typeCount] = 0;
                 }
                 // Process the sizes
-                this.pool[change.ns.coll].metrics[location][type] = Math.max(0, this.pool[change.ns.coll].metrics[location][type] - size);
+                this.pool[bucketNameForMetrics].metrics[location][type] = Math.max(0, this.pool[bucketNameForMetrics].metrics[location][type] - size);
                 // Process the counts
-                this.pool[change.ns.coll].metrics[location][typeCount] = Math.max(0, this.pool[change.ns.coll].metrics[location][typeCount] - 1);
+                this.pool[bucketNameForMetrics].metrics[location][typeCount] = Math.max(0, this.pool[bucketNameForMetrics].metrics[location][typeCount] - 1);
             });
         });
 
@@ -940,7 +921,3 @@ class CountItems {
 }
 
 module.exports = CountItems;
-
-// todo:
-// - fix secondary optime check
-// - detect object replacement
