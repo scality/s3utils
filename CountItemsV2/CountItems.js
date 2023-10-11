@@ -31,7 +31,16 @@ class CountItems {
      * @param {werelogs} log - logger
      */
     constructor(config, log) {
-        this.db = new S3UtilsMongoClient(createMongoParams(log));
+        this.db = new S3UtilsMongoClient(createMongoParams(log, {
+            readPreference: 'secondaryPreferred',
+            readPreferenceOptions: {
+                // This option is ensuring that with the artificial lag
+                // used to ensure all documents from a given second are
+                // properly processed without race conditions, we don't
+                // read from a secondary that is too far behind.
+                maxStalenessSeconds: config.lastModifiedLagSeconds || 1,
+            },
+        }));
         this.log = log;
         this.connected = false;
         this.maxRetries = config.maxRetries || 10;
@@ -172,7 +181,7 @@ class CountItems {
                         .catch(err => {
                             // Force refresh the full bucket in case of error
                             bucketInfo.first = true;
-                            this.log.error(`Error processing bucket: ${bucketName}`, { error: err });
+                            this.log.error(`Error processing bucket: ${bucketName}`, { err });
                             bucketInfo.ongoing = false;
                             promises.splice(promises.indexOf(promise), 1);
                         });
@@ -400,9 +409,19 @@ class CountItems {
             bucketLocation,
             isFirstRun,
         });
-        const replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
-        const secondaryInfo = replStatus.members.find(member => member.self);
+        // TODO handle mongos
+        let replStatus;
+        let secondaryInfo;
+        try {
+            replStatus = await this.db.adminDb.command({ replSetGetStatus: 1 });
+            secondaryInfo = replStatus.members.find(member => member.self);
+        } catch (err) {
+            this.log.warn('Error while getting replSetGetStatus', {
+                reason: err,
+            });
+        }
         const checkpoint = await this.getCheckpoint(bucketName);
+        let lastSyncedTimestamp = new Date();
 
         // TODO exclude user..bucket entries
         const result = await new Promise((resolve, reject) => {
@@ -412,7 +431,6 @@ class CountItems {
             // We cannot use the linearizable read concern as we read from the secondaries,
             // so we need to first get the last sync date of the secondary, and adapt
             // the query 'last-modified' filter based on that.
-            let lastSyncedTimestamp = new Date();
             lastSyncedTimestamp.setSeconds(lastSyncedTimestamp.getSeconds() - this.lastModifiedLagSeconds);
             lastSyncedTimestamp = lastSyncedTimestamp.toISOString();
 
@@ -429,7 +447,6 @@ class CountItems {
                     reason: err,
                 });
             }
-            this.bulkedCheckpoints[bucketName] = lastSyncedTimestamp;
 
             // Step 2: Setup collection and checkpoint
             // We get the current bucket status from the pool;
@@ -464,7 +481,9 @@ class CountItems {
                 {
                     $project: {
                         _id: 1,
-                        dataStoreName: {
+                        // extract the value.dataStoreName ad dataStoreName
+                        dataStoreName: '$value.dataStoreName',
+                        locationsNames: {
                             $cond: [
                                 {
                                     $or: [
@@ -534,8 +553,8 @@ class CountItems {
                     $group: {
                         _id: {
                             $ifNull: [
-                                { $ifNull: ['$coldLocation', '$dataStoreName'] },
-                                INTERNAL_NULL_LOCATION,
+                                { $ifNull: ['$coldLocation', '$locationsNames'] },
+                                `${INTERNAL_NULL_LOCATION}_${'$dataStoreName'}`,
                             ],
                         },
                         masterData: { $sum: { $multiply: ['$isMaster', '$contentLength'] } },
@@ -551,6 +570,7 @@ class CountItems {
 
             return resolve(operation.toArray());
         });
+
         // compute metrics for each location
         const metrics = {};
         result.forEach(_metricsForLocation => {
@@ -565,6 +585,8 @@ class CountItems {
             metrics[_metricsForLocation._id].versionCount = _metricsForLocation.versionCount || 0;
             metrics[_metricsForLocation._id].deleteMarkerCount = _metricsForLocation.deleteMarkerCount || 0;
         });
+
+        this.bulkedCheckpoints[bucketName] = lastSyncedTimestamp;
 
         // return the computed metrics as a single object holding all the data
         return new Promise(resolve => resolve({
@@ -690,9 +712,15 @@ class CountItems {
             }
             const objectId = locationConfig[location] ? locationConfig[location].objectId : null;
             // No location config must be ignored
-            if (!objectId && location !== INTERNAL_NULL_LOCATION) {
+            if (!objectId && !location.startsWith(INTERNAL_NULL_LOCATION)) {
                 this.log.warn('No location config found for location', { location });
                 continue;
+            }
+            let realLocation = location;
+            // This code is not (yet) useful but helps detecting delete markers, if custom
+            // logic is needed here
+            if (location.startsWith(INTERNAL_NULL_LOCATION)) {
+                realLocation = location.replace(`${INTERNAL_NULL_LOCATION}_`, '');
             }
             // Initialize metrics object for objectId if it doesn't exist
             if (!this.pool[bucketName].metrics[objectId]) {
@@ -870,10 +898,26 @@ class CountItems {
                 > this.bulkedCheckpoints[change.ns.coll]) {
                 return;
             }
-            // Process the sizes
-            this.pool[change.ns.coll].metrics[type] = Math.max(0, this.pool[change.ns.coll].metrics[type] - size);
-            // Process the counts
-            this.pool[change.ns.coll].metrics[typeCount] = Math.max(0, this.pool[change.ns.coll].metrics[typeCount] - 1);
+            if (!change.updateDescription.updatedFields.value.location || !Array.isArray(change.updateDescription.updatedFields.value.location)) {
+                // delete marker: ignore
+                return;
+            }
+            change.updateDescription.updatedFields.value.location.forEach(_location => {
+                const location = locationConfig[_location.dataStoreName] ? locationConfig[_location.dataStoreName].objectId : null;
+                // Check to avoid race conditions, while the bucket was processed from Mongo
+                // but not yet in the service.
+                if (!this.pool[change.ns.coll].metrics[location]) {
+                    return;
+                }
+                if (!this.pool[change.ns.coll].metrics[location][type]) {
+                    this.pool[change.ns.coll].metrics[location][type] = 0;
+                    this.pool[change.ns.coll].metrics[location][typeCount] = 0;
+                }
+                // Process the sizes
+                this.pool[change.ns.coll].metrics[location][type] = Math.max(0, this.pool[change.ns.coll].metrics[location][type] - size);
+                // Process the counts
+                this.pool[change.ns.coll].metrics[location][typeCount] = Math.max(0, this.pool[change.ns.coll].metrics[location][typeCount] - 1);
+            });
         });
 
         // Listen for errors

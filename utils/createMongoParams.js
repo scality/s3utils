@@ -47,7 +47,6 @@ function createMongoParams(log, customParams) {
         readPreference: 'secondaryPreferred',
         logger: log,
     };
-
     if (process.env.MONGODB_AUTH_USERNAME
         && process.env.MONGODB_AUTH_PASSWORD) {
         params.authCredentials = {
