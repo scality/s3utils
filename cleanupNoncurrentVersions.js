@@ -1,11 +1,13 @@
 const fs = require('fs');
 const { http, https } = require('httpagent');
+const { ObjectMD } = require('arsenal').models;
 
 const AWS = require('aws-sdk');
-const { doWhilst, eachSeries } = require('async');
+const { doWhilst, eachSeries, filterLimit } = require('async');
 
 const { Logger } = require('werelogs');
 
+const BackbeatClient = require('./BackbeatClient');
 const parseOlderThan = require('./utils/parseOlderThan');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
@@ -31,6 +33,7 @@ const DELETED_BEFORE = (process.env.DELETED_BEFORE
 const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
 const { HTTPS_CA_PATH } = process.env;
 const { HTTPS_NO_VERIFY } = process.env;
+const EXCLUDE_REPLICATING_VERSIONS = _parseBoolean(process.env.EXCLUDE_REPLICATING_VERSIONS);
 
 const LISTING_LIMIT = 1000;
 const LOG_PROGRESS_INTERVAL_MS = 10000;
@@ -80,6 +83,8 @@ Optional environment variables:
     HTTPS_CA_PATH: path to a CA certificate bundle used to authentify
     the S3 endpoint
     HTTPS_NO_VERIFY: set to 1 to disable S3 endpoint certificate check
+    EXCLUDE_REPLICATING_VERSIONS: if is set to '1,' 'true,' or 'yes,'
+    prevent the deletion of replicating versions
 `;
 
 // We accept console statements for usage purpose
@@ -153,6 +158,7 @@ log.info('Start deleting noncurrent versions and delete markers', {
     olderThan: (OLDER_THAN ? OLDER_THAN.toString() : 'N/A'),
     deletedBefore: (DELETED_BEFORE ? DELETED_BEFORE.toString() : 'N/A'),
     onlyDeleted: ONLY_DELETED,
+    excludeReplicatingVersions: EXCLUDE_REPLICATING_VERSIONS,
 });
 
 let agent;
@@ -197,7 +203,11 @@ const s3Options = {
             * (0.9 + Math.random() * 0.2);
     },
 };
-const s3 = new AWS.S3(Object.assign(options, s3Options));
+
+const opt = Object.assign(options, s3Options);
+
+const s3 = new AWS.S3(opt);
+const bb = new BackbeatClient(opt);
 
 let nListed = 0;
 let nDeletesTriggered = 0;
@@ -205,6 +215,7 @@ let nDeleted = 0;
 let nSkippedCurrent = 0;
 let nSkippedTooRecent = 0;
 let nSkippedNotDeleted = 0;
+let nSkippedReplicating = 0;
 let nErrors = 0;
 let bucketInProgress = null;
 let KeyMarker = null;
@@ -218,6 +229,7 @@ function _logProgress(message) {
         skippedCurrent: nSkippedCurrent,
         skippedTooRecent: nSkippedTooRecent,
         skippedNotDeleted: nSkippedNotDeleted,
+        skippedReplicating: EXCLUDE_REPLICATING_VERSIONS ? nSkippedReplicating : 'N/A',
         errors: nErrors,
         bucket: bucketInProgress || null,
         keyMarker: KeyMarker || null,
@@ -238,6 +250,25 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
         KeyMarker,
         VersionIdMarker,
     }, cb);
+}
+
+function _getMetadata(bucket, key, versionId, cb) {
+    return bb.getMetadata({
+        Bucket: bucket,
+        Key: key,
+        VersionId: versionId,
+    }, (err, data) => {
+        if (err) {
+            return cb(err);
+        }
+
+        const { result, error } = ObjectMD.createFromBlob(data.Body);
+        if (error) {
+            return cb(error);
+        }
+
+        return cb(null, result);
+    });
 }
 
 function _lastModifiedIsEligible(lastModifiedString) {
@@ -331,6 +362,44 @@ function decVersionId(versionId) {
     }
     return versionId.slice(0, versionId.length - 1)
         + String.fromCharCode(versionId.charCodeAt(versionId.length - 1) - 1);
+}
+
+function _filterEligibleVersions(bucket, versionsToDelete, cb) {
+    if (!EXCLUDE_REPLICATING_VERSIONS) {
+        return process.nextTick(cb, versionsToDelete);
+    }
+
+    return filterLimit(versionsToDelete, 10, (v, next) => {
+        _getMetadata(bucket, v.Key, v.VersionId, (err, objMD) => {
+            if (err) {
+                nErrors += 1;
+                log.error('version not deleted because get metadata failed', {
+                    bucketName: bucket,
+                    key: v.Key,
+                    versionId: v.VersionId,
+                    error: err,
+                });
+
+                return next(null, false);
+            }
+
+            const replicationStatus = objMD.getReplicationStatus();
+
+            if (replicationStatus && replicationStatus !== 'COMPLETED') {
+                nSkippedReplicating += 1;
+                log.info('version not deleted because being replicated', {
+                    bucketName: bucket,
+                    key: v.Key,
+                    versionId: v.VersionId,
+                    error: err,
+                });
+
+                return next(null, false);
+            }
+
+            return next(null, true);
+        });
+    }, (err, eligibleVersions) => cb(eligibleVersions));
 }
 
 function _triggerDeletesOnEligibleObjects(
@@ -444,7 +513,7 @@ function _triggerDeletesOnEligibleObjects(
             }
         }
     });
-    _triggerDeletes(bucket, versionsToDelete, cb);
+    _filterEligibleVersions(bucket, versionsToDelete, eligibleVersions => _triggerDeletes(bucket, eligibleVersions, cb));
     return ret;
 }
 

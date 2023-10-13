@@ -1624,6 +1624,9 @@ authentify the S3 endpoint
 
 * **HTTPS_NO_VERIFY**: set to 1 to disable S3 endpoint certificate check
 
+* **EXCLUDE_REPLICATING_VERSIONS**: if is set to '1,' 'true,' or 'yes,'
+    prevent the deletion of replicating versions
+
 ## Example
 
 ```
