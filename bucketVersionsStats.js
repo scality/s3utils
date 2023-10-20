@@ -7,6 +7,7 @@ const { doWhilst } = require('async');
 const { Logger } = require('werelogs');
 
 const parseOlderThan = require('./utils/parseOlderThan');
+const { safeListObjectVersions } = require('./utils/safeList');
 
 const log = new Logger('s3utils::bucketVersionsStats');
 const { ENDPOINT } = process.env;
@@ -166,7 +167,7 @@ const logProgressInterval = setInterval(
 );
 
 function _listObjectVersions(bucket, KeyMarker, VersionIdMarker, cb) {
-    return s3.listObjectVersions({
+    return safeListObjectVersions(s3, {
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
@@ -191,8 +192,11 @@ function listBucket(bucket, cb) {
                     return done(err);
                 }
                 for (const version of data.Versions) {
-                    if (_OLDER_THAN_TIMESTAMP && new Date(version.LastModified) > _OLDER_THAN_TIMESTAMP) {
-                        continue;
+                    if (_OLDER_THAN_TIMESTAMP) {
+                        const parsed = new Date(version.LastModified);
+                        if (Number.isNaN(parsed.getTime()) || parsed > _OLDER_THAN_TIMESTAMP) {
+                            continue;
+                        }
                     }
                     const statObj = version.IsLatest ? stats.current : stats.noncurrent;
                     statObj.count += 1;
