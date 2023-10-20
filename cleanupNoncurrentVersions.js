@@ -9,6 +9,7 @@ const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
 const parseOlderThan = require('./utils/parseOlderThan');
+const { safeListObjectVersions } = require('./utils/safeList');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
 
@@ -243,7 +244,7 @@ const logProgressInterval = setInterval(
 );
 
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    return s3.listObjectVersions({
+    return safeListObjectVersions(s3, {
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
@@ -272,11 +273,19 @@ function _getMetadata(bucket, key, versionId, cb) {
 }
 
 function _lastModifiedIsEligible(lastModifiedString) {
-    return !OLDER_THAN || (new Date(lastModifiedString) < OLDER_THAN);
+    const ts = new Date(lastModifiedString);
+    if (Number.isNaN(ts.getTime())) {
+        return false;
+    }
+    return !OLDER_THAN || (ts < OLDER_THAN);
 }
 
 function _deleteMarkerIsEligible(lastModifiedString) {
-    return !DELETED_BEFORE || (new Date(lastModifiedString) < DELETED_BEFORE);
+    const ts = new Date(lastModifiedString);
+    if (Number.isNaN(ts.getTime())) {
+        return false;
+    }
+    return !DELETED_BEFORE || (ts < DELETED_BEFORE);
 }
 
 let deleteQueue = [];
