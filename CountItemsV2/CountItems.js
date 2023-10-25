@@ -14,12 +14,12 @@
  */
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-promise-executor-return */
+// const redis = require('redis');
 const { errors, constants } = require('arsenal');
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 const createMongoParams = require('../utils/createMongoParams');
 const getLocationConfig = require('../utils/locationConfig');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
-
 const locationConfig = getLocationConfig(this.log);
 const METASTORE_COLLECTION = '__metastore';
 const USERBUCKET_COLLECTION = '__usersbucket';
@@ -272,7 +272,7 @@ class CountItems {
                     bucketName: doc._id,
                 });
                 // Retrieve dynamic createdDate from __userbucket collection
-                const userBucketDoc = await userBucketCollection.findOne({ _id: `${doc.value.owner}..|..${doc._id}` });
+                const userBucketDoc = await userBucketCollection.findOne({ _id: `${doc.value.owner}${constants.splitter}${doc._id}` });
                 // if userBucketDoc is null, ignore and proceed to next
                 if (!userBucketDoc) {
                     this.log.warn('userBucketDoc is null', {
@@ -642,7 +642,6 @@ class CountItems {
             this.log.error('updateStorageConsumptionMetrics: error updating count items', {
                 error: err.message,
             });
-            throw errors.InternalError;
         }
     }
 
