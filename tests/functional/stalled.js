@@ -232,7 +232,7 @@ describe('StalledRetry', () => {
 
     afterAll(done => {
         async.series([
-            next => mgoClient.db.dropDatabase(next),
+            next => mgoClient.db.dropDatabase().then(() => next()).catch(() => next()),
             next => mgoClient.close(next),
         ], done);
     });

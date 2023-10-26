@@ -14,51 +14,59 @@ const __COUNT_ITEMS = 'countitems';
 
 
 class S3UtilsMongoClient extends MongoClientInterface {
-    getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
-        const c = this.getCollection(bucketName);
-        const cursor = c.find({}, {
-            projection: {
-                '_id': 1,
-                'value.last-modified': 1,
-                'value.replicationInfo': 1,
-                'value.dataStoreName': 1,
-                'value.content-length': 1,
-                'value.versionId': 1,
-                'value.owner-id': 1,
-                'value.isDeleteMarker': 1,
-                'value.isNull': 1,
-                'value.archive': 1,
-                'value.x-amz-storage-class': 1,
-                'value.isPHD': 1,
-            },
-        });
-        const collRes = {
-            bucket: {}, // bucket level metrics
-            location: {}, // location level metrics
-            account: {}, // account level metrics
-        };
-        let stalledCount = 0;
-        const cmpDate = new Date();
-        cmpDate.setHours(cmpDate.getHours() - 1);
+    async getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
+        try {
+            const c = this.getCollection(bucketName);
+            const cursor = c.find({}, {
+                projection: {
+                    '_id': 1,
+                    'value.last-modified': 1,
+                    'value.replicationInfo': 1,
+                    'value.dataStoreName': 1,
+                    'value.content-length': 1,
+                    'value.versionId': 1,
+                    'value.owner-id': 1,
+                    'value.isDeleteMarker': 1,
+                    'value.isNull': 1,
+                    'value.archive': 1,
+                    'value.x-amz-storage-class': 1,
+                    'value.isPHD': 1,
+                },
+            });
+            const collRes = {
+                bucket: {}, // bucket level metrics
+                location: {}, // location level metrics
+                account: {}, // account level metrics
+            };
+            let stalledCount = 0;
+            const cmpDate = new Date();
+            cmpDate.setHours(cmpDate.getHours() - 1);
 
-        const locationConfig = getLocationConfig(log);
+            const locationConfig = getLocationConfig(log);
 
-        return this.getCollection(USERSBUCKET).find({}, {
-            projection: {
-                'value.creationDate': 1,
-            },
-        }).toArray((err, usersBucketCreationDatesArray) => {
-            if (err) {
-                log.error('Failed to get users bucket creation dates', {
-                    method: 'getObjectMDStats',
-                    error: err,
-                });
-                return callback(err);
-            }
+            const usersBucketCreationDatesArray = await this.getCollection(USERSBUCKET).find({}, {
+                projection: {
+                    'value.creationDate': 1,
+                },
+            }).toArray();
+
             const usersBucketCreationDatesMap = usersBucketCreationDatesArray
                 .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
-            return cursor.forEach(
+            let startCursorDate = new Date();
+            let processed = 0;
+            await cursor.forEach(
                 res => {
+                    // Periodically display information about the cursor
+                    // if more than 30s elapsed
+                    const currentDate = Date.now();
+                    if (currentDate - startCursorDate > 30000) {
+                        startCursorDate = currentDate;
+                        log.info('Processing cursor', {
+                            method: 'getObjectMDStats',
+                            bucketName,
+                            processed,
+                        });
+                    }
                     const { data, error } = this._processEntryData(
                         bucketName,
                         bucketInfo,
@@ -154,12 +162,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
                         });
                     });
+                    processed++;
                 },
                 err => {
                     if (err) {
                         log.error('Error when processing mongo entries', {
                             method: 'getObjectMDStats',
-                            error: err,
+                            errDetails: { ...err },
+                            errorString: err.toString(),
                         });
                         return callback(err);
                     }
@@ -171,7 +181,22 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     return callback(null, retResult);
                 },
             );
-        });
+
+            const bucketStatus = bucketInfo.getVersioningConfiguration();
+            const isVer = (bucketStatus && (bucketStatus.Status === 'Enabled'
+                || bucketStatus.Status === 'Suspended'));
+            const retResult = this._handleResults(collRes, isVer);
+            retResult.stalled = stalledCount;
+
+            return callback(null, retResult);
+        } catch (err) {
+            log.error('An error occurred', {
+                method: 'getObjectMDStats',
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return callback(err);
+        }
     }
 
     /**
@@ -377,32 +402,42 @@ class S3UtilsMongoClient extends MongoClientInterface {
         };
     }
 
-    updateBucketCapacityInfo(bucketName, capacityInfo, log, cb) {
-        const m = this.getCollection(METASTORE);
-        m.findOneAndUpdate({
-            _id: bucketName,
-        }, {
-            $set: {
-                '_id': bucketName,
-                'value.capabilities.VeeamSOSApi.CapacityInfo': {
-                    Capacity: capacityInfo.Capacity,
-                    Available: capacityInfo.Available,
-                    Used: capacityInfo.Used,
-                    LastModified: (new Date()).toISOString(),
+    async updateBucketCapacityInfo(bucketName, capacityInfo, log, cb) {
+        try {
+            const m = this.getCollection(METASTORE);
+            const updateResult = await m.findOneAndUpdate({
+                _id: bucketName,
+            }, {
+                $set: {
+                    '_id': bucketName,
+                    'value.capabilities.VeeamSOSApi.CapacityInfo': {
+                        Capacity: capacityInfo.Capacity,
+                        Available: capacityInfo.Available,
+                        Used: capacityInfo.Used,
+                        LastModified: (new Date()).toISOString(),
+                    },
                 },
-            },
-        }, {
-            upsert: false,
-        }, err => {
-            if (err) {
-                log.error(
-                    'updateBucketCapacityInfo: error putting bucket CapacityInfo',
-                    { error: err.message, bucketName, capacityInfo },
-                );
-                return cb(errors.InternalError);
+            }, {
+                upsert: false,
+            });
+            if (!updateResult.ok) {
+                log.error('updateBucketCapacityInfo: failed to update bucket CapacityInfo', {
+                    bucketName,
+                    capacityInfo,
+                });
+                return cb(new Error('Failed to update bucket CapacityInfo'));
             }
             return cb();
-        });
+        } catch (err) {
+            log.error('updateBucketCapacityInfo: error putting bucket CapacityInfo', {
+                error: err.message,
+                errDetails: { ...err },
+                errorString: err.toString(),
+                bucketName,
+                capacityInfo,
+            });
+            return cb(errors.InternalError);
+        }
     }
 
     static convertNumberToLong(obj) {
@@ -422,79 +457,63 @@ class S3UtilsMongoClient extends MongoClientInterface {
         return newObj;
     }
 
-    updateStorageConsumptionMetrics(countItems, dataMetrics, log, cb) {
-        const updatedStorageMetricsList = [
-            { _id: __COUNT_ITEMS, value: countItems },
-            // iterate every resource through dataMetrics and add to updatedStorageMetricsList
-            ...Object.entries(dataMetrics)
-                .filter(([metricLevel]) => validStorageMetricLevels.has(metricLevel))
-                .flatMap(([metricLevel, result]) => Object.entries(result)
-                    .map(([resource, metrics]) => ({
-                        _id: `${metricLevel}_${resource}`,
-                        measuredOn: new Date().toJSON(),
-                        ...S3UtilsMongoClient.convertNumberToLong(metrics),
-                    }))),
-        ];
-        let tempCollection;
-        async.series([
-            next => this.getCollection(INFOSTORE_TMP).drop(err => {
-                if (err && err.codeName !== 'NamespaceNotFound') {
-                    return next(err);
+    async updateStorageConsumptionMetrics(countItems, dataMetrics, log, cb) {
+        try {
+            const updatedStorageMetricsList = [
+                { _id: __COUNT_ITEMS, value: countItems },
+                // iterate every resource through dataMetrics and add to updatedStorageMetricsList
+                ...Object.entries(dataMetrics)
+                    .filter(([metricLevel]) => validStorageMetricLevels.has(metricLevel))
+                    .flatMap(([metricLevel, result]) => Object.entries(result)
+                        .map(([resource, metrics]) => ({
+                            _id: `${metricLevel}_${resource}`,
+                            measuredOn: new Date().toJSON(),
+                            ...S3UtilsMongoClient.convertNumberToLong(metrics),
+                        }))),
+            ];
+            log.info('updateStorageConsumptionMetrics: updating storage metrics');
+
+            // Drop the temporary collection if it exists
+            try {
+                await this.getCollection(INFOSTORE_TMP).drop();
+            } catch (err) {
+                if (err.codeName !== 'NamespaceNotFound') {
+                    throw err;
                 }
-                return next();
-            }),
-            next => this.db.createCollection(INFOSTORE_TMP, (err, collection) => {
-                if (err) {
-                    return next(err);
-                }
-                tempCollection = collection;
-                return next();
-            }),
-            next => tempCollection.insertMany(updatedStorageMetricsList, { ordered: false }, next),
-            next => async.retry(
-                3,
-                done => tempCollection.rename(INFOSTORE, { dropTarget: true }, done),
-                err => {
-                    if (err) {
-                        log.error('updateStorageConsumptionMetrics: error renaming temp collection, try again', {
-                            error: err.message,
-                        });
-                        return next(err);
-                    }
-                    return next();
-                },
-            ),
-        ], err => {
-            if (err) {
-                log.error('updateStorageConsumptionMetrics: error updating count items', {
-                    error: err.message,
-                });
-                return cb(errors.InternalError);
             }
+            const tempCollection = await this.db.createCollection(INFOSTORE_TMP);
+            await tempCollection.insertMany(updatedStorageMetricsList, { ordered: false });
+            await async.retry(
+                3,
+                async () => tempCollection.rename(INFOSTORE, { dropTarget: true }),
+            );
             return cb();
-        });
+        } catch (err) {
+            log.error('updateStorageConsumptionMetrics: error updating storage metrics', {
+                error: err,
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return cb(errors.InternalError);
+        }
     }
 
-    readStorageConsumptionMetrics(entityName, log, cb) {
-        const i = this.getCollection(INFOSTORE);
-        return async.retry(
-            3,
-            done => i.findOne({
-                _id: entityName,
-            }, done),
-            (err, doc) => {
-                if (err) {
-                    log.error('readStorageConsumptionMetrics: error reading count items', {
-                        error: err.message,
-                    });
-                    return cb(errors.InternalError);
-                }
-                if (!doc) {
-                    return cb(errors.NoSuchEntity);
-                }
-                return cb(null, doc);
-            },
-        );
+    async readStorageConsumptionMetrics(entityName, log, cb) {
+        try {
+            const i = this.getCollection(INFOSTORE);
+            const doc = await i.findOne({ _id: entityName });
+            if (!doc) {
+                return cb(errors.NoSuchEntity);
+            }
+            return cb(null, doc);
+        } catch (err) {
+            log.error('readStorageConsumptionMetrics: error reading metrics', {
+                error: err,
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return cb(errors.InternalError);
+        }
     }
 
     /*
@@ -502,74 +521,84 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * bucket collection exists but bucket is not in metastore collection.
      * For now, to make the count-items cronjob more robust, we ignore those "bad buckets"
      */
-    getBucketInfos(log, cb) {
-        const bucketInfos = [];
-        this.db.listCollections().toArray((err, collInfos) => {
-            if (err) {
-                log.error('could not get list of collections', {
-                    method: '_getBucketInfos',
-                    error: err,
-                });
-                return cb(err);
-            }
-            return async.eachLimit(collInfos, 10, (value, next) => {
+    async getBucketInfos(log, cb) {
+        try {
+            const bucketInfos = [];
+            const collInfos = await this.db.listCollections().toArray();
+            for (const value of collInfos) {
                 if (this._isSpecialCollection(value.name)) {
                     // skip
-                    return next();
+                    continue;
                 }
                 const bucketName = value.name;
-                // FIXME: there is currently no way of distinguishing
-                // master from versions and searching for VID_SEP
-                // does not work because there cannot be null bytes
-                // in $regex
-                return this.getBucketAttributes(bucketName, log, (err, bucketInfo) => {
-                    if (err) {
-                        if (err.message === 'NoSuchBucket') {
-                            log.debug('bucket does not exist in metastore, ignore it', {
-                                bucketName,
-                            });
-                            return next();
-                        }
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    const bucketInfo = await new Promise((resolve, reject) => {
+                        this.getBucketAttributes(bucketName, log, (err, info) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(info);
+                            }
+                        });
+                    });
+                    bucketInfos.push(bucketInfo);
+                } catch (err) {
+                    if (err.message === 'NoSuchBucket') {
+                        log.debug('bucket does not exist in metastore, ignore it', {
+                            bucketName,
+                        });
+                    } else {
                         log.error('failed to get bucket attributes', {
                             bucketName,
-                            error: err,
+                            errDetails: { ...err },
+                            errorString: err.toString(),
                         });
-                        return next(errors.InternalError);
+                        throw errors.InternalError;
                     }
-                    bucketInfos.push(bucketInfo);
-                    return next();
-                });
-            }, err => {
-                if (err) {
-                    return cb(err);
                 }
-                return cb(null, {
-                    bucketCount: bucketInfos.length,
-                    bucketInfos,
-                });
+            }
+            return cb(null, {
+                bucketCount: bucketInfos.length,
+                bucketInfos,
             });
-        });
+        } catch (err) {
+            log.error('could not get list of collections', {
+                method: '_getBucketInfos',
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return cb(err);
+        }
     }
 
-    getUsersBucketCreationDate(ownerId, bucketName, log, cb) {
-        const usersBucketCol = this.getCollection(USERSBUCKET);
-        return usersBucketCol.findOne({
-            _id: `${ownerId}${constants.splitter}${bucketName}`,
-        }, {
-            projection: {
-                'value.creationDate': 1,
-            },
-        }, (err, res) => {
-            if (err) {
-                log.error('failed to read bucket entry from __usersbucket', {
+    async getUsersBucketCreationDate(ownerId, bucketName, log, cb) {
+        try {
+            const usersBucketCol = this.getCollection(USERSBUCKET);
+            const res = await usersBucketCol.findOne({
+                _id: `${ownerId}${constants.splitter}${bucketName}`,
+            }, {
+                projection: {
+                    'value.creationDate': 1,
+                },
+            });
+            if (!res || !res.value || !res.value.creationDate) {
+                log.error('bucket entry not found in __usersbucket', {
                     bucketName,
                     ownerId,
-                    error: err,
                 });
-                return cb(err);
+                return cb(new Error('Bucket entry not found'));
             }
             return cb(null, res.value.creationDate);
-        });
+        } catch (err) {
+            log.error('failed to read bucket entry from __usersbucket', {
+                bucketName,
+                ownerId,
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return cb(err);
+        }
     }
 }
 

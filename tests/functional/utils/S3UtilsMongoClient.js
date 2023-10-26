@@ -834,19 +834,30 @@ describe('S3UtilsMongoClient::getBucketInfos', () => {
             done();
         }));
 
-        it('Should ignore buckets in collection list but not in metastore', done => {
+        it('Should ignore buckets in collection list but not in metastore', async () => {
             const metastoreCollection = client.getCollection('__metastore');
-            return metastoreCollection.deleteOne({ _id: buckets[0]._name }, err => {
-                assert.equal(err, null);
+
+            // Delete a bucket from the metastore
+            const deleteResult = await metastoreCollection.deleteOne({ _id: buckets[0]._name });
+            assert.equal(deleteResult.deletedCount, 1);
+
+            // Fetch bucket information
+            const getBucketInfosPromise = new Promise((resolve, reject) => {
                 client.getBucketInfos(logger, (err, data) => {
-                    assert.equal(err, null);
-                    assert.strictEqual(data.bucketCount, 2);
-                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), undefined);
-                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
-                    assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
-                    done();
+                    if (err) {
+                        return reject(err);
+                    }
+                    return resolve(data);
                 });
             });
+
+            const data = await getBucketInfosPromise;
+
+            // Perform the assertions
+            assert.strictEqual(data.bucketCount, 2);
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), undefined);
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
+            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
         });
     });
 });

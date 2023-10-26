@@ -213,7 +213,7 @@ describe('CountItems', () => {
 
     afterAll(done => {
         async.series([
-            next => client.db.dropDatabase(next),
+            next => client.db.dropDatabase().then(() => next()).catch(() => next()),
             next => client.close(next),
         ], done);
     });

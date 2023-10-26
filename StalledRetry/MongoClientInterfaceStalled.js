@@ -31,20 +31,20 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                 },
             },
             { $project: reducedFields },
-        ]);
+        ]).stream();
     }
 
-    queueStalledObjects(expiredBy, cb) {
+    async queueStalledObjects(expiredBy, cb) {
         const cmpDate = new Date();
         cmpDate.setHours(cmpDate.getHours() - expiredBy);
         const reqHandler = this.requestHandlerFactory(this.logger);
 
         let stalledCount = 0;
-        this.db.listCollections().toArray((err, collections) => {
-            if (err) {
-                return cb(err);
-            }
+        try {
+            const collections = await this.db.listCollections().toArray();
+            let i = 0;
             return async.eachSeries(collections, (value, next) => {
+                i++;
                 if (this._isSpecialCollection(value.name)) {
                     // skip
                     return next();
@@ -56,7 +56,6 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                     this._getStalledObjectsByBucket(bucketName),
                     this.logger,
                 );
-
                 return reqHandler.handleRequests(wrapper, (err, results) => {
                     if (err) {
                         this.logger.error(
@@ -76,7 +75,9 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
                     return next();
                 });
             }, err => cb(err, stalledCount));
-        });
+        } catch (err) {
+            return cb(err);
+        }
     }
 }
 
