@@ -42,11 +42,14 @@ class CountMaster {
                     });
                     return next(err);
                 }
+                this.log.info('got buckets infos', {
+                    bucketCount: bucketList.bucketCount,
+                });
                 this.manager.addWork(bucketList);
                 return next();
             }),
             next => this.manager.start(next),
-            next => this.client.updateStorageConsumptionMetrics(this.manager.store, this.manager.dataMetrics, this._log, next),
+            next => this.client.updateStorageConsumptionMetrics(this.manager.store, this.manager.dataMetrics, this.log, next),
         ], err => {
             if (err) {
                 this.log.error('error occurred in count items job', {

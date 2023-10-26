@@ -5,8 +5,11 @@ const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 const CountWorker = require('./CountWorker');
 const createMongoParams = require('../utils/createMongoParams');
 
+const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
+    ? 'debug' : 'info';
+
 const loggerConfig = {
-    level: 'info',
+    level: logLevel,
     dump: 'error',
 };
 

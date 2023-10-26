@@ -7,8 +7,11 @@ const CountManager = require('./CountManager');
 const createMongoParams = require('../utils/createMongoParams');
 const createWorkers = require('./utils/createWorkers');
 
+const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
+    ? 'debug' : 'info';
+
 const loggerConfig = {
-    level: 'debug',
+    level: logLevel,
     dump: 'error',
 };
 

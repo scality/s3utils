@@ -31,7 +31,7 @@ class CountWorker {
         }
         const bucketInfo = BucketInfo.fromObj(bucketInfoObj);
         const bucketName = bucketInfo.getName();
-        this.log.debug(`${process.pid} handling ${bucketName}`);
+        this.log.info(`${process.pid} handling ${bucketName}`);
         return async.waterfall([
             next => this.client._getIsTransient(bucketInfo, this.log, next),
             (isTransient, next) => this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),

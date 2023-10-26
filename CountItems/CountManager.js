@@ -36,6 +36,11 @@ class CountManager {
             }
             const id = this.workerList.shift();
             return this.workers[id].count(bucketInfo, (err, res) => {
+                this.log.info('processing a bucket', {
+                    method: 'CountManager::_setupQueue',
+                    workInQueue: this.q.length(),
+                    bucketInfo,
+                });
                 if (err) {
                     return done(err);
                 }
