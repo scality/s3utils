@@ -196,7 +196,7 @@ function logProgress(message) {
         haveDupKeys: status.objectsWithDupKeys,
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
         haveDupVersionIds: status.objectsWithDupVersionIds,
-        errors: status.objectErrors,
+        haveObjectsErrors: status.objectsErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
 }
@@ -416,7 +416,28 @@ function listBucketIter(bucket, cb) {
             const objectUrl = getObjectURL(bucket, item.key);
             let digestKey = item.key;
 
-            const md = JSON.parse(item.value);
+            let md;
+            try {
+                md = JSON.parse(item.value);
+              } catch (e) {
+                log.error('Invalid Metadata JSON', {
+                    object: objectUrl,
+                    error: e.message,
+                    mdValue: item.value,
+                });
+                status.objectsScanned += 1;
+                status.objectsErrors +=1;
+                return itemDone();
+              }
+            if (md.isNull) {
+                log.error('Null Metadata JSON', {
+                    object: objectUrl,
+                    mdValue: item.value,
+                });
+                status.objectsScanned += 1;
+                status.objectsErrors +=1;
+                return itemDone();
+            }
             if (vidSepPos === -1) {
                 const reVersionIds = /"versionId":"([^"]*)"/g;
                 const versionIds = [];
