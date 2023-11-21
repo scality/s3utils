@@ -415,27 +415,26 @@ function listBucketIter(bucket, cb) {
             const vidSepPos = item.key.lastIndexOf('\0');
             const objectUrl = getObjectURL(bucket, item.key);
             let digestKey = item.key;
-
             let md;
             try {
                 md = JSON.parse(item.value);
-              } catch (e) {
+            } catch (e) {
                 log.error('Invalid Metadata JSON', {
                     object: objectUrl,
                     error: e.message,
                     mdValue: item.value,
                 });
                 status.objectsScanned += 1;
-                status.objectsErrors +=1;
+                status.objectsErrors += 1;
                 return itemDone();
-              }
+            }
             if (md.isNull) {
                 log.error('Null Metadata JSON', {
                     object: objectUrl,
                     mdValue: item.value,
                 });
                 status.objectsScanned += 1;
-                status.objectsErrors +=1;
+                status.objectsErrors += 1;
                 return itemDone();
             }
             if (vidSepPos === -1) {
