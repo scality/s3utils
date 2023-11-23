@@ -428,7 +428,7 @@ function listBucketIter(bucket, cb) {
                 status.objectsErrors += 1;
                 return itemDone();
             }
-            if (md.isNull && !md.location && !md["md-model-version"] ) {
+            if (md.isNull && !md.location && !md['md-model-version'] ) {
                 log.error('Null Metadata JSON', {
                     object: objectUrl,
                     mdValue: item.value,
