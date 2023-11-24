@@ -384,7 +384,18 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
         return checkSproxydKeys(objectUrl, locations, () => cb(locations));
     });
 }
-
+function hasMinimalMetadata(md) {
+    if (!md) {
+        return false
+    }
+    return md.hasOwnProperty('md-model-version')
+        && md.hasOwnProperty('owner-display-name')
+        && md.hasOwnProperty('owner-id')
+        && md.hasOwnProperty('content-length')
+        && md.hasOwnProperty('content-type') 
+        && md.hasOwnProperty('last-modified')
+        && md.hasOwnProperty('content-md5')
+}
 function listBucketIter(bucket, cb) {
     const url = getBucketdURL(BUCKETD_HOSTPORT, {
         Bucket: bucket,
@@ -428,8 +439,17 @@ function listBucketIter(bucket, cb) {
                 status.objectsErrors += 1;
                 return itemDone();
             }
-            if (md.isNull && !md.location && !md['md-model-version']) {
-                log.error('Null Metadata JSON', {
+            if (item.value === '{}') {
+                log.error('object with empty metadata found', {
+                    objectUrl,
+                });
+                status.objectsScanned += 1;
+                status.objectsWithEmptyMetadata += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+            if (!hasMinimalMetadata(md)) {
+                log.error('Not Complete Metadata JSON', {
                     object: objectUrl,
                     mdValue: item.value,
                 });
@@ -476,16 +496,6 @@ function listBucketIter(bucket, cb) {
                     findDuplicateSproxydKeys.skipVersion();
                     return itemDone();
                 }
-            }
-
-            if (item.value === '{}') {
-                log.error('object with empty metadata found', {
-                    objectUrl,
-                });
-                status.objectsScanned += 1;
-                status.objectsWithEmptyMetadata += 1;
-                findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
             }
 
             if (md.isPHD) {
