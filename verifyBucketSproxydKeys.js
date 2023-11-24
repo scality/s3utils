@@ -389,9 +389,9 @@ function hasMinimalMetadata(md) {
         return false;
     }
     return (
-        md.hasOwnProperty('md-model-version') 
-        && md.hasOwnProperty('owner-display-name') 
-        && md.hasOwnProperty('owner-id') 
+        md.hasOwnProperty('md-model-version')
+        && md.hasOwnProperty('owner-display-name')
+        && md.hasOwnProperty('owner-id')
         && md.hasOwnProperty('content-length')
         && md.hasOwnProperty('content-type')
         && md.hasOwnProperty('last-modified')
