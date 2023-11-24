@@ -386,15 +386,17 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
 }
 function hasMinimalMetadata(md) {
     if (!md) {
-        return false
+        return false;
     }
-    return md.hasOwnProperty('md-model-version')
-        && md.hasOwnProperty('owner-display-name')
-        && md.hasOwnProperty('owner-id')
-        && md.hasOwnProperty('content-length')
-        && md.hasOwnProperty('content-type') 
-        && md.hasOwnProperty('last-modified')
-        && md.hasOwnProperty('content-md5')
+    return (
+      md.hasOwnProperty("md-model-version") &&
+      md.hasOwnProperty("owner-display-name") &&
+      md.hasOwnProperty("owner-id") &&
+      md.hasOwnProperty("content-length") &&
+      md.hasOwnProperty("content-type") &&
+      md.hasOwnProperty("last-modified") &&
+      md.hasOwnProperty("content-md5")
+    );
 }
 function listBucketIter(bucket, cb) {
     const url = getBucketdURL(BUCKETD_HOSTPORT, {
