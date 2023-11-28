@@ -5,8 +5,6 @@ const { shuffle } = require('arsenal');
 
 const DiffStreamOplogFilter = require('../../../CompareRaftMembers/DiffStreamOplogFilter');
 
-const HTTP_TEST_PORT = 9090;
-
 class MockRaftOplogStream extends stream.Readable {
     constructor(entriesToEmit, refreshPeriodMs) {
         super({ objectMode: true });
@@ -71,7 +69,7 @@ describe('DiffStreamOplogFilter', () => {
             }
             throw new Error(`unexpected request path ${url.pathname}`);
         });
-        httpServer.listen(HTTP_TEST_PORT);
+        httpServer.listen(0);
         httpServer.once('listening', done);
     });
     afterAll(done => {
@@ -81,7 +79,7 @@ describe('DiffStreamOplogFilter', () => {
     test('filtering test with mocks', done => {
         const oplogFilter = new DiffStreamOplogFilter({
             bucketdHost: 'localhost',
-            bucketdPort: HTTP_TEST_PORT,
+            bucketdPort: httpServer.address().port,
             maxBufferedEntries: 5,
             excludeFromCseqs: {
                 1: 10,
@@ -204,7 +202,7 @@ describe('DiffStreamOplogFilter', () => {
     test('should handle an empty input stream', done => {
         const oplogFilter = new DiffStreamOplogFilter({
             bucketdHost: 'localhost',
-            bucketdPort: HTTP_TEST_PORT,
+            bucketdPort: httpServer.address().port,
             maxBufferedEntries: 5,
             excludeFromCseqs: {},
         });
@@ -224,7 +222,7 @@ describe('DiffStreamOplogFilter', () => {
     test('should emit a stream error if failing to fetch RSID after retries', done => {
         const oplogFilter = new DiffStreamOplogFilter({
             bucketdHost: 'localhost',
-            bucketdPort: HTTP_TEST_PORT,
+            bucketdPort: httpServer.address().port,
             maxBufferedEntries: 5,
             excludeFromCseqs: {
                 1: 10,

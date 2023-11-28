@@ -4,7 +4,6 @@ const { versioning } = require('arsenal');
 
 const BucketStream = require('../../../CompareRaftMembers/BucketStream');
 
-const HTTP_TEST_PORT = 9090;
 const TEST_BUCKET_FILTERED_CONTENTS_LENGTH = 3210;
 const DUMMY_VERSION_ID = '987654321 FOOBAR42.42';
 const VERSIONED_RANGE = [1210, 1310];
@@ -183,7 +182,7 @@ describe('BucketStream', () => {
             }
             throw new Error(`unexpected request path ${url.pathname}`);
         });
-        httpServer.listen(HTTP_TEST_PORT);
+        httpServer.listen(0);
     });
     afterAll(done => {
         httpServer.close(done);
@@ -230,7 +229,7 @@ describe('BucketStream', () => {
         test(testCase.desc, done => {
             const bucketStream = new BucketStream({
                 bucketdHost: 'localhost',
-                bucketdPort: HTTP_TEST_PORT,
+                bucketdPort: httpServer.address().port,
                 bucketName: 'test-bucket',
                 marker: testCase.marker,
                 lastKey: testCase.lastKey,
@@ -274,7 +273,7 @@ describe('BucketStream', () => {
     test('listing should continue when all keys in a page are ignored', done => {
         const bucketStream = new BucketStream({
             bucketdHost: 'localhost',
-            bucketdPort: HTTP_TEST_PORT,
+            bucketdPort: httpServer.address().port,
             bucketName: 'bucket-with-replay-keys',
             retryDelayMs: 50,
             maxRetryDelayMs: 1000,

@@ -2,7 +2,6 @@ const http = require('http');
 
 const RaftOplogStream = require('../../../CompareRaftMembers/RaftOplogStream');
 
-const HTTP_TEST_PORT = 9090;
 const TEST_OPLOG_NB_RECORDS = 123;
 const DUMMY_VERSION_ID = '987654321 FOOBAR42.42';
 
@@ -82,7 +81,7 @@ describe('RaftOplogStream', () => {
             }
             throw new Error(`unexpected request path ${url.pathname}`);
         });
-        httpServer.listen(HTTP_TEST_PORT);
+        httpServer.listen(0);
         httpServer.on('listening', done);
     });
     afterAll(done => {
@@ -108,7 +107,7 @@ describe('RaftOplogStream', () => {
         test(testCase.desc, done => {
             const oplogStream = new RaftOplogStream({
                 bucketdHost: 'localhost',
-                bucketdPort: HTTP_TEST_PORT,
+                bucketdPort: httpServer.address().port,
                 raftSessionId: 1,
                 startSeq: testCase.startSeq,
                 refreshPeriodMs: 100,
@@ -163,7 +162,7 @@ describe('RaftOplogStream', () => {
         const oplogStream = new RaftOplogStream({
             bucketdHost: 'localhost',
             // change port to get connection errors
-            bucketdPort: HTTP_TEST_PORT + 1,
+            bucketdPort: httpServer.address().port + 1,
             raftSessionId: 1,
             startSeq: 42,
             retryDelayMs: 10,
