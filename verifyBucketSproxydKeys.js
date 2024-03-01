@@ -196,7 +196,7 @@ function logProgress(message) {
         haveDupKeys: status.objectsWithDupKeys,
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
         haveDupVersionIds: status.objectsWithDupVersionIds,
-        errors: status.objectErrors,
+        haveObjectsErrors: status.objectsErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
 }
@@ -384,7 +384,20 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
         return checkSproxydKeys(objectUrl, locations, () => cb(locations));
     });
 }
-
+function hasMinimalMetadata(md) {
+    if (!md) {
+        return false;
+    }
+    return (
+        md.hasOwnProperty('md-model-version')
+        && md.hasOwnProperty('owner-display-name')
+        && md.hasOwnProperty('owner-id')
+        && md.hasOwnProperty('content-length')
+        && md.hasOwnProperty('content-type')
+        && md.hasOwnProperty('last-modified')
+        && md.hasOwnProperty('content-md5')
+    );
+}
 function listBucketIter(bucket, cb) {
     const url = getBucketdURL(BUCKETD_HOSTPORT, {
         Bucket: bucket,
@@ -415,8 +428,37 @@ function listBucketIter(bucket, cb) {
             const vidSepPos = item.key.lastIndexOf('\0');
             const objectUrl = getObjectURL(bucket, item.key);
             let digestKey = item.key;
-
-            const md = JSON.parse(item.value);
+            let md;
+            try {
+                md = JSON.parse(item.value);
+            } catch (e) {
+                log.error('Invalid Metadata JSON', {
+                    object: objectUrl,
+                    error: e.message,
+                    mdValue: item.value,
+                });
+                status.objectsScanned += 1;
+                status.objectsErrors += 1;
+                return itemDone();
+            }
+            if (item.value === '{}') {
+                log.error('object with empty metadata found', {
+                    objectUrl,
+                });
+                status.objectsScanned += 1;
+                status.objectsWithEmptyMetadata += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+            if (!hasMinimalMetadata(md)) {
+                log.error('Not Complete Metadata JSON', {
+                    object: objectUrl,
+                    mdValue: item.value,
+                });
+                status.objectsScanned += 1;
+                status.objectsErrors += 1;
+                return itemDone();
+            }
             if (vidSepPos === -1) {
                 const reVersionIds = /"versionId":"([^"]*)"/g;
                 const versionIds = [];
@@ -456,16 +498,6 @@ function listBucketIter(bucket, cb) {
                     findDuplicateSproxydKeys.skipVersion();
                     return itemDone();
                 }
-            }
-
-            if (item.value === '{}') {
-                log.error('object with empty metadata found', {
-                    objectUrl,
-                });
-                status.objectsScanned += 1;
-                status.objectsWithEmptyMetadata += 1;
-                findDuplicateSproxydKeys.skipVersion();
-                return itemDone();
             }
 
             if (md.isPHD) {
