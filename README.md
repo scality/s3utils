@@ -3,7 +3,7 @@ S3 Connector and Zenko Utilities
 
 Run the Docker container as
 ```
-docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' zenko/s3utils node scriptName bucket1[,bucket2...]
+docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' registry.scality.com/s3utils/s3utils:<tag> node scriptName bucket1[,bucket2...]
 ```
 
 ## Trigger CRR on existing objects
