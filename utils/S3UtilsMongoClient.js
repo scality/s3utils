@@ -98,6 +98,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         });
                     }
 
+                    const isObjectCold = this._isObjectCold(res);
+                    const isObjectRestoring = this._isObjectRestoring(res);
+                    const isObjectRestored = this._isObjectRestored(res);
+
                     const { data, error } = this._processEntryData(
                         bucketName,
                         bucketInfo,
@@ -105,6 +109,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         usersBucketCreationDatesMap[`${res.value['owner-id']}${constants.splitter}${bucketName}`],
                         isTransient,
                         locationConfig,
+                        {
+                            isCold: isObjectCold,
+                            isRestoring: isObjectRestoring,
+                            isRestored: isObjectRestored,
+                        },
                     );
 
                     if (error) {
@@ -240,9 +249,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * @param{object} bucketCreationDate -
      * @param{boolean} isTransient -
      * @param{object} locationConfig - locationConfig.json
+     * @param{object} objectState - whether the object is cold, restoring or restored
      * @returns{object} results -
      */
-    _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
+    _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig, objectState = {
+        isCold: false,
+        isRestoring: false,
+        isRestored: false,
+    }) {
         if (!bucketName) {
             return { error: new Error('no bucket name provided') };
         }
@@ -273,10 +287,18 @@ class S3UtilsMongoClient extends MongoClientInterface {
             account: { [entry.value['owner-id']]: size },
         };
 
-        if (!isTransient
-            || entry.value.replicationInfo.status !== 'COMPLETED') {
-            // only count it in current dataStore if object is not in transient or replication not completed
+        // only count it in current dataStore if object is not in transient or replication not completed
+        if (!isTransient || entry.value.replicationInfo.status !== 'COMPLETED') {
             results.location[entry.value.dataStoreName] = size;
+            // We do not support restores to custom location yet. If we do,
+            // the destination would be present in the object metadata. For now,
+            // we only default to the location constraint of the bucket.
+            // The metric is added to the destination location to be consistent
+            // with the quotas checks, where the data, while not yet restored,
+            // is considered as part of the destination location.
+            if (objectState.isRestoring) {
+                results.location[bucketInfo.getLocationConstraint()] = size;
+            }
         }
         entry.value.replicationInfo.backends.forEach(rep => {
             // count it in the replication destination location if replication compeleted
@@ -284,11 +306,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 results.location[rep.site] = size;
             }
         });
-
         // count in both dataStoreName and cold location if object is restored
-        if (entry.value.archive
-            && entry.value.archive.restoreCompletedAt <= Date.now()
-            && entry.value.archive.restoreWillExpireAt > Date.now()) {
+        if (this._isObjectRestored(entry)) {
             const coldLocation = entry.value['x-amz-storage-class'];
             if (coldLocation && coldLocation !== entry.value.dataStoreName) {
                 if (results.location[coldLocation]) {
@@ -723,6 +742,38 @@ class S3UtilsMongoClient extends MongoClientInterface {
             });
             return cb(err);
         }
+    }
+
+    /**
+     * Check if the entry is currently in a cold backend
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is in a cold backend, false otherwise
+     */
+    _isObjectCold(entry) {
+        return entry.value.archive
+            && (!entry.value.archive.restoreRequestedAt || entry.value.archive.restoreWillExpireAt <= Date.now());
+    }
+
+    /**
+     * Check if the entry is currently being restored
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is being restored, false otherwise
+     */
+    _isObjectRestoring(entry) {
+        return entry.value.archive
+            && entry.value.archive.restoreRequestedAt <= Date.now()
+            && (!entry.value.archive.restoreCompletedAt || entry.value.archive.restoreCompletedAt > Date.now());
+    }
+
+    /**
+     * Check if the entry is currently restored
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is restored, false otherwise
+     */
+    _isObjectRestored(entry) {
+        return entry.value.archive
+            && entry.value.archive.restoreCompletedAt && (entry.value.archive.restoreCompletedAt <= Date.now())
+            && entry.value.archive.restoreWillExpireAt > Date.now();
     }
 }
 
