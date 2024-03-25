@@ -7,6 +7,7 @@ const { BucketInfo } = require('arsenal').models;
 const { versioning, constants } = require('arsenal');
 
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { ObjectMDArchive } = require('arsenal/build/lib/models');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
 const {
@@ -142,26 +143,86 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                            objectCount: {
+                                                current: 2,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 20,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -224,26 +285,86 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                            objectCount: {
+                                                current: 2,
+                                                deleteMarker: 0,
+                                                nonCurrent: 1,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 20,
+                                                nonCurrent: 10,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -301,26 +422,86 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                                    usedCapacity: { current: 0, nonCurrent: 20 },
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 2,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 20,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                                            usedCapacity: { current: 0, nonCurrent: 20 },
+                                            objectCount: {
+                                                current: 0,
+                                                deleteMarker: 1,
+                                                nonCurrent: 2,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 0,
+                                                nonCurrent: 20,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                                    usedCapacity: { current: 0, nonCurrent: 20 },
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 2,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 20,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                                    usedCapacity: { current: 0, nonCurrent: 20 },
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 2,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 20,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -386,34 +567,124 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                            objectCount: {
+                                                current: 1,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 10,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                         'completed': {
-                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                            objectCount: {
+                                                current: 1,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 10,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 10, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 1,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 10,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                                 'completed': {
-                                    objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 10, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 1,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 10,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -493,34 +764,124 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                            usedCapacity: { current: 20, nonCurrent: 0 },
+                                            objectCount: {
+                                                current: 2,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 20,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                         'completed': {
-                                            objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                            usedCapacity: { current: 10, nonCurrent: 0 },
+                                            objectCount: {
+                                                current: 1,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 10,
+                                                nonCurrent: 0,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 20, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                                 'completed': {
-                                    objectCount: { current: 1, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 10, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 1,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 10,
+                                        nonCurrent: 0,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -627,26 +988,86 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         dataMetrics: {
                             account: {
                                 [testAccountCanonicalId]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                     locations: {
                                         'us-east-1': {
-                                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                            usedCapacity: { current: 20, nonCurrent: 10 },
+                                            objectCount: {
+                                                current: 2,
+                                                deleteMarker: 0,
+                                                nonCurrent: 1,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
+                                            usedCapacity: {
+                                                current: 20,
+                                                nonCurrent: 10,
+                                                currentCold: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 0,
+                                                restoring: 0,
+                                            },
                                         },
                                     },
                                 },
                             },
                             bucket: {
                                 [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                             location: {
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 1 },
-                                    usedCapacity: { current: 20, nonCurrent: 10 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 1,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 20,
+                                        nonCurrent: 10,
+                                        currentCold: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 0,
+                                        restoring: 0,
+                                    },
                                 },
                             },
                         },
@@ -690,6 +1111,252 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                             logger,
                             next,
                         ), // null versioned object2
+                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
+                        assert.deepStrictEqual(err, null);
+                        return client.getObjectMDStats(
+                            BUCKET_NAME,
+                            bucketInfo,
+                            false,
+                            logger,
+                            (err, data) => {
+                                assert.deepStrictEqual(err, null);
+                                assert.deepStrictEqual(data, expected);
+                                return done();
+                            },
+                        );
+                    }));
+                });
+            });
+        });
+    });
+
+    // write a test suite for the cold objects
+    describe('Should get correct results for cold objects', () => {
+        const versionParams = {
+            versioning: true,
+            versionId: null,
+        };
+        const object1InCold = {
+            'key': 'test-object1',
+            'content-length': 10,
+            'dataStoreName': 'cold-location',
+            'owner-id': testAccountCanonicalId,
+            'replicationInfo': {
+                backends: [],
+            },
+            'archive': new ObjectMDArchive({}),
+        };
+        const object1Restoring = {
+            'key': 'test-object1',
+            'content-length': 10,
+            'dataStoreName': 'cold-location',
+            'owner-id': testAccountCanonicalId,
+            'replicationInfo': {
+                backends: [],
+            },
+            'archive': new ObjectMDArchive({}, new Date(Date.now() - 5000), 10),
+        };
+        const object1Restored = {
+            'key': 'test-object1',
+            'content-length': 10,
+            'dataStoreName': 'us-east-1',
+            'owner-id': testAccountCanonicalId,
+            'replicationInfo': {
+                backends: [],
+            },
+            'archive': new ObjectMDArchive(
+                {},
+                new Date(Date.now() - 5000),
+                10,
+                new Date(Date.now() - 1000),
+                new Date(Date.now() + 10000),
+            ),
+        };
+        variations.forEach(variation => {
+            describe(variation.it, () => {
+                beforeEach(done => {
+                    async.series([
+                        next => {
+                            client.defaultBucketKeyFormat = variation.vFormat;
+                            return next();
+                        },
+                        next => client.createBucket(BUCKET_NAME, versionedBucketMD, logger, next),
+                    ], done);
+                });
+
+                afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
+
+                it(`Should get correct results ${variation.it}`, done => {
+                    const expected = {
+                        dataManaged: {
+                            locations: {
+                                'cold-location': {
+                                    curr: 0,
+                                    prev: 20,
+                                },
+                                'us-east-1': {
+                                    curr: 10,
+                                    prev: 10,
+                                },
+                            },
+                            total: {
+                                curr: 10,
+                                prev: 30,
+                            },
+                        },
+                        dataMetrics: {
+                            account: {
+                                [testAccountCanonicalId]: {
+                                    locations: {
+                                        'cold-location': {
+                                            objectCount: {
+                                                current: 0,
+                                                currentCold: 0,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                nonCurrentCold: 1,
+                                                restored: 0,
+                                                restoring: 1,
+                                            },
+                                            usedCapacity: {
+                                                current: 0,
+                                                currentCold: 0,
+                                                nonCurrent: 0,
+                                                nonCurrentCold: 10,
+                                                restored: 0,
+                                                restoring: 10,
+                                            },
+                                        },
+                                        'us-east-1': {
+                                            objectCount: {
+                                                current: 0,
+                                                currentCold: 0,
+                                                deleteMarker: 0,
+                                                nonCurrent: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 1,
+                                                restoring: 1,
+                                            },
+                                            usedCapacity: {
+                                                current: 0,
+                                                currentCold: 0,
+                                                nonCurrent: 0,
+                                                nonCurrentCold: 0,
+                                                restored: 10,
+                                                restoring: 10,
+                                            },
+                                        },
+                                    },
+                                    objectCount: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 1,
+                                        restored: 1,
+                                        restoring: 1,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 10,
+                                        restored: 10,
+                                        restoring: 10,
+                                    },
+                                },
+                            },
+                            bucket: {
+                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
+                                    objectCount: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 1,
+                                        restored: 1,
+                                        restoring: 1,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 10,
+                                        restored: 10,
+                                        restoring: 10,
+                                    },
+                                },
+                            },
+                            location: {
+                                'cold-location': {
+                                    objectCount: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 1,
+                                        restored: 0,
+                                        restoring: 1,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 10,
+                                        restored: 0,
+                                        restoring: 10,
+                                    },
+                                },
+                                'us-east-1': {
+                                    objectCount: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 1,
+                                        restoring: 1,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        currentCold: 0,
+                                        nonCurrent: 0,
+                                        nonCurrentCold: 0,
+                                        restored: 10,
+                                        restoring: 10,
+                                    },
+                                },
+                            },
+                        },
+                        objects: 1,
+                        stalled: 0,
+                        versions: 2,
+                    };
+                    return async.series([
+                        next => client.putObject(
+                            BUCKET_NAME,
+                            object1InCold.key,
+                            object1InCold,
+                            versionParams,
+                            logger,
+                            next,
+                        ),
+                        next => client.putObject(
+                            BUCKET_NAME,
+                            object1Restoring.key,
+                            object1Restoring,
+                            versionParams,
+                            logger,
+                            next,
+                        ),
+                        next => client.putObject(
+                            BUCKET_NAME,
+                            object1Restored.key,
+                            object1Restored,
+                            versionParams,
+                            logger,
+                            next,
+                        ), // put object2
                     ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
                         assert.deepStrictEqual(err, null);
                         return client.getObjectMDStats(
