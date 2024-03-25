@@ -35,8 +35,12 @@ function isValidBucketStorageMetrics(bucketMetric) {
     && bucketMetric.usedCapacity
         && typeof bucketMetric.usedCapacity.current === 'number'
         && typeof bucketMetric.usedCapacity.nonCurrent === 'number'
-    && bucketMetric.usedCapacity.current > -1
-    && bucketMetric.usedCapacity.nonCurrent > -1;
+        && bucketMetric.usedCapacity.current > -1
+        && bucketMetric.usedCapacity.nonCurrent > -1
+        && (typeof bucketMetric.usedCapacity.currentCold === 'undefined' || (bucketMetric.usedCapacity.currentCold > -1))
+        && (typeof bucketMetric.usedCapacity.nonCurrentCold === 'undefined' || (bucketMetric.usedCapacity.nonCurrentCold > -1))
+        && (typeof bucketMetric.usedCapacity.restoring === 'undefined' || (bucketMetric.usedCapacity.restoring > -1))
+        && (typeof bucketMetric.usedCapacity.restored === 'undefined' || (bucketMetric.usedCapacity.restored > -1));
 }
 
 function isValidCapacityValue(capacity) {
@@ -76,8 +80,11 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                     (storageMetricDoc, nxt) => {
                         let bucketStorageUsed = -1;
                         if (isValidBucketStorageMetrics(storageMetricDoc)) {
+                            // Do not count the objects in cold for SOSAPI
                             bucketStorageUsed = storageMetricDoc.usedCapacity.current
-                                + storageMetricDoc.usedCapacity.nonCurrent;
+                                + storageMetricDoc.usedCapacity.nonCurrent
+                                + (storageMetricDoc.usedCapacity.restoring || 0)
+                                + (storageMetricDoc.usedCapacity.restored || 0);
                         }
                         // read Capacity from bucket._capabilities
                         const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
