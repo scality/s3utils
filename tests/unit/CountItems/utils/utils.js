@@ -2,18 +2,75 @@ const { consolidateDataMetrics } = require('../../../../CountItems/utils/utils')
 
 describe('CountItems::utils::consolidateDataMetrics', () => {
     const zeroValueRes = {
-        usedCapacity: { current: 0, nonCurrent: 0 },
-        objectCount: { current: 0, nonCurrent: 0, deleteMarker: 0 },
+        usedCapacity: {
+            current: 0,
+            nonCurrent: 0,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+        objectCount: {
+            current: 0,
+            nonCurrent: 0,
+            deleteMarker: 0,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
     };
 
     const example1 = {
-        usedCapacity: { current: 10, nonCurrent: 10 },
-        objectCount: { current: 10, nonCurrent: 10, deleteMarker: 10 },
+        usedCapacity: {
+            current: 10,
+            nonCurrent: 10,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+        objectCount: {
+            current: 10,
+            nonCurrent: 10,
+            deleteMarker: 10,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
     };
 
     const example2 = {
-        usedCapacity: { current: 20, nonCurrent: 20 },
-        objectCount: { current: 20, nonCurrent: 20, deleteMarker: 20 },
+        usedCapacity: {
+            current: 20,
+            nonCurrent: 20,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+        objectCount: {
+            current: 20,
+            nonCurrent: 20,
+            deleteMarker: 20,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
     };
 
     test('should return zero-value if target and source are both undefined', () => {

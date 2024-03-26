@@ -35,8 +35,8 @@ function isValidBucketStorageMetrics(bucketMetric) {
     && bucketMetric.usedCapacity
         && typeof bucketMetric.usedCapacity.current === 'number'
         && typeof bucketMetric.usedCapacity.nonCurrent === 'number'
-    && bucketMetric.usedCapacity.current > -1
-    && bucketMetric.usedCapacity.nonCurrent > -1;
+        && bucketMetric.usedCapacity.current > -1
+        && bucketMetric.usedCapacity.nonCurrent > -1;
 }
 
 function isValidCapacityValue(capacity) {
@@ -76,6 +76,7 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                     (storageMetricDoc, nxt) => {
                         let bucketStorageUsed = -1;
                         if (isValidBucketStorageMetrics(storageMetricDoc)) {
+                            // Do not count the objects in cold for SOSAPI
                             bucketStorageUsed = storageMetricDoc.usedCapacity.current
                                 + storageMetricDoc.usedCapacity.nonCurrent;
                         }

@@ -3,7 +3,7 @@ global.TextDecoder = require('util').TextDecoder;
 const async = require('async');
 const assert = require('assert');
 const werelogs = require('werelogs');
-const { BucketInfo, ObjectMD } = require('arsenal').models;
+const { BucketInfo, ObjectMD, ObjectMDArchive } = require('arsenal').models;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { constants } = require('arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
@@ -127,32 +127,146 @@ describe('S3UtilsMongoClient::_handleResults', () => {
             dataMetrics: {
                 bucket: {
                     bucket1: {
-                        objectCount: { current: 4, deleteMarker: 0, nonCurrent: 0 },
-                        usedCapacity: { current: 40, nonCurrent: 0 },
+                        objectCount: {
+                            current: 4,
+                            deleteMarker: 0,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 40,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                 },
                 location: {
                     location1: {
-                        objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                        usedCapacity: { current: 20, nonCurrent: 0 },
+                        objectCount: {
+                            current: 2,
+                            deleteMarker: 0,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 20,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                     location2: {
-                        objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                        usedCapacity: { current: 20, nonCurrent: 0 },
+                        objectCount: {
+                            current: 2,
+                            deleteMarker: 0,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 20,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                 },
                 account: {
                     account1: {
-                        objectCount: { current: 4, deleteMarker: 0, nonCurrent: 0 },
-                        usedCapacity: { current: 40, nonCurrent: 0 },
+                        objectCount: {
+                            current: 4,
+                            deleteMarker: 0,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 40,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                         locations: {
                             location1: {
-                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                usedCapacity: { current: 20, nonCurrent: 0 },
+                                objectCount: {
+                                    current: 2,
+                                    deleteMarker: 0,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                                usedCapacity: {
+                                    current: 20,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
                             },
                             location2: {
-                                objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                usedCapacity: { current: 20, nonCurrent: 0 },
+                                objectCount: {
+                                    current: 2,
+                                    deleteMarker: 0,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                                usedCapacity: {
+                                    current: 20,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
                             },
                         },
                     },
@@ -177,32 +291,146 @@ describe('S3UtilsMongoClient::_handleResults', () => {
             dataMetrics: {
                 bucket: {
                     bucket1: {
-                        objectCount: { current: 4, deleteMarker: 2, nonCurrent: 0 },
-                        usedCapacity: { current: 40, nonCurrent: 20 },
+                        objectCount: {
+                            current: 4,
+                            deleteMarker: 2,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 40,
+                            nonCurrent: 20,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                 },
                 location: {
                     location1: {
-                        objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
-                        usedCapacity: { current: 20, nonCurrent: 10 },
+                        objectCount: {
+                            current: 2,
+                            deleteMarker: 1,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 20,
+                            nonCurrent: 10,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                     location2: {
-                        objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
-                        usedCapacity: { current: 20, nonCurrent: 10 },
+                        objectCount: {
+                            current: 2,
+                            deleteMarker: 1,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 20,
+                            nonCurrent: 10,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                     },
                 },
                 account: {
                     account1: {
-                        objectCount: { current: 4, deleteMarker: 2, nonCurrent: 0 },
-                        usedCapacity: { current: 40, nonCurrent: 20 },
+                        objectCount: {
+                            current: 4,
+                            deleteMarker: 2,
+                            nonCurrent: 0,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 40,
+                            nonCurrent: 20,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 0,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
                         locations: {
                             location1: {
-                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
-                                usedCapacity: { current: 20, nonCurrent: 10 },
+                                objectCount: {
+                                    current: 2,
+                                    deleteMarker: 1,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                                usedCapacity: {
+                                    current: 20,
+                                    nonCurrent: 10,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
                             },
                             location2: {
-                                objectCount: { current: 2, deleteMarker: 1, nonCurrent: 0 },
-                                usedCapacity: { current: 20, nonCurrent: 10 },
+                                objectCount: {
+                                    current: 2,
+                                    deleteMarker: 1,
+                                    nonCurrent: 0,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                                usedCapacity: {
+                                    current: 20,
+                                    nonCurrent: 10,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 0,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
                             },
                         },
                     },
@@ -504,7 +732,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should only add content-length to cold location when object is currently being restored',
+            'should add content-length to cold storage location and current dataStore '
+            + 'when object is restoring',
             testBucketName,
             true,
             {
@@ -529,6 +758,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     account: { [testAccountCanonicalId]: 42 },
                     bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
                     location: {
+                        'us-east-1': 42,
                         'cold-location': 42,
                     },
                 },
@@ -659,7 +889,11 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
     ];
     tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {
         assert.deepStrictEqual(
-            mongoTestClient._processEntryData(bucketName, bucketInfo, params, testBucketCreationDate, isTransient, locationConfig),
+            mongoTestClient._processEntryData(bucketName, bucketInfo, params, testBucketCreationDate, isTransient, locationConfig, {
+                isCold: mongoTestClient._isObjectCold(params),
+                isRestoring: mongoTestClient._isObjectRestoring(params),
+                isRestored: mongoTestClient._isObjectRestored(params),
+            }),
             expected,
         );
     }));
@@ -678,13 +912,15 @@ function createBucket(client, bucketName, isVersioned, callback) {
 
 function uploadObjects(client, bucketName, objectList, callback) {
     async.eachSeries(objectList, (obj, done) => {
+        const length = obj.contentLength >= 0 ? obj.contentLength : 100;
         const objMD = new ObjectMD()
             .setKey(obj.name)
-            .setDataStoreName('us-east-1')
-            .setContentLength(100)
+            .setDataStoreName(obj.dataStore || 'us-east-1')
+            .setContentLength(length)
             .setLastModified(obj.lastModified)
             .setOwnerId(obj.ownerId)
             .setIsNull(obj.isNull)
+            .setArchive(obj.archive)
             .setIsDeleteMarker(obj.isDeleteMarker);
         if (obj.repInfo) {
             objMD.setReplicationInfo(obj.repInfo);
@@ -745,6 +981,42 @@ describe('S3UtilsMongoClient, tests', () => {
             dataStoreVersionId: '',
             isNFS: null,
         },
+    };
+
+    const coldObjectMdTemp = {
+        name: 'coldkey',
+        versioning: true,
+        versionId: null,
+        lastModified: new Date(Date.now()),
+        ownerId: testAccountCanonicalId,
+        archive: new ObjectMDArchive({}),
+        dataStore: 'cold-location',
+    };
+
+    const restoringObjectMdTemp = {
+        name: 'restoringkey',
+        versioning: true,
+        versionId: null,
+        lastModified: new Date(Date.now()),
+        ownerId: testAccountCanonicalId,
+        archive: new ObjectMDArchive({}, new Date(Date.now() - 5000), 10),
+        dataStore: 'cold-location',
+    };
+
+    const restoredObjectMdTemp = {
+        name: 'restoredkey',
+        versioning: true,
+        versionId: null,
+        lastModified: new Date(Date.now()),
+        ownerId: testAccountCanonicalId,
+        archive: new ObjectMDArchive(
+            {},
+            new Date(Date.now() - 5000),
+            10,
+            new Date(Date.now() - 1000),
+            new Date(Date.now() + 10000),
+        ),
+        dataStore: 'us-east-1',
     };
 
     const tests = [
@@ -834,34 +1106,148 @@ describe('S3UtilsMongoClient, tests', () => {
                 dataMetrics: {
                     account: {
                         [testAccountCanonicalId]: {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
-                            usedCapacity: { current: 200, nonCurrent: 200 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                             locations: {
                                 'rep-loc-1': {
-                                    objectCount: { current: 0, deleteMarker: 0, nonCurrent: 2 },
-                                    usedCapacity: { current: 0, nonCurrent: 200 },
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 200,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
                                 },
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
-                                    usedCapacity: { current: 200, nonCurrent: 200 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 200,
+                                        nonCurrent: 200,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
                                 },
                             },
                         },
                     },
                     bucket: {
                         [`test-bucket_${testBucketCreationDate}`]: {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
-                            usedCapacity: { current: 200, nonCurrent: 200 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                     location: {
                         'rep-loc-1': {
-                            objectCount: { current: 0, deleteMarker: 0, nonCurrent: 2 },
-                            usedCapacity: { current: 0, nonCurrent: 200 },
+                            objectCount: {
+                                current: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                         'us-east-1': {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 2 },
-                            usedCapacity: { current: 200, nonCurrent: 200 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                 },
@@ -909,26 +1295,102 @@ describe('S3UtilsMongoClient, tests', () => {
                 dataMetrics: {
                     account: {
                         [testAccountCanonicalId]: {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                            usedCapacity: { current: 200, nonCurrent: 0 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                             locations: {
                                 'us-east-1': {
-                                    objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                                    usedCapacity: { current: 200, nonCurrent: 0 },
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 200,
+                                        nonCurrent: 0,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
                                 },
                             },
                         },
                     },
                     bucket: {
                         [`test-bucket_${testBucketCreationDate}`]: {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                            usedCapacity: { current: 200, nonCurrent: 0 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                     location: {
                         'us-east-1': {
-                            objectCount: { current: 2, deleteMarker: 0, nonCurrent: 0 },
-                            usedCapacity: { current: 200, nonCurrent: 0 },
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                 },
@@ -996,34 +1458,612 @@ describe('S3UtilsMongoClient, tests', () => {
                 dataMetrics: {
                     account: {
                         [testAccountCanonicalId]: {
-                            objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
-                            usedCapacity: { current: 100, nonCurrent: 300 },
+                            objectCount: {
+                                current: 1,
+                                deleteMarker: 1,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                nonCurrent: 300,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                             locations: {
                                 'rep-loc-1': {
-                                    objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                                    usedCapacity: { current: 0, nonCurrent: 300 },
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 300,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
                                 },
                                 'us-east-1': {
-                                    objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
-                                    usedCapacity: { current: 100, nonCurrent: 300 },
+                                    objectCount: {
+                                        current: 1,
+                                        deleteMarker: 1,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 100,
+                                        nonCurrent: 300,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
                                 },
                             },
                         },
                     },
                     bucket: {
                         [`test-bucket_${testBucketCreationDate}`]: {
-                            objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
-                            usedCapacity: { current: 100, nonCurrent: 300 },
+                            objectCount: {
+                                current: 1,
+                                deleteMarker: 1,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                nonCurrent: 300,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                     location: {
                         'rep-loc-1': {
-                            objectCount: { current: 0, deleteMarker: 1, nonCurrent: 2 },
-                            usedCapacity: { current: 0, nonCurrent: 300 },
+                            objectCount: {
+                                current: 0,
+                                deleteMarker: 1,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                nonCurrent: 300,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                         'us-east-1': {
-                            objectCount: { current: 1, deleteMarker: 1, nonCurrent: 2 },
-                            usedCapacity: { current: 100, nonCurrent: 300 },
+                            objectCount: {
+                                current: 1,
+                                deleteMarker: 1,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                nonCurrent: 300,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                },
+            },
+        ],
+        [
+            'getObjectMDStats() should return correct results for versioned bucket with objects in cold storage, restoring and restored',
+            {
+                bucketName: 'test-bucket',
+                isVersioned: true,
+                objectList: [
+                    // a version of object 1,
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                    },
+                    // deleteMarker of object 1
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                        isDeleteMarker: true,
+                        contentLength: 0,
+                    },
+                    // a cold object
+                    {
+                        ...coldObjectMdTemp,
+                        versioning: true,
+                    },
+                    // a version for the cold object
+                    {
+                        ...coldObjectMdTemp,
+                        versioning: true,
+                    },
+                    // a restoring object, still part of cold location
+                    {
+                        ...restoringObjectMdTemp,
+                        versioning: true,
+                    },
+                    // a restored object: part of current data in us-east-1 location
+                    {
+                        ...restoredObjectMdTemp,
+                        versioning: true,
+                    },
+
+                    // a version of object 1,
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                        repInfo: {
+                            ...objectMdTemp.repInfo,
+                            status: 'PENDING',
+                            backends: [
+                                {
+                                    status: 'PENDING',
+                                    site: 'rep-loc-1',
+                                },
+                            ],
+                        },
+                    },
+                ],
+            },
+            {
+                dataManaged: {
+                    locations: {
+                        'rep-loc-1': {
+                            curr: 0,
+                            prev: 100,
+                        },
+                        'us-east-1': {
+                            curr: 300,
+                            prev: 100,
+                        },
+                        'cold-location': {
+                            curr: 200,
+                            prev: 100,
+                        },
+                    },
+                    total: {
+                        curr: 500,
+                        prev: 300,
+                    },
+                },
+                objects: 4,
+                stalled: 0,
+                versions: 2,
+                dataMetrics: {
+                    account: {
+                        [testAccountCanonicalId]: {
+                            objectCount: {
+                                current: 1,
+                                _currentCold: 1,
+                                deleteMarker: 1,
+                                nonCurrent: 1,
+                                _nonCurrentCold: 1,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                _currentCold: 100,
+                                nonCurrent: 100,
+                                _nonCurrentCold: 100,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 1,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        nonCurrent: 100,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                                'us-east-1': {
+                                    objectCount: {
+                                        current: 1,
+                                        _currentCold: 0,
+                                        deleteMarker: 1,
+                                        nonCurrent: 1,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 1,
+                                        _currentRestoring: 1,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 100,
+                                        _currentCold: 0,
+                                        nonCurrent: 100,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 100,
+                                        _currentRestoring: 100,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                                'cold-location': {
+                                    objectCount: {
+                                        current: 0,
+                                        _currentCold: 1,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 1,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 1,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        _currentCold: 100,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 100,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 100,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    bucket: {
+                        [`test-bucket_${testBucketCreationDate}`]: {
+                            objectCount: {
+                                current: 1,
+                                _currentCold: 1,
+                                deleteMarker: 1,
+                                nonCurrent: 1,
+                                _nonCurrentCold: 1,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                _currentCold: 100,
+                                nonCurrent: 100,
+                                _nonCurrentCold: 100,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                    location: {
+                        'rep-loc-1': {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 0,
+                                deleteMarker: 1,
+                                nonCurrent: 1,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 0,
+                                nonCurrent: 100,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                        'us-east-1': {
+                            objectCount: {
+                                current: 1,
+                                _currentCold: 0,
+                                deleteMarker: 1,
+                                nonCurrent: 1,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 100,
+                                _currentCold: 0,
+                                nonCurrent: 100,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                        'cold-location': {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 1,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 1,
+                                _currentRestored: 0,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 100,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 100,
+                                _currentRestored: 0,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                },
+            },
+        ],
+        [
+            'restoring and restored objects must be part of the destination location and not the cold location',
+            {
+                bucketName: 'test-bucket',
+                isVersioned: true,
+                objectList: [
+                    // a restoring object, still part of cold location
+                    {
+                        ...restoringObjectMdTemp,
+                        versioning: true,
+                    },
+                    // a restored object: part of current data in us-east-1 location
+                    {
+                        ...restoredObjectMdTemp,
+                        versioning: true,
+                    },
+                ],
+            },
+            {
+                dataManaged: {
+                    locations: {
+                        'us-east-1': {
+                            curr: 200,
+                            prev: 0,
+                        },
+                        'cold-location': {
+                            curr: 100,
+                            prev: 0,
+                        },
+                    },
+                    total: {
+                        curr: 300,
+                        prev: 0,
+                    },
+                },
+                objects: 2,
+                stalled: 0,
+                versions: 0,
+                dataMetrics: {
+                    account: {
+                        [testAccountCanonicalId]: {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            locations: {
+                                'cold-location': {
+                                    objectCount: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 1,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 100,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                                'us-east-1': {
+                                    objectCount: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 1,
+                                        _currentRestoring: 1,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        _currentCold: 0,
+                                        nonCurrent: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 100,
+                                        _currentRestoring: 100,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    bucket: {
+                        [`test-bucket_${testBucketCreationDate}`]: {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                    location: {
+                        'us-east-1': {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 1,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 100,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                        'cold-location': {
+                            objectCount: {
+                                current: 0,
+                                _currentCold: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 1,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                _currentCold: 0,
+                                nonCurrent: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 100,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
                         },
                     },
                 },
@@ -1067,4 +2107,54 @@ describe('S3UtilsMongoClient, tests', () => {
             next => client.deleteBucket(bucketName, logger, next),
         ], done);
     }));
+});
+
+describe('S3UtilsMongoClient, cold object helpers', () => {
+    const coldObjectMdTemp = {
+        name: 'coldkey',
+        versioning: true,
+        versionId: null,
+        lastModified: new Date(Date.now()),
+        ownerId: testAccountCanonicalId,
+        archive: new ObjectMDArchive({}),
+        dataStore: 'cold-location',
+    };
+
+    it('should detect a cold object', () => {
+        const coldObject = {
+            value: {
+                ...coldObjectMdTemp,
+                dataStoreName: 'cold-location',
+            },
+        };
+        assert.strictEqual(mongoTestClient._isObjectCold(coldObject), true);
+    });
+
+    it('should detect a restoring object', () => {
+        const restoringObject = {
+            value: {
+                ...coldObjectMdTemp,
+                archive: new ObjectMDArchive({}, new Date(Date.now() - 5000), 10),
+                dataStoreName: 'cold-location',
+            },
+        };
+        assert.strictEqual(mongoTestClient._isObjectRestoring(restoringObject), true);
+    });
+
+    it('should detect a restored object', () => {
+        const restoredObject = {
+            value: {
+                ...coldObjectMdTemp,
+                archive: new ObjectMDArchive(
+                    {},
+                    new Date(Date.now() - 5000),
+                    10,
+                    new Date(Date.now() - 1000),
+                    new Date(Date.now() + 10000),
+                ),
+                dataStoreName: 'us-east-1',
+            },
+        };
+        assert.strictEqual(mongoTestClient._isObjectRestored(restoredObject), true);
+    });
 });

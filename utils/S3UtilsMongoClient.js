@@ -12,6 +12,36 @@ const USERSBUCKET = '__usersbucket';
 const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
 
+const baseMetricsObject = {
+    masterCount: 0,
+    masterData: 0,
+    nullCount: 0,
+    nullData: 0,
+    versionCount: 0,
+    versionData: 0,
+    deleteMarkerCount: 0,
+    masterCountCold: 0,
+    masterDataCold: 0,
+    nullCountCold: 0,
+    nullDataCold: 0,
+    versionCountCold: 0,
+    versionDataCold: 0,
+    deleteMarkerCountCold: 0,
+    masterCountRestoring: 0,
+    masterDataRestoring: 0,
+    nullCountRestoring: 0,
+    nullDataRestoring: 0,
+    versionCountRestoring: 0,
+    versionDataRestoring: 0,
+    deleteMarkerCountRestoring: 0,
+    masterCountRestored: 0,
+    masterDataRestored: 0,
+    nullCountRestored: 0,
+    nullDataRestored: 0,
+    versionCountRestored: 0,
+    versionDataRestored: 0,
+    deleteMarkerCountRestored: 0,
+};
 
 class S3UtilsMongoClient extends MongoClientInterface {
     async getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
@@ -67,6 +97,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             processed,
                         });
                     }
+
+                    const isObjectCold = this._isObjectCold(res);
+                    const isObjectRestoring = this._isObjectRestoring(res);
+                    const isObjectRestored = this._isObjectRestored(res);
+
                     const { data, error } = this._processEntryData(
                         bucketName,
                         bucketInfo,
@@ -74,6 +109,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         usersBucketCreationDatesMap[`${res.value['owner-id']}${constants.splitter}${bucketName}`],
                         isTransient,
                         locationConfig,
+                        {
+                            isCold: isObjectCold,
+                            isRestoring: isObjectRestoring,
+                            isRestored: isObjectRestored,
+                        },
                     );
 
                     if (error) {
@@ -118,6 +158,19 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         targetCount = 'nullCount';
                         targetData = 'nullData';
                     }
+
+                    // Dynamically get the metrics based on the object state
+                    if (isObjectCold) {
+                        targetCount += 'Cold';
+                        targetData += 'Cold';
+                    } else if (isObjectRestoring) {
+                        targetCount += 'Restoring';
+                        targetData += 'Restoring';
+                    } else if (isObjectRestored) {
+                        targetCount += 'Restored';
+                        targetData += 'Restored';
+                    }
+
                     Object.keys(data).forEach(metricLevel => {
                         // metricLevel can only be 'bucket', 'location' or 'account'
                         if (validStorageMetricLevels.has(metricLevel)) {
@@ -125,13 +178,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                 // resourceName can be the name of bucket, location or account
                                 if (!collRes[metricLevel][resourceName]) {
                                     collRes[metricLevel][resourceName] = {
-                                        masterCount: 0,
-                                        masterData: 0,
-                                        nullCount: 0,
-                                        nullData: 0,
-                                        versionCount: 0,
-                                        versionData: 0,
-                                        deleteMarkerCount: 0,
+                                        ...baseMetricsObject,
                                     };
                                 }
                                 collRes[metricLevel][resourceName][targetData] += data[metricLevel][resourceName];
@@ -148,13 +195,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         Object.keys(data.location).forEach(location => {
                             if (!collRes.account[account].locations[location]) {
                                 collRes.account[account].locations[location] = {
-                                    masterCount: 0,
-                                    masterData: 0,
-                                    nullCount: 0,
-                                    nullData: 0,
-                                    versionCount: 0,
-                                    versionData: 0,
-                                    deleteMarkerCount: 0,
+                                    ...baseMetricsObject,
                                 };
                             }
                             collRes.account[account].locations[location][targetData] += data.location[location];
@@ -208,9 +249,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * @param{object} bucketCreationDate -
      * @param{boolean} isTransient -
      * @param{object} locationConfig - locationConfig.json
+     * @param{object} objectState - whether the object is cold, restoring or restored
      * @returns{object} results -
      */
-    _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig) {
+    _processEntryData(bucketName, bucketInfo, entry, bucketCreationDate, isTransient, locationConfig, objectState = {
+        isCold: false,
+        isRestoring: false,
+        isRestored: false,
+    }) {
         if (!bucketName) {
             return { error: new Error('no bucket name provided') };
         }
@@ -241,10 +287,18 @@ class S3UtilsMongoClient extends MongoClientInterface {
             account: { [entry.value['owner-id']]: size },
         };
 
-        if (!isTransient
-            || entry.value.replicationInfo.status !== 'COMPLETED') {
-            // only count it in current dataStore if object is not in transient or replication not completed
+        // only count it in current dataStore if object is not in transient or replication not completed
+        if (!isTransient || entry.value.replicationInfo.status !== 'COMPLETED') {
             results.location[entry.value.dataStoreName] = size;
+            // We do not support restores to custom location yet. If we do,
+            // the destination would be present in the object metadata. For now,
+            // we only default to the location constraint of the bucket.
+            // The metric is added to the destination location to be consistent
+            // with the quotas checks, where the data, while not yet restored,
+            // is considered as part of the destination location.
+            if (objectState.isRestoring) {
+                results.location[bucketInfo.getLocationConstraint()] = size;
+            }
         }
         entry.value.replicationInfo.backends.forEach(rep => {
             // count it in the replication destination location if replication compeleted
@@ -252,11 +306,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 results.location[rep.site] = size;
             }
         });
-
         // count in both dataStoreName and cold location if object is restored
-        if (entry.value.archive
-            && entry.value.archive.restoreCompletedAt <= Date.now()
-            && entry.value.archive.restoreWillExpireAt > Date.now()) {
+        if (this._isObjectRestored(entry)) {
             const coldLocation = entry.value['x-amz-storage-class'];
             if (coldLocation && coldLocation !== entry.value.dataStoreName) {
                 if (results.location[coldLocation]) {
@@ -287,6 +338,13 @@ class S3UtilsMongoClient extends MongoClientInterface {
     _handleResults(res, isVersioned) {
         let totalNonCurrentCount = 0;
         let totalCurrentCount = 0;
+        let totalNonCurrentColdCount = 0;
+        let totalCurrentColdCount = 0;
+        let totalRestoringCount = 0;
+        let totalRestoredCount = 0;
+        let totalVersionRestoringCount = 0;
+        let totalVerionsRestoredCount = 0;
+
         const totalBytes = { curr: 0, prev: 0 };
         const locationBytes = {};
         const dataMetrics = {
@@ -306,55 +364,126 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             usedCapacity: {
                                 current: 0,
                                 nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
                             },
                             objectCount: {
                                 current: 0,
                                 nonCurrent: 0,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
                                 deleteMarker: 0,
                             },
                         };
                     }
                     const {
-                        masterCount,
-                        masterData,
-                        nullCount,
-                        nullData,
-                        versionCount,
-                        versionData,
-                        deleteMarkerCount,
+                        masterCount = 0,
+                        masterData = 0,
+                        nullCount = 0,
+                        nullData = 0,
+                        versionCount = 0,
+                        versionData = 0,
+                        deleteMarkerCount = 0,
+                        masterCountCold = 0,
+                        masterDataCold = 0,
+                        nullCountCold = 0,
+                        nullDataCold = 0,
+                        versionCountCold = 0,
+                        versionDataCold = 0,
+                        deleteMarkerCountCold = 0,
+                        masterCountRestoring = 0,
+                        masterDataRestoring = 0,
+                        nullCountRestoring = 0,
+                        nullDataRestoring = 0,
+                        versionCountRestoring = 0,
+                        versionDataRestoring = 0,
+                        deleteMarkerCountRestoring = 0,
+                        masterCountRestored = 0,
+                        masterDataRestored = 0,
+                        nullCountRestored = 0,
+                        nullDataRestored = 0,
+                        versionCountRestored = 0,
+                        versionDataRestored = 0,
+                        deleteMarkerCountRestored = 0,
                     } = res[metricLevel][resourceName];
 
                     dataMetrics[metricLevel][resourceName].usedCapacity.current += nullData + masterData;
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentCold += nullDataCold + masterDataCold;
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestoring += nullDataRestoring + masterDataRestoring;
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestored += nullDataRestored + masterDataRestored;
                     dataMetrics[metricLevel][resourceName].objectCount.current += nullCount + masterCount;
+                    dataMetrics[metricLevel][resourceName].objectCount._currentCold += nullCountCold + masterCountCold;
+                    dataMetrics[metricLevel][resourceName].objectCount._currentRestoring += nullCountRestoring + masterCountRestoring;
+                    dataMetrics[metricLevel][resourceName].objectCount._currentRestored += nullCountRestored + masterCountRestored;
 
                     if (isVersioned) {
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent
                             += versionData - masterData; // masterData is duplicated in versionedData
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold
+                            += versionDataCold - masterDataCold;
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring
+                            += versionDataRestoring - masterDataRestoring;
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored
+                            += versionDataRestored - masterDataRestored;
+
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored, 0);
+
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent
                             += versionCount - masterCount - deleteMarkerCount;
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold
+                            += versionCountCold - masterCountCold;
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring
+                            += versionCountRestoring - masterCountRestoring;
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored
+                            += versionCountRestored - masterCountRestored;
+
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored, 0);
+
                         dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCount;
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountCold;
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountRestoring;
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountRestored;
                     }
 
                     if (metricLevel === 'location') { // calculate usedCapacity metrics at global and location level
-                        totalBytes.curr += nullData + masterData;
+                        // we only count the restoring and restored for non-cold locations
+                        totalBytes.curr += (nullData + masterData + nullDataCold + masterDataCold + nullDataRestoring + masterDataRestoring + nullDataRestored + masterDataRestored);
                         if (!locationBytes[resourceName]) {
                             locationBytes[resourceName] = { curr: 0, prev: 0 };
                         }
-                        locationBytes[resourceName].curr += nullData + masterData;
+                        locationBytes[resourceName].curr += (nullData + masterData + nullDataCold + masterDataCold + nullDataRestoring + masterDataRestoring + nullDataRestored + masterDataRestored);
                         if (isVersioned) {
-                            totalBytes.prev += versionData;
-                            totalBytes.prev -= masterData;
+                            totalBytes.prev += (versionData + versionDataCold + versionDataRestoring + versionDataRestored);
+                            totalBytes.prev -= (masterData + masterDataCold + masterDataRestoring + masterDataRestored);
                             totalBytes.prev = Math.max(0, totalBytes.prev);
-                            locationBytes[resourceName].prev += versionData;
-                            locationBytes[resourceName].prev -= masterData;
+                            locationBytes[resourceName].prev += (versionData + versionDataCold + versionDataRestoring + versionDataRestored);
+                            locationBytes[resourceName].prev -= (masterData + masterDataCold + masterDataRestoring + masterDataRestored);
                             locationBytes[resourceName].prev = Math.max(0, locationBytes[resourceName].prev);
                         }
                     }
                     if (metricLevel === 'bucket') { // count objects up of all buckets
                         totalCurrentCount += (masterCount + nullCount);
                         totalNonCurrentCount += isVersioned ? (versionCount - masterCount - deleteMarkerCount) : 0;
+                        totalCurrentColdCount += (masterCountCold + nullCountCold);
+                        totalNonCurrentColdCount += isVersioned ? (versionCountCold - masterCountCold) : 0;
+                        totalRestoringCount += (masterCountRestoring + nullCountRestoring);
+                        totalRestoredCount += (masterCountRestored + nullCountRestored);
+                        totalVersionRestoringCount += isVersioned ? (versionCountRestoring - masterCountRestoring) : 0;
+                        totalVerionsRestoredCount += isVersioned ? (versionCountRestored - masterCountRestored) : 0;
                     }
                 });
             }
@@ -374,26 +503,52 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     accountLocation.usedCapacity = {
                         current: 0,
                         nonCurrent: 0,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 0,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
                     };
                 }
                 if (!accountLocation.objectCount) {
                     accountLocation.objectCount = {
                         current: 0,
                         nonCurrent: 0,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 0,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
                         deleteMarker: 0,
                     };
                 }
                 accountLocation.usedCapacity.current += dataMetrics.location[location].usedCapacity.current;
                 accountLocation.usedCapacity.nonCurrent += dataMetrics.location[location].usedCapacity.nonCurrent;
+                accountLocation.usedCapacity._currentCold += dataMetrics.location[location].usedCapacity._currentCold;
+                accountLocation.usedCapacity._nonCurrentCold += dataMetrics.location[location].usedCapacity._nonCurrentCold;
+                accountLocation.usedCapacity._currentRestoring += dataMetrics.location[location].usedCapacity._currentRestoring;
+                accountLocation.usedCapacity._nonCurrentRestoring += dataMetrics.location[location].usedCapacity._nonCurrentRestoring;
+                accountLocation.usedCapacity._currentRestored += dataMetrics.location[location].usedCapacity._currentRestored;
+                accountLocation.usedCapacity._nonCurrentRestored += dataMetrics.location[location].usedCapacity._nonCurrentRestored;
+
                 accountLocation.objectCount.current += dataMetrics.location[location].objectCount.current;
                 accountLocation.objectCount.nonCurrent += dataMetrics.location[location].objectCount.nonCurrent;
+                accountLocation.objectCount._currentCold += dataMetrics.location[location].objectCount._currentCold;
+                accountLocation.objectCount._nonCurrentCold += dataMetrics.location[location].objectCount._nonCurrentCold;
+                accountLocation.objectCount._currentRestoring += dataMetrics.location[location].objectCount._currentRestoring;
+                accountLocation.objectCount._nonCurrentRestoring += dataMetrics.location[location].objectCount._nonCurrentRestoring;
+                accountLocation.objectCount._currentRestored += dataMetrics.location[location].objectCount._currentRestored;
+                accountLocation.objectCount._nonCurrentRestored += dataMetrics.location[location].objectCount._nonCurrentRestored;
+
                 accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
             });
         });
 
         return {
-            versions: Math.max(0, totalNonCurrentCount),
-            objects: totalCurrentCount,
+            versions: Math.max(0, totalNonCurrentCount + totalNonCurrentColdCount + totalVersionRestoringCount + totalVerionsRestoredCount),
+            objects: totalCurrentCount + totalCurrentColdCount + totalRestoringCount + totalRestoredCount,
             dataManaged: {
                 total: totalBytes,
                 locations: locationBytes,
@@ -599,6 +754,38 @@ class S3UtilsMongoClient extends MongoClientInterface {
             });
             return cb(err);
         }
+    }
+
+    /**
+     * Check if the entry is currently in a cold backend
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is in a cold backend, false otherwise
+     */
+    _isObjectCold(entry) {
+        return entry.value.archive
+            && (!entry.value.archive.restoreRequestedAt || entry.value.archive.restoreWillExpireAt <= Date.now());
+    }
+
+    /**
+     * Check if the entry is currently being restored
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is being restored, false otherwise
+     */
+    _isObjectRestoring(entry) {
+        return entry.value.archive
+            && entry.value.archive.restoreRequestedAt <= Date.now()
+            && (!entry.value.archive.restoreCompletedAt || entry.value.archive.restoreCompletedAt > Date.now());
+    }
+
+    /**
+     * Check if the entry is currently restored
+     * @param {Object} entry - the entry to check
+     * @return {boolean} - true if the entry is restored, false otherwise
+     */
+    _isObjectRestored(entry) {
+        return entry.value.archive
+            && entry.value.archive.restoreCompletedAt && (entry.value.archive.restoreCompletedAt <= Date.now())
+            && entry.value.archive.restoreWillExpireAt > Date.now();
     }
 }
 
