@@ -15,9 +15,11 @@ const __COUNT_ITEMS = 'countitems';
 
 class S3UtilsMongoClient extends MongoClientInterface {
     async getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
+        let cursor;
+        let cursorUsersBucketCreationDates;
         try {
             const c = this.getCollection(bucketName);
-            const cursor = c.find({}, {
+            cursor = c.find({}, {
                 projection: {
                     '_id': 1,
                     'value.last-modified': 1,
@@ -44,13 +46,13 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             const locationConfig = getLocationConfig(log);
 
-            const usersBucketCreationDatesArray = await this.getCollection(USERSBUCKET).find({}, {
+            const cursorUsersBucketCreationDates = await this.getCollection(USERSBUCKET).find({}, {
                 projection: {
                     'value.creationDate': 1,
                 },
             }).toArray();
 
-            const usersBucketCreationDatesMap = usersBucketCreationDatesArray
+            const usersBucketCreationDatesMap = cursorUsersBucketCreationDates
                 .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
             let startCursorDate = new Date();
             let processed = 0;
@@ -196,6 +198,21 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 errorString: err.toString(),
             });
             return callback(err);
+        } finally {
+            if (cursor && !cursor.closed) {
+                log.info('Finished processing cursor', {
+                    method: 'getObjectMDStats',
+                    bucketName,
+                });
+                cursor.close();
+            }
+            if (cursorUsersBucketCreationDates && !cursorUsersBucketCreationDates.closed) {
+                log.info('Finished processing cursorUsersBucketCreationDates', {
+                    method: 'getObjectMDStats',
+                    bucketName,
+                });
+                cursorUsersBucketCreationDates.close();
+            }
         }
     }
 
