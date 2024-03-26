@@ -366,16 +366,20 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                 nonCurrent: 0,
                                 currentCold: 0,
                                 nonCurrentCold: 0,
-                                restored: 0,
-                                restoring: 0,
+                                currentRestored: 0,
+                                currentRestoring: 0,
+                                nonCurrentRestored: 0,
+                                nonCurrentRestoring: 0,
                             },
                             objectCount: {
                                 current: 0,
                                 nonCurrent: 0,
                                 currentCold: 0,
                                 nonCurrentCold: 0,
-                                restored: 0,
-                                restoring: 0,
+                                currentRestored: 0,
+                                currentRestoring: 0,
+                                nonCurrentRestored: 0,
+                                nonCurrentRestoring: 0,
                                 deleteMarker: 0,
                             },
                         };
@@ -413,41 +417,41 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
                     dataMetrics[metricLevel][resourceName].usedCapacity.current += nullData + masterData;
                     dataMetrics[metricLevel][resourceName].usedCapacity.currentCold += nullDataCold + masterDataCold;
-                    dataMetrics[metricLevel][resourceName].usedCapacity.restoring += nullDataRestoring + masterDataRestoring;
-                    dataMetrics[metricLevel][resourceName].usedCapacity.restored += nullDataRestored + masterDataRestored;
+                    dataMetrics[metricLevel][resourceName].usedCapacity.currentRestoring += nullDataRestoring + masterDataRestoring;
+                    dataMetrics[metricLevel][resourceName].usedCapacity.currentRestored += nullDataRestored + masterDataRestored;
                     dataMetrics[metricLevel][resourceName].objectCount.current += nullCount + masterCount;
                     dataMetrics[metricLevel][resourceName].objectCount.currentCold += nullCountCold + masterCountCold;
-                    dataMetrics[metricLevel][resourceName].objectCount.restoring += nullCountRestoring + masterCountRestoring;
-                    dataMetrics[metricLevel][resourceName].objectCount.restored += nullCountRestored + masterCountRestored;
+                    dataMetrics[metricLevel][resourceName].objectCount.currentRestoring += nullCountRestoring + masterCountRestoring;
+                    dataMetrics[metricLevel][resourceName].objectCount.currentRestored += nullCountRestored + masterCountRestored;
 
                     if (isVersioned) {
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent
                             += versionData - masterData; // masterData is duplicated in versionedData
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentCold
                             += versionDataCold - masterDataCold;
-                        dataMetrics[metricLevel][resourceName].usedCapacity.restoring
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestoring
                             += versionDataRestoring - masterDataRestoring;
-                        dataMetrics[metricLevel][resourceName].usedCapacity.restored
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestored
                             += versionDataRestored - masterDataRestored;
 
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0);
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentCold, 0);
-                        dataMetrics[metricLevel][resourceName].usedCapacity.restoring = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.restoring, 0);
-                        dataMetrics[metricLevel][resourceName].usedCapacity.restored = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.restored, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestoring, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrentRestored, 0);
 
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent
                             += versionCount - masterCount - deleteMarkerCount;
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrentCold
                             += versionCountCold - masterCountCold;
-                        dataMetrics[metricLevel][resourceName].objectCount.restoring
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestoring
                             += versionCountRestoring - masterCountRestoring;
-                        dataMetrics[metricLevel][resourceName].objectCount.restored
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestored
                             += versionCountRestored - masterCountRestored;
 
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0);
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrentCold, 0);
-                        dataMetrics[metricLevel][resourceName].objectCount.restoring = Math.max(dataMetrics[metricLevel][resourceName].objectCount.restoring, 0);
-                        dataMetrics[metricLevel][resourceName].objectCount.restored = Math.max(dataMetrics[metricLevel][resourceName].objectCount.restored, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestoring, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrentRestored, 0);
 
                         dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCount;
                         dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountCold;
@@ -501,8 +505,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         nonCurrent: 0,
                         currentCold: 0,
                         nonCurrentCold: 0,
-                        restoring: 0,
-                        restored: 0,
+                        currentRestored: 0,
+                        currentRestoring: 0,
+                        nonCurrentRestored: 0,
+                        nonCurrentRestoring: 0,
                     };
                 }
                 if (!accountLocation.objectCount) {
@@ -511,8 +517,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         nonCurrent: 0,
                         currentCold: 0,
                         nonCurrentCold: 0,
-                        restoring: 0,
-                        restored: 0,
+                        currentRestored: 0,
+                        currentRestoring: 0,
+                        nonCurrentRestored: 0,
+                        nonCurrentRestoring: 0,
                         deleteMarker: 0,
                     };
                 }
@@ -520,15 +528,19 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 accountLocation.usedCapacity.nonCurrent += dataMetrics.location[location].usedCapacity.nonCurrent;
                 accountLocation.usedCapacity.currentCold += dataMetrics.location[location].usedCapacity.currentCold;
                 accountLocation.usedCapacity.nonCurrentCold += dataMetrics.location[location].usedCapacity.nonCurrentCold;
-                accountLocation.usedCapacity.restoring += dataMetrics.location[location].usedCapacity.restoring;
-                accountLocation.usedCapacity.restored += dataMetrics.location[location].usedCapacity.restored;
+                accountLocation.usedCapacity.currentRestoring += dataMetrics.location[location].usedCapacity.currentRestoring;
+                accountLocation.usedCapacity.nonCurrentRestoring += dataMetrics.location[location].usedCapacity.nonCurrentRestoring;
+                accountLocation.usedCapacity.currentRestored += dataMetrics.location[location].usedCapacity.currentRestored;
+                accountLocation.usedCapacity.nonCurrentRestored += dataMetrics.location[location].usedCapacity.nonCurrentRestored;
 
                 accountLocation.objectCount.current += dataMetrics.location[location].objectCount.current;
                 accountLocation.objectCount.nonCurrent += dataMetrics.location[location].objectCount.nonCurrent;
                 accountLocation.objectCount.currentCold += dataMetrics.location[location].objectCount.currentCold;
                 accountLocation.objectCount.nonCurrentCold += dataMetrics.location[location].objectCount.nonCurrentCold;
-                accountLocation.objectCount.restoring += dataMetrics.location[location].objectCount.restoring;
-                accountLocation.objectCount.restored += dataMetrics.location[location].objectCount.restored;
+                accountLocation.objectCount.currentRestoring += dataMetrics.location[location].objectCount.currentRestoring;
+                accountLocation.objectCount.nonCurrentRestoring += dataMetrics.location[location].objectCount.nonCurrentRestoring;
+                accountLocation.objectCount.currentRestored += dataMetrics.location[location].objectCount.currentRestored;
+                accountLocation.objectCount.nonCurrentRestored += dataMetrics.location[location].objectCount.nonCurrentRestored;
 
                 accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
             });
