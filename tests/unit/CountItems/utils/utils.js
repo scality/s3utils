@@ -7,8 +7,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             nonCurrent: 0,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
         objectCount: {
             current: 0,
@@ -16,8 +18,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             deleteMarker: 0,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
     };
 
@@ -27,8 +31,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             nonCurrent: 10,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
         objectCount: {
             current: 10,
@@ -36,8 +42,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             deleteMarker: 10,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
     };
 
@@ -47,8 +55,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             nonCurrent: 20,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
         objectCount: {
             current: 20,
@@ -56,8 +66,10 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             deleteMarker: 20,
             currentCold: 0,
             nonCurrentCold: 0,
-            restored: 0,
-            restoring: 0,
+            currentRestored: 0,
+            currentRestoring: 0,
+            nonCurrentRestored: 0,
+            nonCurrentRestoring: 0,
         },
     };
 

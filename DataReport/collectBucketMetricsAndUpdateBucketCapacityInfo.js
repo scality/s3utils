@@ -39,8 +39,10 @@ function isValidBucketStorageMetrics(bucketMetric) {
         && bucketMetric.usedCapacity.nonCurrent > -1
         && (typeof bucketMetric.usedCapacity.currentCold === 'undefined' || (bucketMetric.usedCapacity.currentCold > -1))
         && (typeof bucketMetric.usedCapacity.nonCurrentCold === 'undefined' || (bucketMetric.usedCapacity.nonCurrentCold > -1))
-        && (typeof bucketMetric.usedCapacity.restoring === 'undefined' || (bucketMetric.usedCapacity.restoring > -1))
-        && (typeof bucketMetric.usedCapacity.restored === 'undefined' || (bucketMetric.usedCapacity.restored > -1));
+        && (typeof bucketMetric.usedCapacity.currentRestoring === 'undefined' || (bucketMetric.usedCapacity.currentRestoring > -1))
+        && (typeof bucketMetric.usedCapacity.currentRestored === 'undefined' || (bucketMetric.usedCapacity.currentRestored > -1))
+        && (typeof bucketMetric.usedCapacity.nonCurrentRestoring === 'undefined' || (bucketMetric.usedCapacity.nonCurrentRestoring > -1))
+        && (typeof bucketMetric.usedCapacity.nonCurrentRestored === 'undefined' || (bucketMetric.usedCapacity.nonCurrentRestored > -1));
 }
 
 function isValidCapacityValue(capacity) {
@@ -83,8 +85,10 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                             // Do not count the objects in cold for SOSAPI
                             bucketStorageUsed = storageMetricDoc.usedCapacity.current
                                 + storageMetricDoc.usedCapacity.nonCurrent
-                                + (storageMetricDoc.usedCapacity.restoring || 0)
-                                + (storageMetricDoc.usedCapacity.restored || 0);
+                                + (storageMetricDoc.usedCapacity.currentRestoring || 0)
+                                + (storageMetricDoc.usedCapacity.nonCurrentRestoring || 0)
+                                + (storageMetricDoc.usedCapacity.currentRestored || 0)
+                                + (storageMetricDoc.usedCapacity.nonCurrentRestored || 0);
                         }
                         // read Capacity from bucket._capabilities
                         const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
