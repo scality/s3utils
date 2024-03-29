@@ -14,10 +14,40 @@ const __COUNT_ITEMS = 'countitems';
 
 
 class S3UtilsMongoClient extends MongoClientInterface {
+    /**
+     * Get the list of buckets and their location dates
+     * @param {object} log - Werelogs logger
+     * @returns {object} - Object with bucket names as keys
+     * and their creation dates as values
+     */
+    async _getUsersBucketCreationDates(log) {
+        let cursorUsersBucketCreationDates;
+        try {
+            cursorUsersBucketCreationDates = await this.getCollection(USERSBUCKET).find({}, {
+                projection: {
+                    'value.creationDate': 1,
+                },
+            });
+            const usersBucketCreationDatesArray = await cursorUsersBucketCreationDates.toArray();
+            return usersBucketCreationDatesArray
+                .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
+        } catch (err) {
+            log.error('Failed to read __usersbucket collection', {
+                method: 'getUsersBucketCreationDates',
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return null;
+        } finally {
+            await cursorUsersBucketCreationDates.close();
+        }
+    }
+
     async getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
+        let cursor;
         try {
             const c = this.getCollection(bucketName);
-            const cursor = c.find({}, {
+            cursor = c.find({}, {
                 projection: {
                     '_id': 1,
                     'value.last-modified': 1,
@@ -44,14 +74,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             const locationConfig = getLocationConfig(log);
 
-            const usersBucketCreationDatesArray = await this.getCollection(USERSBUCKET).find({}, {
-                projection: {
-                    'value.creationDate': 1,
-                },
-            }).toArray();
+            const usersBucketCreationDatesMap = await this._getUsersBucketCreationDates(log);
 
-            const usersBucketCreationDatesMap = usersBucketCreationDatesArray
-                .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
+            if (!usersBucketCreationDatesMap) {
+                return callback(errors.InternalError);
+            }
+
             let startCursorDate = new Date();
             let processed = 0;
             await cursor.forEach(
@@ -196,6 +224,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 errorString: err.toString(),
             });
             return callback(err);
+        } finally {
+            if (cursor && !cursor.closed) {
+                log.info('Finished processing cursor', {
+                    method: 'getObjectMDStats',
+                    bucketName,
+                });
+                cursor.close();
+            }
         }
     }
 
