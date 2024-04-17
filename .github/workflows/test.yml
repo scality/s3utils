@@ -12,8 +12,6 @@ concurrency:
 
 env:
   PROJECT_NAME: ${{ github.event.repository.name }}
-  NAMESPACE: ${{ inputs.namespace }}
-  TAG: ${{ inputs.tag }}
 
 jobs:
   prepare:
@@ -36,23 +34,23 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ github.token }}
 
     - name: Build and push MongoDB
       uses: docker/build-push-action@v4
       with:
         push: true
         context: .github/dockerfiles/mongodb
-        tags: "ghcr.io/scality/s3utils/ci-mongodb:${{ github.sha }}"
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        tags: ghcr.io/${{ github.repository }}/ci-mongodb:${{ github.sha }}
+        cache-from: type=gha,scope=ci-mongodb
+        cache-to: type=gha,mode=max,scope=ci-mongodb
 
   tests:
     needs: prepare
     runs-on: ubuntu-latest
     services:
       mongodb:
-        image: ghcr.io/scality/s3utils/ci-mongodb:${{ github.sha }}
+        image: ghcr.io/${{ github.repository }}/ci-mongodb:${{ github.sha }}
         ports:
         - 27017:27017
         - 27018:27018
@@ -79,5 +77,3 @@ jobs:
       - tests
     uses: ./.github/workflows/build.yml
     secrets: inherit
-    with:
-      namespace: s3utils-dev
