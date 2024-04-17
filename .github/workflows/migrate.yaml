@@ -1,0 +1,42 @@
+---
+name: migrate
+
+on:
+  push:
+    branches-ignore:
+    - development/**
+    - q/*/**
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Sync ${{ github.event.repository.name }}
+      run: |
+        docker run --rm quay.io/skopeo/stable:v1.15.0 sync \
+            --src docker --dest docker --all --preserve-digests --retry-times 3 \
+            --src-creds ${{ secrets.REGISTRY_LOGIN }}:${{ secrets.REGISTRY_PASSWORD }} \
+            --dest-creds ${{ github.repository_owner }}:${{ github.token }} \
+            registry.scality.com/${{ github.event.repository.name }}/${{ github.event.repository.name }} \
+            ghcr.io/${{ github.repository_owner }}/
+    - name: Sync ${{ github.event.repository.name }}-dashboards
+      run: |
+        docker run --rm quay.io/skopeo/stable:v1.15.0 sync \
+            --src docker --dest docker --all --preserve-digests --retry-times 3 \
+            --src-creds ${{ secrets.REGISTRY_LOGIN }}:${{ secrets.REGISTRY_PASSWORD }} \
+            --dest-creds ${{ github.repository_owner }}:${{ github.token }} \
+            registry.scality.com/${{ github.event.repository.name }}/${{ github.event.repository.name }}-dashboards \
+            ghcr.io/${{ github.repository }}
+    - name: Sync zenko/s3utils
+      run: |
+        docker run --rm quay.io/skopeo/stable:v1.15.0 sync \
+            --src docker --dest docker --all --preserve-digests --retry-times 3 \
+            --dest-creds ${{ github.repository_owner }}:${{ github.token }} \
+            zenko/${{ github.event.repository.name }} \
+            ghcr.io/${{ github.repository_owner }}/
+
+        docker run --rm quay.io/skopeo/stable:v1.15.0 copy --preserve-digests --retry-times 3 \
+            --dest-creds ${{ github.repository_owner }}:${{ github.token }} \
+            docker://registry.scality.com/zenko/${{ github.event.repository.name }}:1.0.0 \
+            docker://ghcr.io/${{ github.repository }}:1.0.0
