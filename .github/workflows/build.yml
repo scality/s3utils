@@ -3,20 +3,13 @@ name: build
 on:
   workflow_call:
     inputs:
-      namespace:
-        required: false
-        type: string
-        default: s3utils-dev
       tag:
         required: false
         type: string
         default: "${{ github.sha }}"
 
 env:
-  REGISTRY_NAME: registry.scality.com
   PROJECT_NAME: ${{ github.event.repository.name }}
-  NAMESPACE: ${{ inputs.namespace }}
-  TAG: ${{ inputs.tag }}
 
 jobs:
   build:
@@ -35,13 +28,13 @@ jobs:
       - name: Login to Registry
         uses: docker/login-action@v2
         with:
-          registry: registry.scality.com
-          username: ${{ secrets.REGISTRY_LOGIN }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
 
       - name: Push dashboards into the development namespace
         run: |
-          oras push ${{ env.REGISTRY_NAME }}/${{ env.NAMESPACE }}/${{ env.PROJECT_NAME }}-dashboards:${{ env.TAG }} \
+          oras push ghcr.io/${{ github.repository }}/${{ env.PROJECT_NAME }}-dashboards:${{ inputs.tag }} \
             count-items-cronjob/alerts.yaml:application/prometheus-alerts+yaml \
             update-bucket-capacity-info-cronjob/alerts.yaml:application/prometheus-alerts+yaml
         working-directory: monitoring
@@ -53,6 +46,6 @@ jobs:
           file: ./Dockerfile
           provenance: false
           push: true
-          tags: "${{ env.REGISTRY_NAME }}/${{ env.NAMESPACE }}/${{ env.PROJECT_NAME }}:${{ env.TAG }}"
+          tags: ghcr.io/${{ github.repository }}:${{ inputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

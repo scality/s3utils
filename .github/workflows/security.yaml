@@ -26,5 +26,5 @@ jobs:
     uses: scality/workflows/.github/workflows/trivy.yaml@v1
     with:
       name: ${{ github.event.repository.name }}
-      namespace: s3utils-dev
-      registry: registry.scality.com
+      namespace: scality
+      registry: ghcr.io

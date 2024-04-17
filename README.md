@@ -294,7 +294,7 @@ node verifyBucketSproxydKeys.js
     -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
     -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
     -e 'RAFT_SESSIONS=1' \
-    registry.scality.com/s3utils/s3utils:1.12.5 \
+    ghcr.io/scality/s3utils:1.12.5 \
     node verifyBucketSproxydKeys.js
     ```
 
@@ -311,7 +311,7 @@ node verifyBucketSproxydKeys.js
     -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
     -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
     -e 'KEYS_FROM_STDIN=1' \
-    registry.scality.com/s3utils/s3utils:1.12.5 \
+    ghcr.io/scality/s3utils:1.12.5 \
     node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
     ```
 
@@ -621,7 +621,7 @@ docker run \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
 -e 'NO_MISSING_KEY_CHECK=1' \
-registry.scality.com/s3utils/s3utils:1.13.23 \
+ghcr.io/scality/s3utils:1.13.23 \
 node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
@@ -802,7 +802,7 @@ docker run --net=host --rm \
   -v "${PWD}/scan-results:/scan-results" \
   -e "DIFF_OUTPUT_FILE=/scan-results/scan-results.json" \
   -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
-  registry.scality.com/s3utils/s3utils:1.13.23 \
+  ghcr.io/scality/s3utils:1.13.23 \
   bash -c 'DATABASES=$(echo $DATABASES_GLOB) node CompareRaftMembers/followerDiff' \
 | tee -a followerDiff.log
 
@@ -1229,7 +1229,7 @@ docker run --net=host --rm \
   -v "${PWD}/scan-results:/scan-results" \
   -e "DIFF_OUTPUT_FILE=/scan-results/scan-results.json" \
   -e "EXCLUDE_FROM_CSEQS=$(cat /tmp/rs-cseqs.json)" \
-  registry.scality.com/s3utils/s3utils:1.13.23 \
+  ghcr.io/scality/s3utils:1.13.23 \
   bash -c 'DATABASES1=$(echo $DATABASES1_GLOB) DATABASES2=$(echo $DATABASES2_GLOB) node CompareRaftMembers/compareFollowerDbs' \
 | tee -a compareFollowerDbs.log
 
@@ -1406,7 +1406,7 @@ docker run -i --net=host --rm \
   -e "BUCKETD_HOSTPORT=localhost:9000" \
   -e "SPROXYD_HOSTPORT=localhost:8181" \
   -e "DRY_RUN=1" \
-  registry.scality.com/s3utils/s3utils:1.13.23 \
+  ghcr.io/scality/s3utils:1.13.23 \
   node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
@@ -1418,7 +1418,7 @@ cat scan-results.storage-{1..5}/scan-results.jsonl | \
 docker run -i --net=host --rm \
   -e "BUCKETD_HOSTPORT=localhost:9000" \
   -e "SPROXYD_HOSTPORT=localhost:8181" \
-  registry.scality.com/s3utils/s3utils:1.13.23 \
+  ghcr.io/scality/s3utils:1.13.23 \
   node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
@@ -1561,7 +1561,7 @@ duplicate "versionId" field found' and ignores other entries.
 ## Example
 
 ```
-cat /tmp/verifyBucketSproxydKeys.log | docker run -i registry.scality.com/s3utils/s3utils:1.13.24 bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 node repairDuplicateVersionIds.js' > /tmp/repairDuplicateVersionIds.log
+cat /tmp/verifyBucketSproxydKeys.log | docker run -i ghcr.io/scality/s3utils:1.13.24 bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 node repairDuplicateVersionIds.js' > /tmp/repairDuplicateVersionIds.log
 ```
 
 # Cleanup Noncurrent Versions
@@ -1931,7 +1931,7 @@ docker run \
   -e 'COMPARE_OBJECT_SIZE=1' \
   -e 'SRC_BUCKET_PREFIXES=pref1,pref2' \
   -e 'SKIP_OLDER_THAN="2022-11-30T00:00:00Z"' \
-  registry.scality.com/s3utils/s3utils:latest \
+  ghcr.io/scality/s3utils:latest \
   node VerifyReplication/index.js
 ```
 

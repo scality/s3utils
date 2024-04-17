@@ -12,7 +12,6 @@ on:
         required: false
 
 env:
-  REGISTRY_NAME: registry.scality.com
   PROJECT_NAME: ${{ github.event.repository.name }}
 
 jobs:
@@ -20,7 +19,6 @@ jobs:
     name: Build and Push
     uses: ./.github/workflows/build.yml
     with:
-      namespace: s3utils
       tag: ${{ github.event.inputs.tag }}
     secrets: inherit
 
