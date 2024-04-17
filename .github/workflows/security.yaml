@@ -23,8 +23,7 @@ jobs:
   trivy:
     needs: build
     name: Trivy Vulnerability Scan for Code
-    uses: scality/workflows/.github/workflows/trivy.yaml@v1
+    uses: scality/workflows/.github/workflows/trivy.yaml@v2
     with:
       name: ${{ github.event.repository.name }}
-      namespace: s3utils-dev
-      registry: registry.scality.com
+      namespace: scality

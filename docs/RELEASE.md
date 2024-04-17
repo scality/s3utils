@@ -2,11 +2,11 @@
 
 ## Docker Image Generation
 
-Docker images are hosted on [registry.scality.com](registry.scality.com).
+Docker images are hosted on [ghcr.io](https://github.com/orgs/scality/packages).
 S3utils has two namespaces there:
 
-* Production Namespace: registry.scality.com/s3utils
-* Dev Namespace: registry.scality.com/s3utils-dev
+* Production container image: ghcr.io/scality/s3utils
+* Dashboard oras image: ghcr.io/scality/s3utils/s3utils-dashboards
 
 With every CI build, the CI will push images, tagging the
 content with the developer branch's short SHA-1 commit hash.
@@ -18,8 +18,8 @@ Tagged versions of s3utils will be stored in the production namespace.
 ## How to Pull Docker Images
 
 ```sh
-docker pull registry.scality.com/s3utils-dev/s3utils:<commit hash>
-docker pull registry.scality.com/s3utils/s3utils:<tag>
+docker pull ghcr.io/scality/s3utils:<commit hash>
+docker pull ghcr.io/scality/s3utils:<tag>
 ```
 
 ## Release Process
