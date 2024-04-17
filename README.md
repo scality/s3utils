@@ -4,7 +4,7 @@ S3 Connector and Zenko Utilities
 Run the Docker container as
 ```
 docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' -e 'REPLICATION_GROUP_ID=RG001'
-zenko/s3utils node scriptName bucket1[,bucket2...]
+ghcr.io/scality/s3utils:<tag> node scriptName bucket1[,bucket2...]
 ```
 
 ## Trigger CRR on existing objects
@@ -1894,7 +1894,7 @@ The script also logs a progress update (a summary), every 10 seconds by default,
   "dstBucket":"dst-bucket",
   "srcBucket":"src-bucket",
   "prefixFilters":["pref1","pref2"],
-  "skipOlderThan": "2022-11-30T00:00:00Z", 
+  "skipOlderThan": "2022-11-30T00:00:00Z",
   "level":"info",
   "message":"completed replication verification",
   "hostname":"scality.local",
