@@ -1,9 +1,14 @@
+const http = require('http');
+
+const AWS = require('aws-sdk');
 const {
-    doWhilst, eachSeries, eachLimit, waterfall, series,
+    doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
-const werelogs = require('werelogs');
+
 const { ObjectMD } = require('arsenal').models;
-const metadataUtil = require('./CrrExistingObjects/metadataUtils');
+const werelogs = require('werelogs');
+
+const BackbeatClient = require('./BackbeatClient');
 
 const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
     ? 'debug' : 'info';
@@ -15,9 +20,12 @@ werelogs.configure(loggerConfig);
 const log = new werelogs.Logger('s3utils::crrExistingObjects');
 
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
-const { SITE_NAME } = process.env;
-let { STORAGE_TYPE } = process.env;
-let { TARGET_REPLICATION_STATUS } = process.env;
+const {
+    ACCESS_KEY, SECRET_KEY, ENDPOINT, SITE_NAME,
+} = process.env;
+let {
+    STORAGE_TYPE, TARGET_REPLICATION_STATUS,
+} = process.env;
 const { TARGET_PREFIX } = process.env;
 const WORKERS = (process.env.WORKERS
     && Number.parseInt(process.env.WORKERS, 10)) || 10;
@@ -27,16 +35,29 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
     && Number.parseInt(process.env.MAX_SCANNED, 10));
 let { KEY_MARKER } = process.env;
 let { VERSION_ID_MARKER } = process.env;
-const { GENERATE_INTERNAL_VERSION_ID } = process.env;
 
 const LISTING_LIMIT = (process.env.LISTING_LIMIT
     && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
 
 const LOG_PROGRESS_INTERVAL_MS = 10000;
+const AWS_SDK_REQUEST_RETRIES = 100;
+const AWS_SDK_REQUEST_DELAY_MS = 30;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.fatal('No buckets given as input! Please provide '
         + 'a comma-separated list of buckets');
+    process.exit(1);
+}
+if (!ENDPOINT) {
+    log.fatal('ENDPOINT not defined!');
+    process.exit(1);
+}
+if (!ACCESS_KEY) {
+    log.fatal('ACCESS_KEY not defined');
+    process.exit(1);
+}
+if (!SECRET_KEY) {
+    log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
 if (!STORAGE_TYPE) {
@@ -58,6 +79,38 @@ replicationStatusToProcess.forEach(state => {
 log.info('Objects with replication status '
     + `${replicationStatusToProcess.join(' or ')} `
     + 'will be reset to PENDING to trigger CRR');
+
+const options = {
+    accessKeyId: ACCESS_KEY,
+    secretAccessKey: SECRET_KEY,
+    endpoint: ENDPOINT,
+    region: 'us-east-1',
+    sslEnabled: false,
+    s3ForcePathStyle: true,
+    apiVersions: { s3: '2006-03-01' },
+    signatureVersion: 'v4',
+    signatureCache: false,
+    httpOptions: {
+        timeout: 0,
+        agent: new http.Agent({ keepAlive: true }),
+    },
+};
+/**
+ *  Options specific to s3 requests
+ *  `maxRetries` & `customBackoff` are set only to s3 requests
+ *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
+ */
+const s3Options = {
+    maxRetries: AWS_SDK_REQUEST_RETRIES,
+    customBackoff: (retryCount, error) => {
+        log.error('aws sdk request error', { error, retryCount });
+        // computed delay is not truly exponential, it is reset to minimum after
+        // every 10 calls, with max delay of 15 seconds!
+        return AWS_SDK_REQUEST_DELAY_MS * 2 ** (retryCount % 10);
+    },
+};
+const s3 = new AWS.S3(Object.assign(options, s3Options));
+const bb = new BackbeatClient(options);
 
 let nProcessed = 0;
 let nSkipped = 0;
@@ -103,14 +156,14 @@ function _markObjectPending(
     let skip = false;
     return waterfall([
         // get object blob
-        next => metadataUtil.getMetadata({
+        next => bb.getMetadata({
             Bucket: bucket,
             Key: key,
             VersionId: versionId,
-        }, log, next),
+        }, next),
         (mdRes, next) => {
-            objMD = new ObjectMD(mdRes);
-            const md = objMD.getValue();
+            objMD = new ObjectMD(JSON.parse(mdRes.Body));
+            const mdBlob = objMD.getSerialized();
             if (!_objectShouldBeUpdated(objMD)) {
                 skip = true;
                 return next();
@@ -124,13 +177,6 @@ function _markObjectPending(
                 // was versioning-suspended when the object was put.
                 return next();
             }
-            if (!GENERATE_INTERNAL_VERSION_ID) {
-                // When the GENERATE_INTERNAL_VERSION_ID env variable is set,
-                // matching objects with no *internal* versionId will get
-                // "updated" to get an internal versionId. The external versionId
-                // will still be "null".
-                return next();
-            }
             // The object does not have an *internal* versionId, as it
             // was put on a nonversioned bucket: do a first metadata
             // update to generate one, just passing on the existing metadata
@@ -138,11 +184,13 @@ function _markObjectPending(
             // but the following update will be able to create a versioned key
             // for this object, so that replication can happen. The externally
             // visible version will stay "null".
-            return metadataUtil.putMetadata({
+            return bb.putMetadata({
                 Bucket: bucket,
                 Key: key,
-                Body: md,
-            }, log, (err, putRes) => {
+                VersionId: versionId,
+                ContentLength: Buffer.byteLength(mdBlob),
+                Body: mdBlob,
+            }, (err, putRes) => {
                 if (err) {
                     return next(err);
                 }
@@ -186,12 +234,14 @@ function _markObjectPending(
             objMD.setReplicationSiteStatus(storageClass, 'PENDING');
             objMD.setReplicationStatus('PENDING');
             objMD.updateMicroVersionId();
-            const md = objMD.getValue();
-            return metadataUtil.putMetadata({
+            const mdBlob = objMD.getSerialized();
+            return bb.putMetadata({
                 Bucket: bucket,
                 Key: key,
-                Body: md,
-            }, log, next);
+                VersionId: versionId,
+                ContentLength: Buffer.byteLength(mdBlob),
+                Body: mdBlob,
+            }, next);
         },
     ], err => {
         ++nProcessed;
@@ -213,19 +263,19 @@ function _markObjectPending(
 
 // list object versions
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    return metadataUtil.listObjectVersions({
+    return s3.listObjectVersions({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
         VersionIdMarker,
         KeyMarker,
-    }, log, cb);
+    }, cb);
 }
 
 function _markPending(bucket, versions, cb) {
     const options = { Bucket: bucket };
     waterfall([
-        next => metadataUtil.getBucketReplication(options, log, (err, res) => {
+        next => s3.getBucketReplication(options, (err, res) => {
             if (err) {
                 log.error('error getting bucket replication', { error: err });
                 return next(err);
@@ -272,9 +322,7 @@ function triggerCRROnBucket(bucketName, cb) {
                     log.error('error listing object versions', { error: err });
                     return done(err);
                 }
-                const versions = data.DeleteMarkers
-                    ? data.Versions.concat(data.DeleteMarkers) : data.Versions;
-                return _markPending(bucket, versions, err => {
+                return _markPending(bucket, data.Versions.concat(data.DeleteMarkers), err => {
                     if (err) {
                         return done(err);
                     }
@@ -331,11 +379,7 @@ function triggerCRROnBucket(bucketName, cb) {
 }
 
 // trigger the calls to list objects and mark them for crr
-series([
-    next => metadataUtil.metadataClient.setup(next),
-    next => eachSeries(BUCKETS, triggerCRROnBucket, next),
-    next => metadataUtil.metadataClient.close(next),
-], err => {
+eachSeries(BUCKETS, triggerCRROnBucket, err => {
     clearInterval(logProgressInterval);
     if (err) {
         return log.error('error during task execution', { error: err });
