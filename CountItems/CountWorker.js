@@ -1,6 +1,7 @@
 const assert = require('assert');
 const async = require('async');
 const { BucketInfo } = require('arsenal').models;
+const monitoring = require('../utils/monitoring');
 
 class CountWorker {
     constructor(params) {
@@ -35,7 +36,10 @@ class CountWorker {
         return async.waterfall([
             next => this.client._getIsTransient(bucketInfo, this.log, next),
             (isTransient, next) => this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),
-        ], callback);
+        ], (err, results) => {
+            monitoring.workersCount.inc({ state: err ? 'error' : 'success' });
+            callback(err, results);
+        });
     }
 
     clientTeardown(callback) {
