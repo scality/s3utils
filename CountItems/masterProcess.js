@@ -1,4 +1,5 @@
 const werelogs = require('werelogs');
+const { network } = require('arsenal');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
@@ -6,6 +7,9 @@ const CountMaster = require('./CountMaster');
 const CountManager = require('./CountManager');
 const createMongoParams = require('../utils/createMongoParams');
 const createWorkers = require('./utils/createWorkers');
+
+const WebServer = network.http.server;
+const monitoring = require('../utils/monitoring');
 
 const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
     ? 'debug' : 'info';
@@ -26,7 +30,7 @@ const concurrentCursors = (process.env.CONCURRENT_CURSORS
     && !Number.isNaN(process.env.CONCURRENT_CURSORS))
     ? Number.parseInt(process.env.CONCURRENT_CURSORS, 10)
     : 5;
-
+const metricServer = new WebServer(8003, log);
 const countMaster = new CountMaster({
     log,
     manager: new CountManager({
@@ -35,7 +39,17 @@ const countMaster = new CountMaster({
         maxConcurrent: concurrentCursors,
     }),
     client: new S3UtilsMongoClient(createMongoParams(log)),
+    metrics: metricServer,
 });
+
+metricServer.onRequest((req, res) => monitoring.metricsHandler(
+    countMaster,
+    () => {
+        process.exit(1);
+    },
+    req,
+    res,
+));
 
 const handleSignal = sig => countMaster.stop(sig, () => process.exit(0));
 process.on('SIGINT', handleSignal);
