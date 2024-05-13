@@ -5,6 +5,7 @@ const { errors, constants } = require('arsenal');
 const async = require('async');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
 const getLocationConfig = require('./locationConfig');
+const monitoring = require('./monitoring');
 
 const METASTORE = '__metastore';
 const INFOSTORE = '__infostore';
@@ -150,6 +151,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             entry: res,
                             error,
                         });
+                        monitoring.objectsCount.inc({ state: 'error' });
                         return;
                     }
 
@@ -159,6 +161,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             method: 'getObjectMDStats',
                             entry: res,
                         });
+                        monitoring.objectsCount.inc({ state: 'skipped' });
                         return;
                     }
 
@@ -231,6 +234,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
                         });
                     });
+                    monitoring.objectsCount.inc({ state: 'success' });
                     processed++;
                 },
                 err => {
