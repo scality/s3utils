@@ -2,6 +2,7 @@ const async = require('async');
 const { once } = require('arsenal').jsutil;
 const { validStorageMetricLevels } = require('./utils/constants');
 const { consolidateDataMetrics } = require('./utils/utils');
+const monitoring = require('../utils/monitoring');
 
 class CountManager {
     constructor(params) {
@@ -26,6 +27,9 @@ class CountManager {
             account: {},
         };
         this.workerList = [];
+        this.uniqueAccounts = new Set();
+        this.uniqueLocations = new Set();
+        this.uniqueBuckets = new Set();
         this._setupQueue();
     }
 
@@ -35,7 +39,12 @@ class CountManager {
                 return done(new Error('emptyWorkerList'));
             }
             const id = this.workerList.shift();
+            const processingStartTime = process.hrtime.bigint();
             return this.workers[id].count(bucketInfo, (err, res) => {
+                const processingDuration = Number(process.hrtime.bigint() - processingStartTime) / 1e9;
+                monitoring.bucketProcessingDuration.labels({
+                    service: 'countItems',
+                }).observe(processingDuration);
                 this.log.info('processing a bucket', {
                     method: 'CountManager::_setupQueue',
                     workInQueue: this.q.length(),
@@ -44,6 +53,7 @@ class CountManager {
                 if (err) {
                     return done(err);
                 }
+                monitoring.bucketCount.inc();
                 this._consolidateData(res);
                 this.workerList.push(id);
                 return done();
@@ -53,6 +63,7 @@ class CountManager {
     }
 
     _consolidateData(results) {
+        const startTime = process.hrtime.bigint();
         if (!results) {
             return;
         }
@@ -84,6 +95,18 @@ class CountManager {
                 // metricLevel can only be 'bucket', 'location' or 'account'
                 if (validStorageMetricLevels.has(metricLevel)) {
                     Object.keys(results.dataMetrics[metricLevel]).forEach(resourceName => {
+                        if (metricLevel === 'account' && !this.uniqueAccounts.has(resourceName)) {
+                            this.uniqueAccounts.add(resourceName);
+                            monitoring.metricsCount.inc({ metricLevel: 'account' });
+                        }
+                        if (metricLevel === 'location' && !this.uniqueLocations.has(resourceName)) {
+                            this.uniqueLocations.add(resourceName);
+                            monitoring.metricsCount.inc({ metricLevel: 'location' });
+                        }
+                        if (metricLevel === 'bucket' && !this.uniqueBuckets.has(resourceName)) {
+                            this.uniqueBuckets.add(resourceName);
+                            monitoring.metricsCount.inc({ metricLevel: 'bucket' });
+                        }
                         // resourceName can be the name of bucket, location or account
                         this.dataMetrics[metricLevel][resourceName] = consolidateDataMetrics(
                             this.dataMetrics[metricLevel][resourceName],
@@ -111,6 +134,10 @@ class CountManager {
         } else {
             this.dataMetrics = results.dataMetrics;
         }
+        const consolidationDurationInS = Number(process.hrtime.bigint() - startTime) / 1e9;
+        monitoring.consolidationDuration.labels({
+            service: 'countItems',
+        }).observe(consolidationDurationInS);
     }
 
     setup(callback) {
