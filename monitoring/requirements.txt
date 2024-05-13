@@ -1,0 +1,2 @@
+attrs==21.4.0
+grafanalib==0.6.3
