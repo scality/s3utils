@@ -1,4 +1,5 @@
 const werelogs = require('werelogs');
+const { network } = require('arsenal');
 const { reshapeExceptionError } = require('arsenal').errorUtils;
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
@@ -6,6 +7,9 @@ const CountMaster = require('./CountMaster');
 const CountManager = require('./CountManager');
 const createMongoParams = require('../utils/createMongoParams');
 const createWorkers = require('./utils/createWorkers');
+
+const WebServer = network.http.server;
+const monitoring = require('../utils/monitoring');
 
 const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
     ? 'debug' : 'info';
@@ -15,8 +19,19 @@ const loggerConfig = {
     dump: 'error',
 };
 
+let waitingForPromScraping = false;
+
 werelogs.configure(loggerConfig);
 const log = new werelogs.Logger('S3Utils::CountItems::Master');
+
+function tryParseInt(s, defaultValue) {
+    const v = Number.parseInt(s, 10);
+    return v > 0 ? v : defaultValue;
+}
+
+const prometheusPollingPeriod = tryParseInt(process.env.PROMETHEUS_POLLING_PERIOD, 30);
+
+const prometheusPollingAttempts = tryParseInt(process.env.PROMETHEUS_POLLING_ATTEMPTS, 5);
 
 const numWorkers = process.env.NUM_WORKERS && !Number.isNaN(process.env.NUM_WORKERS)
     ? Number.parseInt(process.env.NUM_WORKERS, 10)
@@ -37,6 +52,17 @@ const countMaster = new CountMaster({
     client: new S3UtilsMongoClient(createMongoParams(log)),
 });
 
+const metricServer = new WebServer(8003, log).onRequest((req, res) => monitoring.metricsHandler(
+    () => {
+        if (waitingForPromScraping === true) {
+            countMaster.stop(null, () => process.exit(1));
+        }
+    },
+    req,
+    res,
+));
+metricServer.start();
+
 const handleSignal = sig => countMaster.stop(sig, () => process.exit(0));
 process.on('SIGINT', handleSignal);
 process.on('SIGHUP', handleSignal);
@@ -53,5 +79,8 @@ countMaster.start(err => {
     if (err) {
         process.exit(1);
     }
-    process.exit(0);
+    waitingForPromScraping = true;
+    setTimeout(() => {
+        countMaster.stop(null, () => process.exit(0));
+    }, prometheusPollingAttempts * prometheusPollingPeriod * 1000 * 4);
 });
