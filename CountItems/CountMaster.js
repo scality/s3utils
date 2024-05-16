@@ -58,7 +58,7 @@ class CountMaster {
                 });
                 return this.stop(null, () => callback(err));
             }
-            return this.stop(null, () => callback());
+            return callback();
         });
     }
 }

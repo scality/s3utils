@@ -2,6 +2,7 @@ const async = require('async');
 const { once } = require('arsenal').jsutil;
 const { validStorageMetricLevels } = require('./utils/constants');
 const { consolidateDataMetrics } = require('./utils/utils');
+const monitoring = require('../utils/monitoring');
 
 class CountManager {
     constructor(params) {
@@ -35,6 +36,7 @@ class CountManager {
                 return done(new Error('emptyWorkerList'));
             }
             const id = this.workerList.shift();
+            const processingStartTime = process.hrtime.bigint();
             return this.workers[id].count(bucketInfo, (err, res) => {
                 this.log.info('processing a bucket', {
                     method: 'CountManager::_setupQueue',
@@ -44,6 +46,8 @@ class CountManager {
                 if (err) {
                     return done(err);
                 }
+                const processingDuration = Number(process.hrtime.bigint() - processingStartTime) / 1e9;
+                monitoring.bucketProcessingDuration.observe(processingDuration);
                 this._consolidateData(res);
                 this.workerList.push(id);
                 return done();
@@ -53,6 +57,7 @@ class CountManager {
     }
 
     _consolidateData(results) {
+        const startTime = process.hrtime.bigint();
         if (!results) {
             return;
         }
@@ -111,6 +116,8 @@ class CountManager {
         } else {
             this.dataMetrics = results.dataMetrics;
         }
+        const consolidationDurationInS = Number(process.hrtime.bigint() - startTime) / 1e9;
+        monitoring.consolidationDuration.observe(consolidationDurationInS);
     }
 
     setup(callback) {

@@ -3,8 +3,8 @@ const async = require('async');
 const werelogs = require('werelogs');
 const { BucketInfo, ObjectMD } = require('arsenal').models;
 const { constants } = require('arsenal');
+const sinon = require('sinon');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
-
 const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
 const createMongoParams = require('../../utils/createMongoParams');
@@ -190,6 +190,7 @@ jest.setTimeout(120000);
 describe('CountItems', () => {
     const oldEnv = process.env;
     let client;
+    let setTimeoutSpy;
 
     beforeAll(done => {
         process.env = oldEnv;
@@ -209,9 +210,12 @@ describe('CountItems', () => {
             next => client.setup(next),
             next => populateMongo(client, next),
         ], done);
+        setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+        setTimeoutSpy.mockImplementation((callback, delay) => callback());
     });
 
     afterAll(done => {
+        setTimeoutSpy.mockRestore();
         async.series([
             next => client.db.dropDatabase().then(() => next()).catch(() => next()),
             next => client.close(next),
