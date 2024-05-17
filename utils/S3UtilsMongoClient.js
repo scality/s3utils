@@ -74,6 +74,89 @@ class S3UtilsMongoClient extends MongoClientInterface {
         }
     }
 
+    async updateInflightDeltas(allMetrics, log) {
+        let cursor;
+        try {
+            if (!allMetrics || !Array.isArray(allMetrics) || allMetrics.length === 0) {
+                return allMetrics;
+            }
+
+            cursor = await this.getCollection(INFOSTORE).find({}, {
+                projection: {
+                    'usedCapacity._inflight': 1,
+                },
+            });
+
+            const inflights = await cursor.toArray();
+            // convert inflights to a map with _id: usedCapacity._inflight
+            const inflightsMap = inflights.reduce((map, obj) => {
+                const inflightLong = obj.usedCapacity && obj.usedCapacity._inflight ? obj.usedCapacity._inflight : 0;
+                return {
+                    ...map,
+                    [obj._id]: inflightLong,
+                };
+            }, {});
+
+            const accountInflights = {};
+            allMetrics.forEach(entry => {
+                const id = entry._id;
+                if (id.startsWith('bucket_')) {
+                    const inflightDocument = inflightsMap[id];
+                    const inflight = Long.fromNumber(Number(inflightDocument ? Math.max(0, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0));
+                    if (inflight) {
+                        const inflightLong = Long.fromNumber(Number(inflight));
+                        // Inflights remaining after the scan are part of the "current" bytes,
+                        // and stored in _inflightsDelta
+                        // eslint-disable-next-line no-param-reassign
+                        entry.usedCapacity.current = Long.fromNumber(Number(entry.usedCapacity.current)).add(inflightLong);
+                        // eslint-disable-next-line no-param-reassign
+                        entry.usedCapacity._inflightsDelta = inflightLong;
+                        const accountOwnerId = `account_${entry.accountOwnerID}`;
+                        if (accountInflights[accountOwnerId]) {
+                            accountInflights[accountOwnerId] = Long.fromNumber(Number(accountInflights[accountOwnerId])).add(inflightLong);
+                        } else {
+                            accountInflights[accountOwnerId] = inflightLong;
+                        }
+                        // eslint-disable-next-line no-param-reassign
+                        delete entry.usedCapacity._inflightsPreScan;
+                        // eslint-disable-next-line no-param-reassign
+                        delete entry.accountOwnerID;
+                    }
+                }
+            });
+
+            allMetrics.forEach(entry => {
+                const id = entry._id;
+                if (id.startsWith('account_')) {
+                    if (accountInflights[id]) {
+                        // Inflights remaining after the scan are part of the "current" bytes,
+                        // and stored in _inflightsDelta
+                        // eslint-disable-next-line no-param-reassign
+                        entry.usedCapacity.current = Long.fromNumber(Number(entry.usedCapacity.current)).add(accountInflights[id]);
+                        // eslint-disable-next-line no-param-reassign
+                        entry.usedCapacity._inflightsDelta = accountInflights[id];
+                    }
+                }
+            });
+
+            return allMetrics;
+        } catch (err) {
+            log.error('An error occurred', {
+                method: 'updateInflightDeltas',
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return allMetrics;
+        } finally {
+            if (cursor && !cursor.closed) {
+                log.info('Finished processing cursor', {
+                    method: 'updateInflightDeltas',
+                });
+                cursor.close();
+            }
+        }
+    }
+
     async getObjectMDStats(bucketName, bucketInfo, isTransient, log, callback) {
         let cursor;
         try {
@@ -100,6 +183,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 account: {}, // account level metrics
             };
             let stalledCount = 0;
+            let bucketKey;
+            let inflightsPreScan = 0;
+            let accountBucket;
             const cmpDate = new Date();
             cmpDate.setHours(cmpDate.getHours() - 1);
 
@@ -109,6 +195,14 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             if (!usersBucketCreationDatesMap) {
                 return callback(errors.InternalError);
+            }
+
+            const bucketEntry = usersBucketCreationDatesMap[`${bucketInfo.getOwner()}${constants.splitter}${bucketName}`];
+            if (bucketEntry) {
+                bucketKey = `bucket_${bucketName}_${new Date(usersBucketCreationDatesMap[bucketEntry]).getTime()}`;
+                if (bucketKey) {
+                    inflightsPreScan = await this.readStorageConsumptionInflights(bucketKey, log);
+                }
             }
 
             let startCursorDate = new Date();
@@ -234,6 +328,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             collRes.account[account].locations[location].deleteMarkerCount += res.value.isDeleteMarker ? 1 : 0;
                         });
                     });
+                    // one bucket has only one account
+                    [accountBucket] = Object.keys(collRes.account);
                     monitoring.objectsCount.inc({ status: 'success' });
                     processed++;
                 },
@@ -260,6 +356,16 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 || bucketStatus.Status === 'Suspended'));
             const retResult = this._handleResults(collRes, isVer);
             retResult.stalled = stalledCount;
+
+            if (inflightsPreScan > 0 && retResult && retResult.dataMetrics) {
+                Object.keys(retResult.dataMetrics.bucket).forEach(key => {
+                    retResult.dataMetrics.bucket[key].usedCapacity = {
+                        ...retResult.dataMetrics.bucket[key].usedCapacity,
+                        _inflightsPreScan: inflightsPreScan,
+                    };
+                    retResult.dataMetrics.bucket[key].accountOwnerID = accountBucket;
+                });
+            }
 
             return callback(null, retResult);
         } catch (err) {
@@ -654,7 +760,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
     async updateStorageConsumptionMetrics(countItems, dataMetrics, log, cb) {
         try {
-            const updatedStorageMetricsList = [
+            let updatedStorageMetricsList = [
                 { _id: __COUNT_ITEMS, value: countItems },
                 // iterate every resource through dataMetrics and add to updatedStorageMetricsList
                 ...Object.entries(dataMetrics)
@@ -667,6 +773,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         }))),
             ];
             log.info('updateStorageConsumptionMetrics: updating storage metrics');
+
+            // update the inflights
+            updatedStorageMetricsList = await this.updateInflightDeltas(updatedStorageMetricsList, log);
 
             // Drop the temporary collection if it exists
             try {
@@ -708,6 +817,24 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 errorString: err.toString(),
             });
             return cb(errors.InternalError);
+        }
+    }
+
+    async readStorageConsumptionInflights(entityName, log) {
+        try {
+            const i = this.getCollection(INFOSTORE);
+            const doc = await i.findOne({ _id: entityName });
+            if (!doc || !doc.usedCapacity || !doc.usedCapacity._inflight) {
+                return 0;
+            }
+            return doc.usedCapacity._inflight;
+        } catch (err) {
+            log.error('readStorageConsumptionInflights: error reading metrics', {
+                error: err,
+                errDetails: { ...err },
+                errorString: err.toString(),
+            });
+            return 0;
         }
     }
 

@@ -17,6 +17,7 @@ function consolidateDataMetrics(target, source) {
                 _currentRestoring: 0,
                 _nonCurrentRestored: 0,
                 _nonCurrentRestoring: 0,
+                _inflightsPreScan: 0,
             },
         });
     }
@@ -38,7 +39,7 @@ function consolidateDataMetrics(target, source) {
     if (!source) {
         return resTarget;
     }
-    const { usedCapacity, objectCount } = source;
+    const { usedCapacity, objectCount, accountOwnerID } = source;
     resTarget.usedCapacity.current += usedCapacity && usedCapacity.current ? usedCapacity.current : 0;
     resTarget.usedCapacity.nonCurrent += usedCapacity && usedCapacity.nonCurrent ? usedCapacity.nonCurrent : 0;
     resTarget.usedCapacity._currentCold += usedCapacity && usedCapacity._currentCold ? usedCapacity._currentCold : 0;
@@ -58,7 +59,11 @@ function consolidateDataMetrics(target, source) {
     resTarget.objectCount._nonCurrentRestoring += objectCount && objectCount._nonCurrentRestoring ? objectCount._nonCurrentRestoring : 0;
     resTarget.objectCount._nonCurrentRestored += objectCount && objectCount._nonCurrentRestored ? objectCount._nonCurrentRestored : 0;
 
-    // Current and NonCurrent are the total of all other metrics
+    resTarget.usedCapacity._inflightsPreScan += usedCapacity && usedCapacity._inflightsPreScan ? usedCapacity._inflightsPreScan : 0;
+    if (accountOwnerID) {
+        resTarget.accountOwnerID = accountOwnerID;
+    }
+
     resTarget.usedCapacity.current += usedCapacity
         ? usedCapacity._currentCold + usedCapacity._currentRestored + usedCapacity._currentRestoring : 0;
     resTarget.usedCapacity.nonCurrent += usedCapacity

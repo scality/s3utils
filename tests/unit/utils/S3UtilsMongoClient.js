@@ -1,11 +1,13 @@
 global.TextEncoder = require('util').TextEncoder;
 global.TextDecoder = require('util').TextDecoder;
+const sinon = require('sinon');
 const async = require('async');
 const assert = require('assert');
 const werelogs = require('werelogs');
+const { Long } = require('mongodb');
 const { BucketInfo, ObjectMD, ObjectMDArchive } = require('arsenal').models;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
-const { constants } = require('arsenal');
+const { constants, errors } = require('arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const {
     mongoMemoryServerParams,
@@ -1003,6 +1005,10 @@ describe('S3UtilsMongoClient, tests', () => {
         next => repl.stop()
             .then(() => next())
             .catch(next),
+        next => {
+            sinon.restore();
+            next();
+        },
     ], done));
 
     const nonVersionedObjectMdTemp = {
@@ -2122,12 +2128,227 @@ describe('S3UtilsMongoClient, tests', () => {
                 },
             },
         ],
+        [
+            'getObjectMDStats() should return correct results for buckets with inflights',
+            {
+                bucketName: 'test-bucket-inflights',
+                isVersioned: true,
+                inflights: 1000,
+                objectList: [
+                    // versioned object 1,
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                    },
+                    // versioned object 2,
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                    },
+                    // stalled object 1
+                    {
+                        ...objectMdTemp,
+                        versioning: true,
+                        lastModified: new Date(Date.now() - hr),
+                        repInfo: {
+                            ...objectMdTemp.repInfo,
+                            status: 'PENDING',
+                            backends: [
+                                {
+                                    status: 'PENDING',
+                                    site: 'rep-loc-1',
+                                },
+                            ],
+                        },
+                    },
+                    // null versioned object
+                    {
+                        name: 'nullkey',
+                        isNull: true,
+                        ownerId: testAccountCanonicalId,
+                        lastModified: new Date(Date.now() - hr),
+                    },
+                ],
+            },
+            {
+                dataManaged: {
+                    locations: {
+                        'rep-loc-1': {
+                            curr: 0,
+                            prev: 200,
+                        },
+                        'us-east-1': {
+                            curr: 200,
+                            prev: 200,
+                        },
+                    },
+                    total: {
+                        curr: 200,
+                        prev: 400,
+                    },
+                },
+                objects: 2,
+                stalled: 1,
+                versions: 2,
+                dataMetrics: {
+                    account: {
+                        [testAccountCanonicalId]: {
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            locations: {
+                                'rep-loc-1': {
+                                    objectCount: {
+                                        current: 0,
+                                        deleteMarker: 0,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 0,
+                                        nonCurrent: 200,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                                'us-east-1': {
+                                    objectCount: {
+                                        current: 2,
+                                        deleteMarker: 0,
+                                        nonCurrent: 2,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                    usedCapacity: {
+                                        current: 200,
+                                        nonCurrent: 200,
+                                        _currentCold: 0,
+                                        _nonCurrentCold: 0,
+                                        _currentRestored: 0,
+                                        _currentRestoring: 0,
+                                        _nonCurrentRestored: 0,
+                                        _nonCurrentRestoring: 0,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    bucket: {
+                        [`test-bucket-inflights_${testBucketCreationDate}`]: {
+                            accountOwnerID: 'd1d40abd2bd8250962f7f5774af1bbbeaec9b77a0853749d41ec46f142e66fe4',
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _inflightsPreScan: 1000,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                    location: {
+                        'rep-loc-1': {
+                            objectCount: {
+                                current: 0,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 0,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                        'us-east-1': {
+                            objectCount: {
+                                current: 2,
+                                deleteMarker: 0,
+                                nonCurrent: 2,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 200,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 0,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                },
+            },
+        ],
     ];
     tests.forEach(([msg, testCase, expected]) => it(msg, done => {
         const {
             bucketName,
             isVersioned,
             objectList,
+            inflights,
         } = testCase;
         return async.waterfall([
             next => createBucket(client, bucketName, isVersioned, err => next(err)),
@@ -2144,22 +2365,184 @@ describe('S3UtilsMongoClient, tests', () => {
             ),
             next => uploadObjects(client, bucketName, objectList, err => next(err)),
             next => client.getBucketAttributes(bucketName, logger, next),
-            (bucketInfo, next) => client.getObjectMDStats(
-                bucketName,
-                BucketInfo.fromObj(bucketInfo),
-                false,
-                logger,
-                (err, res) => {
-                    if (err) {
-                        return next(err);
-                    }
-                    assert.deepStrictEqual(res, expected);
-                    return next();
-                },
-            ),
+            (bucketInfo, next) => {
+                if (inflights) {
+                    const mock = sinon.stub(client, 'readStorageConsumptionInflights');
+                    mock.onFirstCall().returns(Promise.resolve(inflights));
+                    mock.onSecondCall().returns(Promise.resolve(inflights * 1.5));
+                }
+                return client.getObjectMDStats(
+                    bucketName,
+                    BucketInfo.fromObj(bucketInfo),
+                    false,
+                    logger,
+                    (err, res) => {
+                        if (err) {
+                            return next(err);
+                        }
+                        assert.deepStrictEqual(res, expected);
+                        return next();
+                    },
+                );
+            },
             next => client.deleteBucket(bucketName, logger, next),
         ], done);
     }));
+});
+
+describe('S3UtilsMongoClient, update inflight deltas', () => {
+    let client;
+    let repl;
+
+    const metrics = [
+        {
+            _id: 'bucket_bucket1_1715849127256',
+            measuredOn: '2024-05-17T16:08:04.113Z',
+            accountOwnerID: '1234',
+            usedCapacity: {
+                current: 1000,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                _inflightsPreScan: 100,
+                _inflight: 100,
+            },
+            objectCount: {
+                current: 10,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                deleteMarker: 0,
+            },
+        },
+        {
+            _id: 'bucket_bucket2_1715849127257',
+            measuredOn: '2024-05-17T16:08:04.113Z',
+            accountOwnerID: '1234',
+            usedCapacity: {
+                current: 1000,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                _inflightsPreScan: 1500,
+                _inflight: 1500,
+            },
+            objectCount: {
+                current: 10,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                deleteMarker: 0,
+            },
+        },
+        {
+            _id: 'account_1234',
+            measuredOn: '2024-05-17T16:08:04.113Z',
+            usedCapacity: {
+                current: 2000,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                _inflight: 0,
+            },
+            objectCount: {
+                current: 10,
+                nonCurrent: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                deleteMarker: 0,
+            },
+        },
+    ];
+
+    beforeAll(async done => {
+        repl = await MongoMemoryReplSet.create(mongoMemoryServerParams);
+        client = new S3UtilsMongoClient({
+            ...createMongoParamsFromMongoMemoryRepl(repl),
+            logger,
+        });
+        return client.setup(done);
+    });
+
+    afterEach(done => {
+        sinon.restore();
+        done();
+    });
+
+    afterAll(done => async.series([
+        next => client.close(next),
+        next => repl.stop()
+            .then(() => next())
+            .catch(next),
+    ], done));
+
+    it('should do nothing if the metrics are empty', async () => {
+        const input = [];
+        const output = await client.updateInflightDeltas(input, logger);
+        assert.strictEqual(input, output);
+    });
+
+    it('should return the metrics in case of error', async () => {
+        sinon.stub(client, 'getCollection').rejects(errors.InternalError);
+        const output = await client.updateInflightDeltas(metrics, logger);
+        assert.equal(metrics, output);
+    });
+
+    it('should properly compute the inflights deltas', async () => {
+        sinon.stub(client, 'getCollection').returns({
+            find: async () => ({
+                toArray: async () => [
+                    {
+                        _id: 'bucket_bucket1_1715849127256',
+                        usedCapacity: {
+                            _inflight: 3000,
+                        },
+                    },
+                    {
+                        _id: 'bucket_bucket2_1715849127257',
+                        usedCapacity: {
+                            _inflight: 5000,
+                        },
+                    },
+                ],
+                close: async () => {},
+            }),
+        });
+        const output = await client.updateInflightDeltas([
+            ...metrics,
+        ], logger);
+        // first bucket: 1000 current + (3000 post scan - 100 pre scan) = 3900
+        assert.strictEqual(output[0].usedCapacity.current.toNumber(), new Long('3900').toNumber());
+        // second bucket: 1000 current + (5000 post scan - 1500 pre scan) = 4500
+        assert.strictEqual(output[1].usedCapacity.current.toNumber(), new Long('4500').toNumber());
+        // for account, we have the current and the sum of bucket's inflight deltas
+        // as they belong to this account: 2000 + 2900 + 3500
+        assert.strictEqual(output[2].usedCapacity.current.toNumber(), new Long('8400').toNumber());
+    });
 });
 
 describe('S3UtilsMongoClient, cold object helpers', () => {
