@@ -36,7 +36,8 @@ jobs:
         run: |
           oras push ghcr.io/${{ github.repository }}/${{ env.PROJECT_NAME }}-dashboards:${{ inputs.tag }} \
             count-items-cronjob/alerts.yaml:application/prometheus-alerts+yaml \
-            update-bucket-capacity-info-cronjob/alerts.yaml:application/prometheus-alerts+yaml
+            update-bucket-capacity-info-cronjob/alerts.yaml:application/prometheus-alerts+yaml \
+            count-items-cronjob/dashboard.json:application/prometheus-dashboard+json 
         working-directory: monitoring
 
       - name: Build and push
