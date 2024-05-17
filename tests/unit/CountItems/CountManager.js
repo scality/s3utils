@@ -199,6 +199,7 @@ describe('CountItems::CountManager', () => {
                     usedCapacity: {
                         current: 200,
                         nonCurrent: 100,
+                        _inflightsPreScan: 0,
                         _currentCold: 0,
                         _nonCurrentCold: 0,
                         _currentRestored: 100,
@@ -222,6 +223,7 @@ describe('CountItems::CountManager', () => {
                             usedCapacity: {
                                 current: 200,
                                 nonCurrent: 100,
+                                _inflightsPreScan: 0,
                                 _currentCold: 0,
                                 _nonCurrentCold: 0,
                                 _currentRestored: 100,
@@ -249,6 +251,7 @@ describe('CountItems::CountManager', () => {
                     usedCapacity: {
                         current: 200,
                         nonCurrent: 100,
+                        _inflightsPreScan: 0,
                         _currentCold: 0,
                         _nonCurrentCold: 0,
                         _currentRestored: 100,
@@ -274,6 +277,235 @@ describe('CountItems::CountManager', () => {
                     usedCapacity: {
                         current: 200,
                         nonCurrent: 100,
+                        _inflightsPreScan: 0,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 100,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                },
+            },
+        });
+    });
+
+    test('should update dataMetrics with inflights', () => {
+        const workers = createWorkers(1);
+        const m = new CountManager({
+            log: new DummyLogger(),
+            workers,
+            maxConcurrent: 1,
+        });
+        expect(m.dataMetrics).toEqual({
+            account: {},
+            bucket: {},
+            location: {},
+        });
+        m._consolidateData({
+            dataMetrics: {
+                account: {
+                    account1: {
+                        objectCount: {
+                            current: 10,
+                            deleteMarker: 0,
+                            nonCurrent: 10,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 1,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 100,
+                            nonCurrent: 100,
+                            _inflightsPreScan: 1000,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 100,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        locations: {
+                            location1: {
+                                objectCount: {
+                                    current: 10,
+                                    deleteMarker: 0,
+                                    nonCurrent: 10,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 1,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                                usedCapacity: {
+                                    current: 100,
+                                    nonCurrent: 100,
+                                    _inflightsPreScan: 1000,
+                                    _currentCold: 0,
+                                    _nonCurrentCold: 0,
+                                    _currentRestored: 100,
+                                    _currentRestoring: 0,
+                                    _nonCurrentRestored: 0,
+                                    _nonCurrentRestoring: 0,
+                                },
+                            },
+                        },
+                    },
+                },
+                bucket: {
+                    bucket1: {
+                        objectCount: {
+                            current: 10,
+                            deleteMarker: 0,
+                            nonCurrent: 10,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 1,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 100,
+                            nonCurrent: 100,
+                            _inflightsPreScan: 1000,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 100,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                    },
+                },
+                location: {
+                    location1: {
+                        objectCount: {
+                            current: 10,
+                            deleteMarker: 0,
+                            nonCurrent: 10,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 1,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                        usedCapacity: {
+                            current: 100,
+                            nonCurrent: 100,
+                            _inflightsPreScan: 1000,
+                            _currentCold: 0,
+                            _nonCurrentCold: 0,
+                            _currentRestored: 100,
+                            _currentRestoring: 0,
+                            _nonCurrentRestored: 0,
+                            _nonCurrentRestoring: 0,
+                        },
+                    },
+                },
+            },
+        });
+        expect(m.dataMetrics).toEqual({
+            account: {
+                account1: {
+                    objectCount: {
+                        current: 11,
+                        deleteMarker: 0,
+                        nonCurrent: 10,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 1,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                    usedCapacity: {
+                        current: 200,
+                        nonCurrent: 100,
+                        _inflightsPreScan: 1000,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 100,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                    locations: {
+                        location1: {
+                            objectCount: {
+                                current: 11,
+                                deleteMarker: 0,
+                                nonCurrent: 10,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 1,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                            usedCapacity: {
+                                current: 200,
+                                nonCurrent: 100,
+                                _inflightsPreScan: 1000,
+                                _currentCold: 0,
+                                _nonCurrentCold: 0,
+                                _currentRestored: 100,
+                                _currentRestoring: 0,
+                                _nonCurrentRestored: 0,
+                                _nonCurrentRestoring: 0,
+                            },
+                        },
+                    },
+                },
+            },
+            bucket: {
+                bucket1: {
+                    objectCount: {
+                        current: 11,
+                        deleteMarker: 0,
+                        nonCurrent: 10,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 1,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                    usedCapacity: {
+                        current: 200,
+                        nonCurrent: 100,
+                        _inflightsPreScan: 1000,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 100,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                },
+            },
+            location: {
+                location1: {
+                    objectCount: {
+                        current: 11,
+                        deleteMarker: 0,
+                        nonCurrent: 10,
+                        _currentCold: 0,
+                        _nonCurrentCold: 0,
+                        _currentRestored: 1,
+                        _currentRestoring: 0,
+                        _nonCurrentRestored: 0,
+                        _nonCurrentRestoring: 0,
+                    },
+                    usedCapacity: {
+                        current: 200,
+                        nonCurrent: 100,
+                        _inflightsPreScan: 1000,
                         _currentCold: 0,
                         _nonCurrentCold: 0,
                         _currentRestored: 100,

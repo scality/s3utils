@@ -5,6 +5,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
         usedCapacity: {
             current: 0,
             nonCurrent: 0,
+            _inflightsPreScan: 0,
             _currentCold: 0,
             _nonCurrentCold: 0,
             _currentRestored: 0,
@@ -29,6 +30,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
         usedCapacity: {
             current: 10,
             nonCurrent: 10,
+            _inflightsPreScan: 0,
             _currentCold: 0,
             _nonCurrentCold: 0,
             _currentRestored: 0,
@@ -53,6 +55,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
         usedCapacity: {
             current: 20,
             nonCurrent: 20,
+            _inflightsPreScan: 0,
             _currentCold: 0,
             _nonCurrentCold: 0,
             _currentRestored: 0,
@@ -64,6 +67,56 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             current: 20,
             nonCurrent: 20,
             deleteMarker: 20,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+    };
+
+    const exampleWithInflights = {
+        usedCapacity: {
+            current: 20,
+            nonCurrent: 20,
+            _inflightsPreScan: 1000,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+        objectCount: {
+            current: 20,
+            nonCurrent: 20,
+            deleteMarker: 20,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+    };
+
+    const expectedResponseWithInflights = {
+        usedCapacity: {
+            current: 40,
+            nonCurrent: 40,
+            _inflightsPreScan: 1000,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+        },
+        objectCount: {
+            current: 40,
+            nonCurrent: 40,
+            deleteMarker: 40,
             _currentCold: 0,
             _nonCurrentCold: 0,
             _currentRestored: 0,
@@ -113,5 +166,12 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
         };
         const res = consolidateDataMetrics(target, source);
         expect(res).toEqual(zeroValueRes);
+    });
+
+    test('should consolidate inflight delta metrics', () => {
+        const source = exampleWithInflights;
+        const target = example1;
+        const res = consolidateDataMetrics(target, source);
+        expect(res).toEqual(expectedResponseWithInflights);
     });
 });
