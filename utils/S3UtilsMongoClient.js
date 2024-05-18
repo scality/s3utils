@@ -197,9 +197,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 return callback(errors.InternalError);
             }
 
-            const bucketEntry = usersBucketCreationDatesMap[`${bucketInfo.getOwner()}${constants.splitter}${bucketName}`];
-            if (bucketEntry) {
-                bucketKey = `bucket_${bucketName}_${new Date(usersBucketCreationDatesMap[bucketEntry]).getTime()}`;
+            const bucketDate = usersBucketCreationDatesMap[`${bucketInfo.getOwner()}${constants.splitter}${bucketName}`];
+            if (bucketDate) {
+                bucketKey = `bucket_${bucketName}_${new Date(bucketDate).getTime()}`;
                 if (bucketKey) {
                     inflightsPreScan = await this.readStorageConsumptionInflights(bucketKey, log);
                 }

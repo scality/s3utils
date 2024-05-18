@@ -82,5 +82,5 @@ countMaster.start(err => {
     waitingForPromScraping = true;
     setTimeout(() => {
         countMaster.stop(null, () => process.exit(0));
-    }, prometheusPollingAttempts * prometheusPollingPeriod * 1000 * 4);
+    }, prometheusPollingAttempts * prometheusPollingPeriod * 1000);
 });
