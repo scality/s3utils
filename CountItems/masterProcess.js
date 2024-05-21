@@ -55,7 +55,7 @@ const countMaster = new CountMaster({
 const metricServer = new WebServer(8003, log).onRequest((req, res) => monitoring.metricsHandler(
     () => {
         if (waitingForPromScraping === true) {
-            countMaster.stop(null, () => process.exit(1));
+            countMaster.stop(null, () => process.exit(0));
         }
     },
     req,
