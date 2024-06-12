@@ -1,12 +1,9 @@
 const { errors } = require('arsenal');
 const promClient = require('prom-client');
-const { Registry } = require('prom-client');
 const { http } = require('httpagent');
-const CountMaster = require('../CountItems/CountMaster');
 
 const aggregatorRegistry = new promClient.AggregatorRegistry();
 const { collectDefaultMetrics } = promClient;
-
 
 // Histogram of the bucket processing duration, by the utilization service.
 const bucketProcessingDuration = new promClient.Histogram({
@@ -40,7 +37,7 @@ const objectsCount = new promClient.Counter({
  */
 function _writeResponse(res, error) {
     let statusCode = 500;
-    if (error instanceof errors.ArsenalError && Number.isInteger(error.code)) {
+    if (error && Number.isInteger(error.code)) {
         statusCode = error.code;
     }
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
