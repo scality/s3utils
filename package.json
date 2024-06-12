@@ -1,6 +1,6 @@
 {
   "name": "s3utils",
-  "version": "1.14.10",
+  "version": "1.14.11",
   "engines": {
     "node": ">= 16"
   },
