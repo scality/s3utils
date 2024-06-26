@@ -196,4 +196,32 @@ describe('CountItems::CountWorker', () => {
             done();
         }, 100);
     });
+
+    // test that the countworker's "countItems" method properly handles
+    // buckets with website
+    test('should correctly handle buckets with website', done => {
+        const testSendFn = jest.fn();
+        const w = new CountWorker({
+            log: new DummyLogger(),
+            sendFn: testSendFn,
+            client: mongoMock,
+        });
+        const bucketInfo = {
+            _name: 'test-bucket',
+            _owner: 'any',
+            _ownerDisplayName: 'any',
+            _creationDate: Date.now().toString(),
+            website: { indexDocument: 'index.html' },
+        };
+        mongoMock.setup.mockImplementationOnce(cb => cb());
+        mongoMock.close.mockImplementationOnce(cb => cb());
+        mongoMock.client.isConnected.mockImplementationOnce(() => false);
+        mongoMock._getIsTransient.mockImplementationOnce((_a, _b, cb) => cb(null, true));
+        mongoMock.getObjectMDStats.mockImplementationOnce((_a, _b, _c, _d, cb) => cb(null, { value: 42 }));
+        w.countItems(bucketInfo, (err, results) => {
+            expect(err).toBeNull();
+            expect(results).toEqual({ value: 42 });
+            done();
+        });
+    });
 });

@@ -30,6 +30,11 @@ class CountWorker {
         if (!this.client.client) {
             return callback(new Error('NotConnected'));
         }
+        // 'fromObj' expects that the website configuration is an instance of
+        // WebsiteConfiguration as it is not used in CountItems, we nullify it.
+        if (bucketInfoObj._websiteConfiguration) {
+            Object.assign(bucketInfoObj, { _websiteConfiguration: null });
+        }
         const bucketInfo = BucketInfo.fromObj(bucketInfoObj);
         const bucketName = bucketInfo.getName();
         this.log.info(`${process.pid} handling ${bucketName}`);
