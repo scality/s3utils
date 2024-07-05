@@ -36,7 +36,7 @@ RUN apt-get update && \
         python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-ENV BALLOT_VERSION 1.0.3
+ENV BALLOT_VERSION 1.0.4
 ADD https://github.com/scality/ballot/releases/download/v${BALLOT_VERSION}/ballot-v${BALLOT_VERSION}-linux-amd64 /usr/src/app/ballot
 RUN chmod +x /usr/src/app/ballot
 
