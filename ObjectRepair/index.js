@@ -44,28 +44,26 @@ Optional environment variables:
     OBJECT_REPAIR_TLS_CA_PATH: path to TLS alternate CA file
 `;
 for (const [key, value] of Object.entries(env)) {
-    if (!value) {
+    if (value === undefined) {
         log.info(`${key} must be defined`);
         console.error(USAGE);
         process.exit(1);
     }
 }
 
-env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ = process.env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ;
-
 /**
  * Creates new reader and runs until stop().
  * @returns {undefined}
  */
 function runJournalReader() {
-    if (env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ === undefined) {
+    if (env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ === null) {
         log.info('OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ is not defined.'
         + 'Ingestion will start at latest cseq - OBJECT_REPAIR_LOOKBACK_WINDOW');
     }
     const reader = new RaftJournalReader(
-        Number.parseInt(env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ, 10),
-        Number.parseInt(env.OBJECT_REPAIR_RAFT_LOG_BATCH_SIZE, 10),
-        Number.parseInt(env.OBJECT_REPAIR_RAFT_SESSION_ID, 10),
+        env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ,
+        env.OBJECT_REPAIR_RAFT_LOG_BATCH_SIZE,
+        env.OBJECT_REPAIR_RAFT_SESSION_ID,
     );
     reader.run();
 }
