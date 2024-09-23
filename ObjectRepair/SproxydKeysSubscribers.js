@@ -19,7 +19,7 @@ class DuplicateSproxydKeyFoundHandler {
         this._getObjectURL = getObjectURL;
         this.queue = queue(this._repairObject, 1);
         // use OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE since there will be at least one sproxyd key per object
-        this.visitedObjects = new BoundedMap(env.DUPLICATE_KEYS_WINDOW_SIZE);
+        this.visitedObjects = new BoundedMap(env.OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE);
     }
 
     /**
