@@ -846,7 +846,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
     async getBucketInfos(log, cb) {
         try {
             const bucketInfos = [];
-            const collInfos = await this.db.listCollections().toArray();
+            const collInfos = await this.db.listCollections({ type: 'collection' }).toArray();
             for (const value of collInfos) {
                 if (this._isSpecialCollection(value.name)) {
                     // skip
