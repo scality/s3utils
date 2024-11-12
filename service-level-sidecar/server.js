@@ -63,7 +63,7 @@ function finishMiddleware(req, res) {
 }
 
 // Hash our api key once for reuse during the request
-// We prepend `Bearer ` to avoid having to strip it from the header value runtime for comparison
+// We prepend `Bearer ` to avoid having to strip it from the header value at runtime for comparison
 const actualKeyHash = crypto.createHash('sha512').copy().update(`Bearer ${env.apiKey}`).digest();
 
 // Any handler mounted under `/api/` requires an Authorization header
@@ -101,7 +101,7 @@ app.post('/api/report', (req, res, next) => {
     const timestamp = Date.now() * 1000;
     getServiceReportCb(timestamp, req.log, (err, report) => {
         if (err) {
-            req.log.error('error generating metrics report', { error: err });
+            req.log.error('error generating metrics report', { error: err.message });
             next(makeError(500, 'Internal Server Error'));
             return;
         }
@@ -119,7 +119,7 @@ app.use((req, res, next) => {
 
 // Catch all error handler
 app.use((err, req, res, next) => {
-    req.log.error('error during request', { error: err });
+    req.log.error('error during request', { error: err.message });
     // Default errors to `500 Internal Server Error` in case something unexpected slips through
     const data = {
         code: err.status || 500,
