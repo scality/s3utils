@@ -41,6 +41,30 @@ class Warp10Client {
         log.debug('warpscript executed', { ...params, stats: resp.meta });
         return resp;
     }
+
+    async getMetricsForBucket(timestamp, bucket, log) {
+        log.debug('getting metrics for bucket', { bucket, timestamp });
+        const params = {
+            params: {
+                end: timestamp,
+                labels: { bck: bucket },
+                node: this.nodeId,
+            },
+            macro: 'utapi/getMetricsAt',
+        };
+
+        const resp = await this.exec(params);
+
+        if (resp.result.length === 0) {
+            log.error('unable to retrieve metrics', { bucket });
+            throw new Error('Error retrieving metrics');
+        }
+
+        return {
+            count: resp.result[0].objD,
+            bytes: resp.result[0].sizeD,
+        };
+    }
 }
 
 

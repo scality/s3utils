@@ -1,7 +1,12 @@
 const async = require('async');
 const util = require('util');
 
+const arsenal = require('arsenal');
+
+const { splitter } = arsenal.constants;
+
 const bucketd = require('./bucketd');
+const scuba = require('./scuba');
 const env = require('./env');
 const warp10 = require('./warp10');
 const { getAccountIdForCanonicalId } = require('./vault');
@@ -43,34 +48,36 @@ class MetricReport {
 
 
 /**
- *
+ * @param {Array<Number>} sessionIds - raft session ids to retrieve metrics for (only contains info if scuba backend is enabled)
  * @param {integer} timestamp - timestamp to retrieve metrics in microseconds
- * @param {string} bucket - bucket name to retrieve metrics for
+ * @param {object} bucket - bucket  to retrieve metrics for
+ * @param {string} bucket.name - bucket name
+ * @param {string} bucket.account - bucket owner account canonical id
  * @param {object} log - werelogs logger instance
  * @returns {object} - object count and bytes stored for bucket
  */
-async function getMetricsForBucket(timestamp, bucket, log) {
-    log.debug('getting metrics for bucket', { bucket, timestamp });
-    const params = {
-        params: {
-            end: timestamp,
-            labels: { bck: bucket },
-            node: env.warp10.nodeId,
-        },
-        macro: 'utapi/getMetricsAt',
-    };
+async function getMetricsForBucket(sessionIds, timestamp, bucket, log) {
+    log.debug('getting metrics for bucket', { bucket: bucket.name, timestamp });
 
-    const resp = await warp10.exec(params);
+    if (env.enableScuba) {
+        const resourceName = `${bucket.account}${splitter}${bucket.name}`;
+        const logResults = await util.promisify(async.mapLimit)(sessionIds, env.concurrencyLimit, async logId => {
+            try {
+                return await scuba.getMetrics('bucket', resourceName, logId, new Date(timestamp), log);
+            } catch (err) {
+                log.error('error getting metrics for bucket', { bucket: bucket.name, logId, error: err.message });
+                throw err;
+            }
+        });
 
-    if (resp.result.length === 0) {
-        log.error('unable to retrieve metrics', { bucket });
-        throw new Error('Error retrieving metrics');
+        return logResults
+            .filter(result => result !== null)
+            .reduce((acc, result) => ({
+                count: acc.count + result.value.metrics.objectsTotal,
+                bytes: acc.bytes + result.value.metrics.bytesTotal,
+            }), { count: 0, bytes: 0 });
     }
-
-    return {
-        count: resp.result[0].objD,
-        bytes: resp.result[0].sizeD,
-    };
+    return warp10.getMetricsForBucket(timestamp, bucket.name, log);
 }
 
 /**
@@ -92,10 +99,16 @@ async function getServiceReport(timestamp, log) {
     const bucketReports = {};
     const accountInfoCache = {};
 
+    let sessionIds = [];
+    if (env.enableScuba) {
+        sessionIds = await bucketd.getRaftSessionIds(log);
+        sessionIds = sessionIds.filter(id => id !== '0');
+    }
+
     for await (const buckets of bucketd.listBuckets(log)) {
         log.debug('got response from bucketd', { numBuckets: buckets.length });
         await util.promisify(async.eachLimit)(buckets, env.concurrencyLimit, async bucket => {
-            const metrics = await getMetricsForBucket(timestamp, bucket.name, log);
+            const metrics = await getMetricsForBucket(sessionIds, timestamp, bucket, log);
 
             log.debug('fetched metrics for bucket', { bucket: bucket.name, accCanonicalId: bucket.account });
 

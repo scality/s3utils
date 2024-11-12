@@ -99,6 +99,9 @@ const defaults = {
         host: 'localhost',
         port: 8500,
     },
+    enableScuba: false,
+    scubaBucketd: 'localhost:19000',
+    scubaBucketdTls: false,
 };
 
 module.exports = {
@@ -123,4 +126,7 @@ module.exports = {
         readToken: loadFromEnv('WARP10_READ_TOKEN', defaults.warp10.readToken),
         ...loadFromEnv('WARP10_NODE', defaults.warp10.node, typeCasts.node),
     },
+    enableScuba: loadFromEnv('ENABLE_SCUBA', defaults.enableScuba, typeCasts.bool),
+    scubaBucketd: loadFromEnv('SCUBA_BUCKETD_BOOTSTRAP', defaults.scubaBucketd),
+    scubaBucketdTls: loadFromEnv('SCUBA_BUCKETD_ENABLE_TLS', defaults.scubaBucketdTls, typeCasts.bool),
 };

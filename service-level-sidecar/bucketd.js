@@ -60,6 +60,22 @@ async function* listBuckets(log) {
     }
 }
 
+async function getRaftSessionIds(log) {
+    return new Promise((resolve, reject) => {
+        metadata.client.getAllRafts(log.getSerializedUids(), (error, res) => {
+            if (error) {
+                log.error('error getting raft session ids', { error });
+                return reject(error);
+            }
+
+            const data = JSON.parse(res);
+
+            return resolve(data.map(raft => `${raft.id}`));
+        }, log);
+    });
+}
+
 module.exports = {
     listBuckets,
+    getRaftSessionIds,
 };

@@ -1972,6 +1972,9 @@ REST API to provide service level reports for UtapiV2
 
 ## Usage
 
+
+**Using Warp 10 backend**
+
 ```shell
 docker run -d \
   --network=host \
@@ -1979,7 +1982,21 @@ docker run -d \
   -e SIDECAR_SCALE_FACTOR=1.4 \
   -e SIDECAR_WARP10_NODE="md1-cluster1:4802@127.0.0.1:4802" \
   scality/s3utils service-level-sidecar/index.js
+```
 
+**Using Scuba backend**
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_API_KEY=dev_key_change_me \
+  -e SIDECAR_SCALE_FACTOR=1.4 \
+  -e SIDECAR_ENABLE_SCUBA=true \
+  -e SIDECAR_SCUBA_BUCKETD_BOOTSTRAP=127.0.0.1:19000 \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+**Example output**
+```shell
 curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report | jq
 {
   "account": [
@@ -2120,7 +2137,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-#### Warp10
+#### Warp 10
 
 The Warp 10 address is configured using `SIDECAR_WARP10_NODE`.
 The Warp 10 `nodeId` must be included (normally matches ansible inventory name plus port ie `md1-cluster1:4802`).
@@ -2130,6 +2147,21 @@ The format is `<nodeId>@<host>:<port>`.
 docker run -d \
   --network=host \
   -e SIDECAR_WARP10_NODE="md1-cluster1:4802@127.0.0.1:4802" \
+  scality/s3utils service-level-sidecar/index.js
+```
+
+#### Scuba
+
+The scuba backend can be enabled by setting `SIDECAR_ENABLE_SCUBA`.
+A bucketd address can be provided using `SIDECAR_SCUBA_BUCKETD_BOOTSTRAP`.
+If a bucketd address is not provided `127.0.0.1:19000` will be used.
+Internal TLS support can be enabled using `SIDECAR_SCUBA_BUCKETD_ENABLE_TLS`.
+
+```shell
+docker run -d \
+  --network=host \
+  -e SIDECAR_ENABLE_SCUBA=true \
+  -e SIDECAR_SCUBA_BUCKETD_BOOTSTRAP=127.0.0.1:19000 \
   scality/s3utils service-level-sidecar/index.js
 ```
 
