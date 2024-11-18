@@ -17,7 +17,12 @@ const params = {
 
 const metadata = new BucketClientInterface(params, bucketclient, rootLogger);
 
-const listObjects = utils.retryable(metadata.listObject.bind(metadata));
+const listObjects = utils.retryable((bucket, params, log, cb) => metadata.listObject(bucket, params, log, (err, res) => {
+    if (err && err.NoSuchBucket) {
+        return cb(null, []);
+    }
+    return cb(err, res);
+}));
 
 /**
  * List all s3 buckets implemented as a async generator
@@ -36,6 +41,10 @@ async function* listBuckets(log) {
             // eslint-disable-next-line no-await-in-loop
             res = await listObjects(usersBucket, { ...listingParams, gt }, log);
         } catch (error) {
+            if (error.NoSuchBucket) {
+                log.info('no buckets found');
+                return;
+            }
             log.error('Error during listing', { error });
             throw error;
         }

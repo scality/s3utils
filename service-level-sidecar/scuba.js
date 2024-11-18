@@ -15,7 +15,12 @@ const params = {
 
 const metadata = new BucketClientInterface(params, bucketclient, rootLogger);
 
-const listObjects = utils.retryable(metadata.listObject.bind(metadata));
+const listObjects = utils.retryable((bucket, params, log, cb) => metadata.listObject(bucket, params, log, (err, res) => {
+    if (err && err.NoSuchBucket) {
+        return cb(null, []);
+    }
+    return cb(err, res);
+}));
 
 function roundToDay(timestamp) {
     return new Date(
@@ -53,10 +58,7 @@ async function getMetrics(classType, resourceName, sessionId, timestamp, log) {
             value: JSON.parse(value),
         };
     } catch (error) {
-        if (error.NoSuchBucket) {
-            return null;
-        }
-        log.error('error during metric listing', { error: error.message });
+        log.error('error during metric listing', { bucket, error: error.message });
         throw error;
     }
 }
