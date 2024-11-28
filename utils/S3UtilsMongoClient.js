@@ -838,62 +838,6 @@ class S3UtilsMongoClient extends MongoClientInterface {
         }
     }
 
-    /*
-     * Overwrite the getBucketInfos method to specially handle the cases that
-     * bucket collection exists but bucket is not in metastore collection.
-     * For now, to make the count-items cronjob more robust, we ignore those "bad buckets"
-     */
-    async getBucketInfos(log, cb) {
-        try {
-            const bucketInfos = [];
-            const collInfos = await this.db.listCollections({ type: 'collection' }).toArray();
-            for (const value of collInfos) {
-                if (this._isSpecialCollection(value.name)) {
-                    // skip
-                    continue;
-                }
-                const bucketName = value.name;
-                try {
-                    // eslint-disable-next-line no-await-in-loop
-                    const bucketInfo = await new Promise((resolve, reject) => {
-                        this.getBucketAttributes(bucketName, log, (err, info) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                resolve(info);
-                            }
-                        });
-                    });
-                    bucketInfos.push(bucketInfo);
-                } catch (err) {
-                    if (err.message === 'NoSuchBucket') {
-                        log.debug('bucket does not exist in metastore, ignore it', {
-                            bucketName,
-                        });
-                    } else {
-                        log.error('failed to get bucket attributes', {
-                            bucketName,
-                            errDetails: { ...err },
-                            errorString: err.toString(),
-                        });
-                        throw errors.InternalError;
-                    }
-                }
-            }
-            return cb(null, {
-                bucketCount: bucketInfos.length,
-                bucketInfos,
-            });
-        } catch (err) {
-            log.error('could not get list of collections', {
-                method: '_getBucketInfos',
-                errDetails: { ...err },
-                errorString: err.toString(),
-            });
-            return cb(err);
-        }
-    }
-
     async getUsersBucketCreationDate(ownerId, bucketName, log, cb) {
         try {
             const usersBucketCol = this.getCollection(USERSBUCKET);
