@@ -11,10 +11,6 @@ const nonVersionedObjId = versionIdUtils.getInfVid(REPLICATION_GROUP_ID);
 
 function _processVersions(list) {
     /* eslint-disable no-param-reassign */
-    list.NextVersionIdMarker = list.NextVersionIdMarker
-        ? versionIdUtils.encode(list.NextVersionIdMarker)
-        : list.NextVersionIdMarker;
-
     list.Versions.forEach(v => {
         v.VersionId = v.VersionId
             ? versionIdUtils.encode(v.VersionId) : v.VersionId;
