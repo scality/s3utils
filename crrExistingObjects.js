@@ -50,6 +50,10 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
+if (!SITE_NAME) {
+    log.fatal('SITE_NAME not defined');
+    process.exit(1);
+}
 if (!STORAGE_TYPE) {
     STORAGE_TYPE = '';
 }
