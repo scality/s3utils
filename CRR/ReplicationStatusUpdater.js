@@ -114,16 +114,19 @@ class ReplicationStatusUpdater {
      * Determines if an object should be updated based on its replication metadata properties.
      * @private
      * @param {ObjectMD} objMD - The metadata of the object.
+     * @param {string} site - The destination site name.
      * @returns {boolean} True if the object should be updated.
      */
-    _objectShouldBeUpdated(objMD) {
+    _objectShouldBeUpdated(objMD, site) {
         return this.replicationStatusToProcess.some(filter => {
             if (filter === 'NEW') {
+                // Either site specific replication info is missing
+                // or are initialized with empty fields.
                 return (!objMD.getReplicationInfo()
-                    || objMD.getReplicationInfo().status === '');
+                    || !objMD.getReplicationSiteStatus(site));
             }
             return (objMD.getReplicationInfo()
-                && objMD.getReplicationInfo().status === filter);
+                && objMD.getReplicationSiteStatus(site) === filter);
         });
     }
 
@@ -172,35 +175,53 @@ class ReplicationStatusUpdater {
                 //   codebase easier to maintain and upgrade, as opposed to having multiple branches or versions of
                 //   the code for different schema versions.
                 objMD = new ObjectMD(JSON.parse(mdRes.Body));
-                if (!this._objectShouldBeUpdated(objMD)) {
+                if (!this._objectShouldBeUpdated(objMD, storageClass)) {
                     skip = true;
                     return process.nextTick(next);
                 }
                 // Initialize replication info, if missing
                 // This is particularly important if the object was created before
                 // enabling replication on the bucket.
-                if (!objMD.getReplicationInfo()
-                    || !objMD.getReplicationSiteStatus(storageClass)) {
+                let replicationInfo = objMD.getReplicationInfo();
+                if (!replicationInfo || !replicationInfo.status) {
                     const { Rules, Role } = repConfig;
                     const destination = Rules[0].Destination.Bucket;
                     // set replication properties
                     const ops = objMD.getContentLength() === 0 ? ['METADATA']
                         : ['METADATA', 'DATA'];
-                    const backends = [{
+                    replicationInfo = {
+                        status: 'PENDING',
+                        content: ops,
+                        backends: [],
+                        destination,
+                        storageClass: '',
+                        role: Role,
+                        storageType: '',
+                    };
+                    objMD.setReplicationInfo(replicationInfo);
+                }
+                // Update replication info with site specific info
+                if (!objMD.getReplicationSiteStatus(storageClass)) {
+                    // When replicating to multiple destinations,
+                    // the storageClass and storageType properties
+                    // become comma-separated lists of the storage
+                    // classes and types of the replication destinations.
+                    const storageClasses = objMD.getReplicationStorageClass()
+                        ? `${objMD.getReplicationStorageClass()},${storageClass}` : storageClass;
+                    objMD.setReplicationStorageClass(storageClasses);
+                    if (this.storageType) {
+                        const storageTypes = objMD.getReplicationStorageType()
+                            ? `${objMD.getReplicationStorageType()},${this.storageType}` : this.storageType;
+                        objMD.setReplicationStorageType(storageTypes);
+                    }
+                    // Add site to the list of replication backends
+                    const backends = objMD.getReplicationBackends();
+                    backends.push({
                         site: storageClass,
                         status: 'PENDING',
                         dataStoreVersionId: '',
-                    }];
-                    const replicationInfo = {
-                        status: 'PENDING',
-                        backends,
-                        content: ops,
-                        destination,
-                        storageClass,
-                        role: Role,
-                        storageType: this.storageType,
-                    };
-                    objMD.setReplicationInfo(replicationInfo);
+                    });
+                    objMD.setReplicationBackends(backends);
                 }
 
                 objMD.setReplicationSiteStatus(storageClass, 'PENDING');
@@ -273,12 +294,15 @@ class ReplicationStatusUpdater {
             }),
             (repConfig, next) => {
                 const { Rules } = repConfig;
-                const storageClass = Rules[0].Destination.StorageClass || this.siteName;
+                const storageClass = this.siteName || Rules[0].Destination.StorageClass;
                 if (!storageClass) {
                     const errMsg = 'missing SITE_NAME environment variable, must be set to'
                         + ' the value of "site" property in the CRR configuration';
                     this.log.error(errMsg);
                     return next(new Error(errMsg));
+                }
+                if (!this.siteName) {
+                    this.log.warn(`missing SITE_NAME environment variable, triggering replication to the ${storageClass} storage class`);
                 }
                 return eachLimit(versions, this.workers, (i, apply) => {
                     const { Key, VersionId } = i;

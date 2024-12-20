@@ -26,6 +26,7 @@ describe('ReplicationStatusUpdater', () => {
             replicationStatusToProcess: ['NEW'],
             targetPrefix: 'toto',
             listingLimit: 10,
+            siteName: 'aws-location',
         }, logger);
     });
 
@@ -127,6 +128,263 @@ describe('ReplicationStatusUpdater', () => {
             assert.strictEqual(crr._nUpdated, 2);
             assert.strictEqual(crr._nErrors, 0);
             return done();
+        });
+    });
+
+    [
+        {
+            description: 'for an object with a null replication info',
+            replicationInfo: null,
+            replicationStatusToProcess: ['NEW'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        }, {
+            description: 'for an object with empty replication info',
+            replicationInfo: {
+                status: '',
+                backends: [],
+                content: [],
+                destination: '',
+                storageClass: '',
+                role: '',
+                storageType: '',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+            replicationStatusToProcess: ['NEW'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        }, {
+            description: 'for an object with a failed replication',
+            replicationInfo: {
+                status: 'FAILED',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'FAILED',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+            replicationStatusToProcess: ['FAILED'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        }, {
+            description: 'for an object with a completed replication',
+            replicationInfo: {
+                status: 'COMPLETED',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'COMPLETED',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+            replicationStatusToProcess: ['COMPLETED'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        }, {
+            description: 'of a single site for an object with multiple replication destinations',
+            replicationInfo: {
+                status: 'FAILED',
+                backends: [
+                    {
+                        site: 'azure-location',
+                        status: 'COMPLETED',
+                        dataStoreVersionId: '',
+                    },
+                    {
+                        site: 'aws-location',
+                        status: 'FAILED',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'azure-location,aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'azure,aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+            replicationStatusToProcess: ['FAILED'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'azure-location',
+                        status: 'COMPLETED',
+                        dataStoreVersionId: '',
+                    }, {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'azure-location,aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'azure,aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        }, {
+            description: 'of a single non initialized site for an object with multiple replication destinations',
+            replicationInfo: {
+                status: 'FAILED',
+                backends: [
+                    {
+                        site: 'azure-location',
+                        status: 'COMPLETED',
+                        dataStoreVersionId: '',
+                    },
+                    {
+                        site: 'azure-location-2',
+                        status: 'FAILED',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'azure-location,azure-location-2',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'azure,azure',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+            replicationStatusToProcess: ['NEW'],
+            expectedReplicationInfo: {
+                status: 'PENDING',
+                backends: [
+                    {
+                        site: 'azure-location',
+                        status: 'COMPLETED',
+                        dataStoreVersionId: '',
+                    }, {
+                        site: 'azure-location-2',
+                        status: 'FAILED',
+                        dataStoreVersionId: '',
+                    }, {
+                        site: 'aws-location',
+                        status: 'PENDING',
+                        dataStoreVersionId: '',
+                    },
+                ],
+                content: ['METADATA', 'DATA'],
+                destination: 'arn:aws:s3:::sourcebucket',
+                storageClass: 'azure-location,azure-location-2,aws-location',
+                role: 'arn:aws:iam::root:role/s3-replication-role',
+                storageType: 'azure,azure,aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            },
+        },
+    ].forEach(params => {
+        it(`should trigger replication ${params.description}`, done => {
+            crr.bb.getMetadata = jest.fn((p, cb) => {
+                const objectMd = JSON.parse(getMetadataRes.Body);
+                objectMd.replicationInfo = params.replicationInfo;
+                cb(null, { Body: JSON.stringify(objectMd) });
+            });
+            crr.siteName = 'aws-location';
+            crr.storageType = 'aws_s3';
+            crr.replicationStatusToProcess = params.replicationStatusToProcess;
+            crr.run(err => {
+                assert.ifError(err);
+
+                expect(crr.s3.listObjectVersions).toHaveBeenCalledTimes(1);
+                expect(crr.s3.getBucketReplication).toHaveBeenCalledTimes(1);
+                expect(crr.bb.getMetadata).toHaveBeenCalledTimes(1);
+                expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+                expect(crr.bb.putMetadata).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        Body: expect.stringContaining(JSON.stringify(params.expectedReplicationInfo)),
+                    }),
+                    expect.any(Function),
+                );
+
+                assert.strictEqual(crr._nProcessed, 1);
+                assert.strictEqual(crr._nSkipped, 0);
+                assert.strictEqual(crr._nUpdated, 1);
+                assert.strictEqual(crr._nErrors, 0);
+                return done();
+            });
         });
     });
 });
