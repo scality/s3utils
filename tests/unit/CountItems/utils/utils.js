@@ -12,6 +12,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
         objectCount: {
             current: 0,
@@ -23,6 +24,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
     };
 
@@ -37,6 +39,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
         objectCount: {
             current: 10,
@@ -48,6 +51,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
     };
 
@@ -62,6 +66,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
         objectCount: {
             current: 20,
@@ -73,6 +78,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
     };
 
@@ -87,6 +93,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
         objectCount: {
             current: 20,
@@ -98,6 +105,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
     };
 
@@ -112,6 +120,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
         },
         objectCount: {
             current: 40,
@@ -123,6 +132,61 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 0,
+        },
+    };
+
+    const exampleWithMPU = {
+        usedCapacity: {
+            current: 20,
+            nonCurrent: 20,
+            _inflightsPreScan: 0,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 100,
+        },
+        objectCount: {
+            current: 20,
+            nonCurrent: 20,
+            deleteMarker: 20,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 10,
+        },
+    };
+
+    const expectedConsolidatedMPU = {
+        usedCapacity: {
+            current: 220,
+            nonCurrent: 30,
+            _inflightsPreScan: 0,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 200,
+        },
+        objectCount: {
+            current: 40,
+            nonCurrent: 21,
+            deleteMarker: 21,
+            _currentCold: 0,
+            _nonCurrentCold: 0,
+            _currentRestored: 0,
+            _currentRestoring: 0,
+            _nonCurrentRestored: 0,
+            _nonCurrentRestoring: 0,
+            _incompleteMPUParts: 20,
         },
     };
 
@@ -173,5 +237,36 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
         const target = example1;
         const res = consolidateDataMetrics(target, source);
         expect(res).toEqual(expectedResponseWithInflights);
+    });
+
+    test('should consolidate MPUs', () => {
+        const source = {
+            usedCapacity: {
+                current: 100,
+                nonCurrent: 10,
+                _inflightsPreScan: 0,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                _incompleteMPUParts: 100,
+            },
+            objectCount: {
+                current: 10,
+                nonCurrent: 1,
+                deleteMarker: 1,
+                _currentCold: 0,
+                _nonCurrentCold: 0,
+                _currentRestored: 0,
+                _currentRestoring: 0,
+                _nonCurrentRestored: 0,
+                _nonCurrentRestoring: 0,
+                _incompleteMPUParts: 10,
+            },
+        };
+        const res = consolidateDataMetrics(exampleWithMPU, source);
+        expect(res).toEqual(expectedConsolidatedMPU);
     });
 });
