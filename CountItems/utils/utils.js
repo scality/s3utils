@@ -33,7 +33,7 @@ function consolidateDataMetrics(target, source) {
                 _currentRestoring: 0,
                 _nonCurrentRestored: 0,
                 _nonCurrentRestoring: 0,
-                _incompleteMPUParts: 0,
+                _incompleteMPUUploads: 0,
                 deleteMarker: 0,
             },
         });
@@ -61,7 +61,7 @@ function consolidateDataMetrics(target, source) {
     resTarget.objectCount._currentRestored += objectCount && objectCount._currentRestored ? objectCount._currentRestored : 0;
     resTarget.objectCount._nonCurrentRestoring += objectCount && objectCount._nonCurrentRestoring ? objectCount._nonCurrentRestoring : 0;
     resTarget.objectCount._nonCurrentRestored += objectCount && objectCount._nonCurrentRestored ? objectCount._nonCurrentRestored : 0;
-    resTarget.objectCount._incompleteMPUParts += objectCount && objectCount._incompleteMPUParts ? objectCount._incompleteMPUParts : 0;
+    resTarget.objectCount._incompleteMPUUploads += objectCount && objectCount._incompleteMPUUploads ? objectCount._incompleteMPUUploads : 0;
 
     resTarget.usedCapacity._inflightsPreScan += usedCapacity && usedCapacity._inflightsPreScan ? usedCapacity._inflightsPreScan : 0;
     if (accountOwnerID) {
@@ -75,7 +75,7 @@ function consolidateDataMetrics(target, source) {
         ? usedCapacity._nonCurrentCold + usedCapacity._nonCurrentRestored + usedCapacity._nonCurrentRestoring : 0;
     resTarget.objectCount.current += objectCount
         ? objectCount._currentCold + objectCount._currentRestored + objectCount._currentRestoring
-        + objectCount._incompleteMPUParts : 0;
+        + objectCount._incompleteMPUUploads : 0;
     resTarget.objectCount.nonCurrent += objectCount
         ? objectCount._nonCurrentCold + objectCount._nonCurrentRestored + objectCount._nonCurrentRestoring : 0;
 

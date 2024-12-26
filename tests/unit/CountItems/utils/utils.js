@@ -24,7 +24,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 0,
+            _incompleteMPUUploads: 0,
         },
     };
 
@@ -51,7 +51,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 0,
+            _incompleteMPUUploads: 0,
         },
     };
 
@@ -78,7 +78,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 0,
+            _incompleteMPUUploads: 0,
         },
     };
 
@@ -105,7 +105,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 0,
+            _incompleteMPUUploads: 0,
         },
     };
 
@@ -132,7 +132,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 0,
+            _incompleteMPUUploads: 0,
         },
     };
 
@@ -159,7 +159,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 10,
+            _incompleteMPUUploads: 10,
         },
     };
 
@@ -186,7 +186,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
             _currentRestoring: 0,
             _nonCurrentRestored: 0,
             _nonCurrentRestoring: 0,
-            _incompleteMPUParts: 20,
+            _incompleteMPUUploads: 20,
         },
     };
 
@@ -263,7 +263,7 @@ describe('CountItems::utils::consolidateDataMetrics', () => {
                 _currentRestoring: 0,
                 _nonCurrentRestored: 0,
                 _nonCurrentRestoring: 0,
-                _incompleteMPUParts: 10,
+                _incompleteMPUUploads: 10,
             },
         };
         const res = consolidateDataMetrics(exampleWithMPU, source);

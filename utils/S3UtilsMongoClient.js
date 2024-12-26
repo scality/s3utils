@@ -42,7 +42,7 @@ const baseMetricsObject = {
     versionCountRestored: 0,
     versionDataRestored: 0,
     deleteMarkerCountRestored: 0,
-    mpuPartCount: 0,
+    mpuUploadCounts: 0,
     mpuPartsData: 0,
 };
 
@@ -304,7 +304,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 }
 
                 if (isMPUPart || isOverviewKey) {
-                    targetCount = 'mpuPartCount';
+                    targetCount = 'mpuUploadCounts';
                     targetData = 'mpuPartsData';
                 }
 
@@ -353,19 +353,6 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             await cursor.forEach(
                 res => processCursorEntry(res),
-                err => {
-                    if (err) {
-                        log.error('Error when processing mongo entries', {
-                            method: 'getObjectMDStats',
-                            errDetails: { ...err },
-                            errorString: err.toString(),
-                        });
-                        return callback(err);
-                    }
-                    const retResult = this._handleResults(collRes, isVer);
-                    retResult.stalled = stalledCount;
-                    return callback(null, retResult);
-                },
             );
 
             const mpuBucket = `${constants.mpuBucketPrefix}${bucketName}`;
@@ -415,19 +402,6 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             'isPHD': false,
                         },
                     }, true);
-                },
-                err => {
-                    if (err) {
-                        log.error('Error when processing mongo mpu entries', {
-                            method: 'getObjectMDStats',
-                            errDetails: { ...err },
-                            errorString: err.toString(),
-                        });
-                        return callback(err);
-                    }
-                    const retResult = this._handleResults(collRes, isVer);
-                    retResult.stalled = stalledCount;
-                    return callback(null, retResult);
                 },
             );
 
@@ -604,7 +578,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                 _currentRestoring: 0,
                                 _nonCurrentRestored: 0,
                                 _nonCurrentRestoring: 0,
-                                _incompleteMPUParts: 0,
+                                _incompleteMPUUploads: 0,
                                 deleteMarker: 0,
                             },
                         };
@@ -638,7 +612,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         versionCountRestored = 0,
                         versionDataRestored = 0,
                         deleteMarkerCountRestored = 0,
-                        mpuPartCount = 0,
+                        mpuUploadCounts = 0,
                         mpuPartsData = 0,
                     } = res[metricLevel][resourceName];
 
@@ -651,7 +625,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     dataMetrics[metricLevel][resourceName].objectCount._currentCold += nullCountCold + masterCountCold;
                     dataMetrics[metricLevel][resourceName].objectCount._currentRestoring += nullCountRestoring + masterCountRestoring;
                     dataMetrics[metricLevel][resourceName].objectCount._currentRestored += nullCountRestored + masterCountRestored;
-                    dataMetrics[metricLevel][resourceName].objectCount._incompleteMPUParts += mpuPartCount;
+                    dataMetrics[metricLevel][resourceName].objectCount._incompleteMPUUploads += mpuUploadCounts;
 
                     if (isVersioned) {
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent
@@ -751,7 +725,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                         deleteMarker: 0,
                     };
                 }
@@ -773,7 +747,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 accountLocation.objectCount._nonCurrentRestoring += dataMetrics.location[location].objectCount._nonCurrentRestoring;
                 accountLocation.objectCount._currentRestored += dataMetrics.location[location].objectCount._currentRestored;
                 accountLocation.objectCount._nonCurrentRestored += dataMetrics.location[location].objectCount._nonCurrentRestored;
-                accountLocation.objectCount._incompleteMPUParts += dataMetrics.location[location].objectCount._incompleteMPUParts;
+                accountLocation.objectCount._incompleteMPUUploads += dataMetrics.location[location].objectCount._incompleteMPUUploads;
 
                 accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
             });

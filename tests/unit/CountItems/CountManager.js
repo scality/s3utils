@@ -92,7 +92,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -117,7 +117,7 @@ describe('CountItems::CountManager', () => {
                                     _currentRestoring: 0,
                                     _nonCurrentRestored: 0,
                                     _nonCurrentRestoring: 0,
-                                    _incompleteMPUParts: 0,
+                                    _incompleteMPUUploads: 0,
                                 },
                                 usedCapacity: {
                                     current: 100,
@@ -146,7 +146,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -173,7 +173,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -203,7 +203,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
@@ -229,7 +229,7 @@ describe('CountItems::CountManager', () => {
                                 _currentRestoring: 0,
                                 _nonCurrentRestored: 0,
                                 _nonCurrentRestoring: 0,
-                                _incompleteMPUParts: 0,
+                                _incompleteMPUUploads: 0,
                             },
                             usedCapacity: {
                                 current: 200,
@@ -259,7 +259,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
@@ -287,7 +287,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
@@ -332,7 +332,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -358,7 +358,7 @@ describe('CountItems::CountManager', () => {
                                     _currentRestoring: 0,
                                     _nonCurrentRestored: 0,
                                     _nonCurrentRestoring: 0,
-                                    _incompleteMPUParts: 0,
+                                    _incompleteMPUUploads: 0,
                                 },
                                 usedCapacity: {
                                     current: 100,
@@ -388,7 +388,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -416,7 +416,7 @@ describe('CountItems::CountManager', () => {
                             _currentRestoring: 0,
                             _nonCurrentRestored: 0,
                             _nonCurrentRestoring: 0,
-                            _incompleteMPUParts: 0,
+                            _incompleteMPUUploads: 0,
                         },
                         usedCapacity: {
                             current: 100,
@@ -447,7 +447,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
@@ -473,7 +473,7 @@ describe('CountItems::CountManager', () => {
                                 _currentRestoring: 0,
                                 _nonCurrentRestored: 0,
                                 _nonCurrentRestoring: 0,
-                                _incompleteMPUParts: 0,
+                                _incompleteMPUUploads: 0,
                             },
                             usedCapacity: {
                                 current: 200,
@@ -503,7 +503,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
@@ -531,7 +531,7 @@ describe('CountItems::CountManager', () => {
                         _currentRestoring: 0,
                         _nonCurrentRestored: 0,
                         _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        _incompleteMPUUploads: 0,
                     },
                     usedCapacity: {
                         current: 200,
