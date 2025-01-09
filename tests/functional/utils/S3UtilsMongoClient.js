@@ -153,6 +153,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -163,6 +164,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -176,6 +178,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 20,
@@ -186,6 +189,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -203,6 +207,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -213,6 +218,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -228,6 +234,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -238,6 +245,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -311,6 +319,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -321,6 +330,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -334,6 +344,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 20,
@@ -344,6 +355,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -361,6 +373,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -371,6 +384,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -386,6 +400,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -396,6 +411,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -464,6 +480,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -474,6 +491,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -487,6 +505,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 0,
@@ -497,6 +516,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -514,6 +534,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -524,6 +545,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -539,6 +561,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -549,6 +572,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -625,6 +649,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -635,6 +660,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -648,6 +674,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 10,
@@ -658,6 +685,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                         'completed': {
@@ -671,6 +699,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 10,
@@ -681,6 +710,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -698,6 +728,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -708,6 +739,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -723,6 +755,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 10,
@@ -733,6 +766,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                                 'completed': {
@@ -746,6 +780,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 10,
@@ -756,6 +791,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -846,6 +882,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -856,6 +893,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -869,6 +907,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 20,
@@ -879,6 +918,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                         'completed': {
@@ -892,6 +932,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 10,
@@ -902,6 +943,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -919,6 +961,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -929,6 +972,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -944,6 +988,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -954,6 +999,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                                 'completed': {
@@ -967,6 +1013,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 10,
@@ -977,6 +1024,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -1094,6 +1142,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -1104,6 +1153,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                     locations: {
                                         'us-east-1': {
@@ -1117,6 +1167,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 20,
@@ -1127,6 +1178,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 0,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -1144,6 +1196,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -1154,6 +1207,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -1169,6 +1223,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 20,
@@ -1179,6 +1234,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 0,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -1331,6 +1387,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 1,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 0,
@@ -1341,6 +1398,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 10,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                         'us-east-1': {
@@ -1354,6 +1412,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 1,
+                                                _incompleteMPUUploads: 0,
                                             },
                                             usedCapacity: {
                                                 current: 0,
@@ -1364,6 +1423,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                                 _currentRestoring: 0,
                                                 _nonCurrentRestored: 0,
                                                 _nonCurrentRestoring: 10,
+                                                _incompleteMPUParts: 0,
                                             },
                                         },
                                     },
@@ -1377,6 +1437,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 1,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -1387,6 +1448,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 10,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -1402,6 +1464,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 1,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -1412,6 +1475,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 10,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
@@ -1427,6 +1491,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 1,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -1437,6 +1502,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 10,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                                 'us-east-1': {
@@ -1450,6 +1516,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 1,
+                                        _incompleteMPUUploads: 0,
                                     },
                                     usedCapacity: {
                                         current: 0,
@@ -1460,6 +1527,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                                         _currentRestoring: 0,
                                         _nonCurrentRestored: 0,
                                         _nonCurrentRestoring: 10,
+                                        _incompleteMPUParts: 0,
                                     },
                                 },
                             },
