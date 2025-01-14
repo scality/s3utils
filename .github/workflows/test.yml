@@ -62,6 +62,12 @@ jobs:
           node-version: '16'
           cache: 'yarn'
       - run: sudo apt-get update -q
+      # Ubuntu 24.04 doesn't have libssl1.1 which is needed by mongo-memory-server
+      - name: install libssl1.1
+        run: |
+          mkdir -p ~/ssl && cd ~/ssl
+          wget -nc https://ftp.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb
       - run: yarn --network-concurrency 1
       - run: yarn --silent lint -- --max-warnings 0
       - run: yarn --silent test:unit
