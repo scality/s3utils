@@ -19,82 +19,82 @@ const dbName = 'countItemsTest';
 const USERSBUCKET = '__usersbucket';
 
 const expectedCountItems = {
-    objects: BigInt(90),
-    versions: BigInt(60),
+    objects: 90n,
+    versions: 60n,
     buckets: 9,
     dataManaged: {
-        total: { curr: BigInt(15000), prev: BigInt(12000) },
+        total: { curr: 15000n, prev: 12000n },
         byLocation: {
-            'us-east-1': { curr: BigInt(9000), prev: BigInt(6000) },
-            'secondary-location-1': { curr: BigInt(3000), prev: BigInt(3000) },
-            'secondary-location-2': { curr: BigInt(3000), prev: BigInt(3000) },
+            'us-east-1': { curr: 9000n, prev: 6000n },
+            'secondary-location-1': { curr: 3000n, prev: 3000n },
+            'secondary-location-2': { curr: 3000n, prev: 3000n },
         },
     },
     stalled: 0,
 };
 const expectedDataMetrics = {
     [`account_${testAccountCanonicalId}`]: {
-        objectCount: { current: BigInt(90), deleteMarker: BigInt(0), nonCurrent: BigInt(60) },
-        usedCapacity: { current: BigInt(9000), nonCurrent: BigInt(6000) },
+        objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n },
+        usedCapacity: { current: 9000n, nonCurrent: 6000n },
         locations: {
             'secondary-location-1': {
-                objectCount: { current: BigInt(30), deleteMarker: BigInt(0), nonCurrent: BigInt(30) },
-                usedCapacity: { current: BigInt(3000), nonCurrent: BigInt(3000) },
+                objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+                usedCapacity: { current: 3000n, nonCurrent: 3000n },
             },
             'secondary-location-2': {
-                objectCount: { current: BigInt(30), deleteMarker: BigInt(0), nonCurrent: BigInt(30) },
-                usedCapacity: { current: BigInt(3000), nonCurrent: BigInt(3000) },
+                objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+                usedCapacity: { current: 3000n, nonCurrent: 3000n },
             },
             'us-east-1': {
-                objectCount: { current: BigInt(90), deleteMarker: BigInt(0), nonCurrent: BigInt(60) },
-                usedCapacity: { current: BigInt(9000), nonCurrent: BigInt(6000) },
+                objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n },
+                usedCapacity: { current: 9000n, nonCurrent: 6000n },
             },
         },
     },
     [`bucket_test-bucket-0_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(0) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(0) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 0n },
+        usedCapacity: { current: 1000n, nonCurrent: 0n },
     },
     [`bucket_test-bucket-1_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(0) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(0) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 0n },
+        usedCapacity: { current: 1000n, nonCurrent: 0n },
     },
     [`bucket_test-bucket-2_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(0) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(0) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 0n },
+        usedCapacity: { current: 1000n, nonCurrent: 0n },
     },
     [`bucket_test-bucket-3_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     [`bucket_test-bucket-4_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     [`bucket_test-bucket-5_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     [`bucket_test-bucket-6_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     [`bucket_test-bucket-7_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     [`bucket_test-bucket-8_${testBucketCreationDate}`]: {
-        objectCount: { current: BigInt(10), deleteMarker: BigInt(0), nonCurrent: BigInt(10) },
-        usedCapacity: { current: BigInt(1000), nonCurrent: BigInt(1000) },
+        objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
+        usedCapacity: { current: 1000n, nonCurrent: 1000n },
     },
     'location_secondary-location-1': {
-        objectCount: { current: BigInt(30), deleteMarker: BigInt(0), nonCurrent: BigInt(30) }, usedCapacity: { current: BigInt(3000), nonCurrent: BigInt(3000) },
+        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n }, usedCapacity: { current: 3000n, nonCurrent: 3000n },
     },
     'location_secondary-location-2': {
-        objectCount: { current: BigInt(30), deleteMarker: BigInt(0), nonCurrent: BigInt(30) }, usedCapacity: { current: BigInt(3000), nonCurrent: BigInt(3000) },
+        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n }, usedCapacity: { current: 3000n, nonCurrent: 3000n },
     },
     'location_us-east-1': {
-        objectCount: { current: BigInt(90), deleteMarker: BigInt(0), nonCurrent: BigInt(60) }, usedCapacity: { current: BigInt(9000), nonCurrent: BigInt(6000) },
+        objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n }, usedCapacity: { current: 9000n, nonCurrent: 6000n },
     },
 };
 

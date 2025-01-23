@@ -132,12 +132,12 @@ const s3 = new AWS.S3(Object.assign(options, s3Options));
 
 const stats = {
     current: {
-        count: BigInt(0),
-        size: BigInt(0),
+        count: 0n,
+        size: 0n,
     },
     noncurrent: {
-        count: BigInt(0),
-        size: BigInt(0),
+        count: 0n,
+        size: 0n,
     },
 };
 
@@ -199,8 +199,8 @@ function listBucket(bucket, cb) {
                         }
                     }
                     const statObj = version.IsLatest ? stats.current : stats.noncurrent;
-                    statObj.count += BigInt(1);
-                    statObj.size += version.Size || BigInt(0);
+                    statObj.count += 1n;
+                    statObj.size += version.Size || 0n;
                     if (VERBOSE) {
                         log.info('version info', {
                             bucket: BUCKET,

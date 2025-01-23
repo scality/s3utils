@@ -12,8 +12,8 @@ const { getAccountIdForCanonicalId } = require('./vault');
 class MetricReport {
     constructor(factor = 1) {
         this.factor = factor;
-        this.count = BigInt(0);
-        this.bytes = BigInt(0);
+        this.count = 0n;
+        this.bytes = 0n;
     }
 
     /**

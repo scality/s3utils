@@ -54,17 +54,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                     },
                 },
                 CapacityInfo: {
-                    Capacity: BigInt(0),
-                    Available: BigInt(0),
-                    Used: BigInt(0),
+                    Capacity: 0n,
+                    Available: 0n,
+                    Used: 0n,
                 },
             },
         };
         client.updateStorageConsumptionMetrics({}, {
             bucket: {
                 [`${testBucketName}_${testBucketCreationDate}`]: {
-                    usedCapacity: { current: BigInt(10), nonCurrent: BigInt(10) },
-                    objectCount: { current: BigInt(10), nonCurrent: BigInt(10) },
+                    usedCapacity: { current: 10n, nonCurrent: 10n },
+                    objectCount: { current: 10n, nonCurrent: 10n },
                 },
             },
         }, logger, done);
@@ -126,16 +126,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, BigInt(0));
-                assert.strictEqual(Available, BigInt(0));
-                assert.strictEqual(Used, BigInt(0));
+                assert.strictEqual(Capacity, 0n);
+                assert.strictEqual(Available, 0n);
+                assert.strictEqual(Used, 0n);
                 next();
             }),
         ], done);
     });
 
     test('should successfully collect bucketMetrics and update bucket CapacityInfo', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = BigInt(30);
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30n;
 
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -160,9 +160,9 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, BigInt(30));
-                assert.strictEqual(Available, BigInt(10));
-                assert.strictEqual(Used, BigInt(20));
+                assert.strictEqual(Capacity, 30n);
+                assert.strictEqual(Available, 10n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
@@ -194,16 +194,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, BigInt(-1));
-                assert.strictEqual(Available, BigInt(-1));
-                assert.strictEqual(Used, BigInt(20));
+                assert.strictEqual(Capacity, -1n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
     });
 
     test('should update bucket Available -1 if Capacity value is smaller than Used', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = BigInt(10);
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 10n;
 
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -228,16 +228,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, BigInt(10));
-                assert.strictEqual(Available, BigInt(-1));
-                assert.strictEqual(Used, BigInt(20));
+                assert.strictEqual(Capacity, 10n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
     });
 
     test('should update bucket Used and Available -1 if bucket metrics are not retrievable', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = BigInt(30);
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30n;
 
         return async.series([
             next => client.updateStorageConsumptionMetrics({}, { bucket: {} }, logger, next),
@@ -263,9 +263,9 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, BigInt(30));
-                assert.strictEqual(Available, BigInt(-1));
-                assert.strictEqual(Used, BigInt(-1));
+                assert.strictEqual(Capacity, 30n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, -1n);
                 next();
             }),
         ], done);
