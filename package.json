@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
-    "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/collectBucketMetricsAndUpdateBucketCapacityInfo.js'"
+    "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
   },
   "repository": {
     "type": "git",
