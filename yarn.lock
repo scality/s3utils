@@ -1593,9 +1593,9 @@ arrify@^1.0.1:
   optionalDependencies:
     ioctl "^2.0.2"
 
-"arsenal@git+https://github.com/scality/arsenal#8.1.142":
-  version "8.1.142"
-  resolved "git+https://github.com/scality/arsenal#7402f096c9839815db5f03cbc2f4117536f55c28"
+"arsenal@git+https://github.com/scality/arsenal#3c8219beb3785a66d1a5d74b4dff14eda869348f":
+  version "8.1.145"
+  resolved "git+https://github.com/scality/arsenal#3c8219beb3785a66d1a5d74b4dff14eda869348f"
   dependencies:
     "@azure/identity" "^3.1.1"
     "@azure/storage-blob" "^12.12.0"

@@ -3,6 +3,10 @@ const async = require('async');
 const { BucketInfo } = require('arsenal').models;
 const monitoring = require('../utils/monitoring');
 
+/* eslint-disable no-extend-native */
+BigInt.prototype.toJSON = () => this.toString();
+/* eslint-disable no-extend-native */
+
 class CountWorker {
     constructor(params) {
         this.log = params.log;

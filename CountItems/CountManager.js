@@ -11,12 +11,12 @@ class CountManager {
         this.maxConcurrent = params.maxConcurrent;
         this.temporaryStore = {};
         this.store = {
-            objects: 0,
-            versions: 0,
+            objects: BigInt(0),
+            versions: BigInt(0),
             buckets: 0,
             bucketList: [],
             dataManaged: {
-                total: { curr: 0, prev: 0 },
+                total: { curr: BigInt(0), prev: BigInt(0) },
                 byLocation: {},
             },
             stalled: 0,
@@ -61,14 +61,22 @@ class CountManager {
         if (!results) {
             return;
         }
-        this.store.versions += results.versions;
-        this.store.objects += results.objects;
+        this.store.versions += results.versions ? results.versions : BigInt(0);
+        // eslint-disable-next-line no-console
+        console.log('results.objects', results.objects);
+        this.store.objects += results.objects ? results.objects : BigInt(0);
+        // eslint-disable-next-line no-console
+        console.log('this.store.objects', this.store.objects);
         this.store.stalled += results.stalled;
         if (results.dataManaged
             && results.dataManaged.locations
             && results.dataManaged.total) {
             const { locations, total } = results.dataManaged;
+            // eslint-disable-next-line no-console
+            console.log('total.curr', total.curr);
             this.store.dataManaged.total.curr += total.curr;
+            // eslint-disable-next-line no-console
+            console.log('total.prev', total.prev);
             this.store.dataManaged.total.prev += total.prev;
             Object.keys(locations).forEach(site => {
                 if (!this.store.dataManaged.byLocation[site]) {

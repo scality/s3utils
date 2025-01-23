@@ -12,14 +12,14 @@ const { getAccountIdForCanonicalId } = require('./vault');
 class MetricReport {
     constructor(factor = 1) {
         this.factor = factor;
-        this.count = 0;
-        this.bytes = 0;
+        this.count = BigInt(0);
+        this.bytes = BigInt(0);
     }
 
     /**
      * Add the given data to the metric report
-     * @param {integer} count - Amount to increment object count
-     * @param {integer} bytes - Amount to increment bytes stored
+     * @param {bigint} count - Amount to increment object count
+     * @param {bigint} bytes - Amount to increment bytes stored
      * @returns {undefined} -
      */
     update(count, bytes) {

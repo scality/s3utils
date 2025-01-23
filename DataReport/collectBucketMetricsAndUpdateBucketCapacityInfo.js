@@ -33,14 +33,14 @@ function isSOSCapacityInfoEnabled(bucketInfo) {
 function isValidBucketStorageMetrics(bucketMetric) {
     return bucketMetric
     && bucketMetric.usedCapacity
-        && typeof bucketMetric.usedCapacity.current === 'number'
-        && typeof bucketMetric.usedCapacity.nonCurrent === 'number'
-        && bucketMetric.usedCapacity.current > -1
-        && bucketMetric.usedCapacity.nonCurrent > -1;
+        && typeof bucketMetric.usedCapacity.current === 'bigint'
+        && typeof bucketMetric.usedCapacity.nonCurrent === 'bigint'
+        && bucketMetric.usedCapacity.current > BigInt(-1)
+        && bucketMetric.usedCapacity.nonCurrent > BigInt(-1);
 }
 
 function isValidCapacityValue(capacity) {
-    return (Number.isSafeInteger(capacity) && capacity >= 0);
+    return (typeof capacity === 'bigint' && capacity >= BigInt(0));
 }
 
 function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callback) {
@@ -74,22 +74,33 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                         return nxt(null, doc);
                     }),
                     (storageMetricDoc, nxt) => {
-                        let bucketStorageUsed = -1;
+                        let bucketStorageUsed = BigInt(-1);
+                        console.log('storageMetricDoc', storageMetricDoc);
                         if (isValidBucketStorageMetrics(storageMetricDoc)) {
+                            console.log(' here in the isValidBucketStorageMetrics');
                             // Do not count the objects in cold for SOSAPI
                             bucketStorageUsed = storageMetricDoc.usedCapacity.current
                                 + storageMetricDoc.usedCapacity.nonCurrent;
+                            console.log('bucketStorageUsed', { bucketStorageUsed });
                         }
                         // read Capacity from bucket._capabilities
                         const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
+                        console.log('Capacity', Capacity);
 
-                        let available = -1;
-                        let capacity = -1;
-                        if (isValidCapacityValue(Capacity)) { // is Capacity value is valid
+                        let available = BigInt(-1);
+                        let capacity = BigInt(-1);
+                        if (isValidCapacityValue(Capacity)) {
+                            console.log('we are in the valid capacity value');
+                            // is Capacity value is valid
                             capacity = Capacity;
                             // if bucket storage used is valid and capacity is bigger than used
-                            if (bucketStorageUsed !== -1 && (capacity - bucketStorageUsed) >= 0) {
+                            if (bucketStorageUsed !== BigInt(-1) && (capacity - bucketStorageUsed) >= BigInt(0)) {
+                                console.log('WE ARE IN THE CONDITION');
                                 available = capacity - bucketStorageUsed;
+                                console.log('available', available);
+                                console.log('capacity', typeof capacity);
+                                console.log('bucketStorageUsed', typeof bucketStorageUsed);
+                                console.log('available', typeof available);
                             }
                         }
                         return mongoClient.updateBucketCapacityInfo(bucketName, {

@@ -23,7 +23,13 @@
         "no-lonely-if": 0,
         "max-classes-per-file": 0,
         "prefer-spread": 0,
-        "no-constructor-return": 0
+        "no-constructor-return": 0,
+        "no-console": 0,
+        "object-curly-spacing": 0,
+        "no-extend-native": 0
+    },
+    "globals": {
+        "BigInt": "readonly"
     }
 }
 

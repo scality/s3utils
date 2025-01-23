@@ -21,6 +21,10 @@ const loggerConfig = {
 
 let waitingForPromScraping = false;
 
+/* eslint-disable no-extend-native */
+BigInt.prototype.toJSON = () => this.toString();
+/* eslint-disable no-extend-native */
+
 werelogs.configure(loggerConfig);
 const log = new werelogs.Logger('S3Utils::CountItems::Master');
 

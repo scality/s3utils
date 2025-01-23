@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
-    "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
+    "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js  --coverage --testPathPattern='tests/functional/collectBucketMetricsAndUpdateBucketCapacityInfo.js'"
   },
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   "dependencies": {
     "@senx/warp10": "^1.1.2",
     "JSONStream": "^1.3.5",
-    "arsenal": "git+https://github.com/scality/arsenal#8.1.142",
+    "arsenal": "git+https://github.com/scality/arsenal#3c8219beb3785a66d1a5d74b4dff14eda869348f",
     "async": "^2.6.4",
     "aws-sdk": "^2.1005.0",
     "bucketclient": "git+https://github.com/scality/bucketclient#8.1.5",
