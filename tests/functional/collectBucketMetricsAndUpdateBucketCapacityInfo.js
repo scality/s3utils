@@ -72,7 +72,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
 
     afterEach(done => client.deleteBucket(testBucketName, logger, done));
 
-    test.only('should not update bucket CapacityInfo if bucket doesn\'t have _capabilities attribute', done => {
+    test('should not update bucket CapacityInfo if bucket doesn\'t have _capabilities attribute', done => {
         testBucketCapacities.VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo = false;
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -168,7 +168,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         ], done);
     });
 
-    test('should update bucket Capacity and Available -1 if Capacity value is not valid', done => {
+    test.only('should update bucket Capacity and Available -1 if Capacity value is not valid', done => {
         testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 'not-a-number';
 
         return async.series([
