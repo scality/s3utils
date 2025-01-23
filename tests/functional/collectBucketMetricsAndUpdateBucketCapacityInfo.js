@@ -72,7 +72,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
 
     afterEach(done => client.deleteBucket(testBucketName, logger, done));
 
-    test('should not update bucket CapacityInfo if bucket doesn\'t have _capabilities attribute', done => {
+    test.only('should not update bucket CapacityInfo if bucket doesn\'t have _capabilities attribute', done => {
         testBucketCapacities.VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo = false;
         return async.series([
             next => client.createBucket(testBucketName, {
