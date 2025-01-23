@@ -168,7 +168,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         ], done);
     });
 
-    test.only('should update bucket Capacity and Available -1 if Capacity value is not valid', done => {
+    test('should update bucket Capacity and Available -1 if Capacity value is not valid', done => {
         testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 'not-a-number';
 
         return async.series([
@@ -202,7 +202,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         ], done);
     });
 
-    test('should update bucket Available -1 if Capacity value is smaller than Used', done => {
+    test.only('should update bucket Available -1 if Capacity value is smaller than Used', done => {
         testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = BigInt(10);
 
         return async.series([
