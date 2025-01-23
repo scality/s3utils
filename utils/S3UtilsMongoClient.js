@@ -87,7 +87,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
     async updateInflightDeltas(allMetrics, log) {
         let cursor;
-        console.log('WE ARE HEEEEEEEEERE');
+        console.log('WE ARE HEEEEEEEEERE', allMetrics);
         try {
             if (!allMetrics || !Array.isArray(allMetrics) || allMetrics.length === 0) {
                 return allMetrics;
@@ -99,11 +99,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 },
             });
 
-            console.log('CURSOR', cursor);
+            // console.log('CURSOR', cursor);
             const inflights = await cursor.toArray();
             // convert inflights to a map with _id: usedCapacity._inflight
             const inflightsMap = inflights.reduce((map, obj) => {
-                const inflightLong = obj.usedCapacity && obj.usedCapacity._inflight ? obj.usedCapacity._inflight : 0;
+                const inflightLong = obj.usedCapacity && obj.usedCapacity._inflight ? obj.usedCapacity._inflight : BigInt(0);
                 return {
                     ...map,
                     [obj._id]: inflightLong,
@@ -151,7 +151,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     }
                 }
             });
-
+            console.log('ALL METRICS', allMetrics);
             return allMetrics;
         } catch (err) {
             log.error('An error occurred', {
