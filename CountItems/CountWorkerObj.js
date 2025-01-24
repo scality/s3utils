@@ -11,6 +11,35 @@ class CountWorkerObj {
         this._init();
     }
 
+    _serializeBigInts(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+            return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
+        }
+        const result = Array.isArray(obj) ? [] : {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                result[key] = this._serializeBigInts(obj[key]);
+            }
+        }
+        return result;
+    }
+
+    _deserializeBigInts(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+            return obj;
+        }
+        if (obj.__bigint !== undefined) {
+            return BigInt(obj.__bigint);
+        }
+        const result = Array.isArray(obj) ? [] : {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                result[key] = this._deserializeBigInts(obj[key]);
+            }
+        }
+        return result;
+    }
+
     _init() {
         this._worker.on('online', () => {
             this.ready = true;
@@ -118,12 +147,18 @@ class CountWorkerObj {
 
     count(bucketInfo, callback) {
         const id = uuid.v4();
-        this._addCallback(id, 'count', callback);
+        this._addCallback(id, 'count', (err, results) => {
+            if (err) {
+                return callback(err);
+            }
+            // Deserialize BigInts from the worker response
+            return callback(null, this._deserializeBigInts(results));
+        });
         this._worker.send({
             id,
             owner: 'scality',
             type: 'count',
-            bucketInfo,
+            bucketInfo: this._serializeBigInts(bucketInfo),
         });
     }
 

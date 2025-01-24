@@ -61,8 +61,8 @@ class CountManager {
         if (!results) {
             return;
         }
-        this.store.versions += results.versions;
-        this.store.objects += results.objects;
+        this.store.versions += (results.versions || 0);
+        this.store.objects += (results.objects || 0);
         this.store.stalled += results.stalled;
         if (results.dataManaged
             && results.dataManaged.locations
