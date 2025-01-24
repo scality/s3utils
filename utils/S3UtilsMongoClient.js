@@ -773,9 +773,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 $set: {
                     '_id': bucketName,
                     'value.capabilities.VeeamSOSApi.CapacityInfo': {
-                        Capacity: capacityInfo.Capacity,
-                        Available: capacityInfo.Available,
-                        Used: capacityInfo.Used,
+                        Capacity: new Long(capacityInfo.Capacity),
+                        Available: new Long(capacityInfo.Available),
+                        Used: new Long(capacityInfo.Used),
                         LastModified: (new Date()).toISOString(),
                     },
                 },
@@ -870,7 +870,18 @@ class S3UtilsMongoClient extends MongoClientInterface {
             if (!doc) {
                 return cb(errors.NoSuchEntity);
             }
-            return cb(null, doc);
+
+            // Keep only relevant metrics: the values are either
+            // number or Long, so we first stringify them and
+            // create a BigInt for processing.
+            const convertedDoc = {
+                usedCapacity: {
+                    current: BigInt(doc.usedCapacity.current.toString()),
+                    nonCurrent: BigInt(doc.usedCapacity.nonCurrent.toString()),
+                },
+            };
+
+            return cb(null, convertedDoc);
         } catch (err) {
             log.error('readStorageConsumptionMetrics: error reading metrics', {
                 error: err,
