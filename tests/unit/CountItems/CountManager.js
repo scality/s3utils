@@ -550,6 +550,245 @@ describe('CountItems::CountManager', () => {
         });
     });
 
+    test('should update dataMetrics with large numbers above MAX_SAFE_INTEGER for both counts and capacity', () => {
+        const workers = createWorkers(1);
+        const m = new CountManager({
+            log: new DummyLogger(),
+            workers,
+            maxConcurrent: 1,
+        });
+        m._consolidateData({
+            dataMetrics: {
+                account: {
+                    account1: {
+                        objectCount: {
+                            current: 9007199254740991n,
+                            deleteMarker: 9007199254740991n,
+                            nonCurrent: 9007199254740991n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUUploads: 9007199254740991n,
+                        },
+                        usedCapacity: {
+                            current: 9007199254740991n,
+                            nonCurrent: 9007199254740992n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUParts: 9007199254740991n,
+                            _inflightsPreScan: 9007199254740991n,
+                        },
+                        locations: {
+                            location1: {
+                                objectCount: {
+                                    current: 9007199254740991n,
+                                    deleteMarker: 9007199254740991n,
+                                    nonCurrent: 9007199254740991n,
+                                    _currentCold: 9007199254740991n,
+                                    _nonCurrentCold: 9007199254740991n,
+                                    _currentRestored: 9007199254740991n,
+                                    _currentRestoring: 9007199254740991n,
+                                    _nonCurrentRestored: 9007199254740991n,
+                                    _nonCurrentRestoring: 9007199254740991n,
+                                    _incompleteMPUUploads: 9007199254740991n,
+                                },
+                                usedCapacity: {
+                                    current: 9007199254740991n,
+                                    nonCurrent: 9007199254740992n,
+                                    _currentCold: 9007199254740991n,
+                                    _nonCurrentCold: 9007199254740991n,
+                                    _currentRestored: 9007199254740991n,
+                                    _currentRestoring: 9007199254740991n,
+                                    _nonCurrentRestored: 9007199254740991n,
+                                    _nonCurrentRestoring: 9007199254740991n,
+                                    _incompleteMPUParts: 9007199254740991n,
+                                    _inflightsPreScan: 9007199254740991n,
+                                },
+                            },
+                        },
+                    },
+                },
+                bucket: {
+                    bucket1: {
+                        objectCount: {
+                            current: 9007199254740991n,
+                            deleteMarker: 9007199254740991n,
+                            nonCurrent: 9007199254740991n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUUploads: 9007199254740991n,
+                        },
+                        usedCapacity: {
+                            current: 9007199254740991n,
+                            nonCurrent: 9007199254740992n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUParts: 9007199254740991n,
+                            _inflightsPreScan: 9007199254740991n,
+                        },
+                    },
+                },
+                location: {
+                    location1: {
+                        objectCount: {
+                            current: 9007199254740991n,
+                            deleteMarker: 9007199254740991n,
+                            nonCurrent: 9007199254740991n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUUploads: 9007199254740991n,
+                        },
+                        usedCapacity: {
+                            current: 9007199254740991n,
+                            nonCurrent: 9007199254740992n,
+                            _currentCold: 9007199254740991n,
+                            _nonCurrentCold: 9007199254740991n,
+                            _currentRestored: 9007199254740991n,
+                            _currentRestoring: 9007199254740991n,
+                            _nonCurrentRestored: 9007199254740991n,
+                            _nonCurrentRestoring: 9007199254740991n,
+                            _incompleteMPUParts: 9007199254740991n,
+                            _inflightsPreScan: 9007199254740991n,
+                        },
+                    },
+                },
+            },
+        });
+        expect(m.dataMetrics).toEqual({
+            account: {
+                account1: {
+                    objectCount: {
+                        current: 45035996273704955n,
+                        deleteMarker: 9007199254740991n,
+                        nonCurrent: 36028797018963964n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUUploads: 9007199254740991n,
+                    },
+                    usedCapacity: {
+                        current: 45035996273704955n,
+                        nonCurrent: 36028797018963965n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUParts: 9007199254740991n,
+                        _inflightsPreScan: 9007199254740991n,
+                    },
+                    locations: {
+                        location1: {
+                            objectCount: {
+                                current: 45035996273704955n,
+                                deleteMarker: 9007199254740991n,
+                                nonCurrent: 36028797018963964n,
+                                _currentCold: 9007199254740991n,
+                                _nonCurrentCold: 9007199254740991n,
+                                _currentRestored: 9007199254740991n,
+                                _currentRestoring: 9007199254740991n,
+                                _nonCurrentRestored: 9007199254740991n,
+                                _nonCurrentRestoring: 9007199254740991n,
+                                _incompleteMPUUploads: 9007199254740991n,
+                            },
+                            usedCapacity: {
+                                current: 45035996273704955n,
+                                nonCurrent: 36028797018963965n,
+                                _currentCold: 9007199254740991n,
+                                _nonCurrentCold: 9007199254740991n,
+                                _currentRestored: 9007199254740991n,
+                                _currentRestoring: 9007199254740991n,
+                                _nonCurrentRestored: 9007199254740991n,
+                                _nonCurrentRestoring: 9007199254740991n,
+                                _incompleteMPUParts: 9007199254740991n,
+                                _inflightsPreScan: 9007199254740991n,
+                            },
+                        },
+                    },
+                },
+            },
+            bucket: {
+                bucket1: {
+                    objectCount: {
+                        current: 45035996273704955n,
+                        deleteMarker: 9007199254740991n,
+                        nonCurrent: 36028797018963964n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUUploads: 9007199254740991n,
+                    },
+                    usedCapacity: {
+                        current: 45035996273704955n,
+                        nonCurrent: 36028797018963965n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUParts: 9007199254740991n,
+                        _inflightsPreScan: 9007199254740991n,
+                    },
+                },
+            },
+            location: {
+                location1: {
+                    objectCount: {
+                        current: 45035996273704955n,
+                        deleteMarker: 9007199254740991n,
+                        nonCurrent: 36028797018963964n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUUploads: 9007199254740991n,
+                    },
+                    usedCapacity: {
+                        current: 45035996273704955n,
+                        nonCurrent: 36028797018963965n,
+                        _currentCold: 9007199254740991n,
+                        _nonCurrentCold: 9007199254740991n,
+                        _currentRestored: 9007199254740991n,
+                        _currentRestoring: 9007199254740991n,
+                        _nonCurrentRestored: 9007199254740991n,
+                        _nonCurrentRestoring: 9007199254740991n,
+                        _incompleteMPUParts: 9007199254740991n,
+                        _inflightsPreScan: 9007199254740991n,
+                    },
+                },
+            },
+        });
+    });
+
     test('should add tasks to queue', () => {
         const workers = createWorkers(1);
         const m = new CountManager({
