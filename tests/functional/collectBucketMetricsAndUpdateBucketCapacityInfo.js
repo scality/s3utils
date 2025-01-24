@@ -54,17 +54,17 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                     },
                 },
                 CapacityInfo: {
-                    Capacity: 0,
-                    Available: 0,
-                    Used: 0,
+                    Capacity: 0n,
+                    Available: 0n,
+                    Used: 0n,
                 },
             },
         };
         client.updateStorageConsumptionMetrics({}, {
             bucket: {
                 [`${testBucketName}_${testBucketCreationDate}`]: {
-                    usedCapacity: { current: 10, nonCurrent: 10 },
-                    objectCount: { current: 10, nonCurrent: 10 },
+                    usedCapacity: { current: 10n, nonCurrent: 10n },
+                    objectCount: { current: 10n, nonCurrent: 10n },
                 },
             },
         }, logger, done);
@@ -94,8 +94,8 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 next();
             }),
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
-                assert.equal(err, null);
-                assert.equal(bucketInfo.getCapabilities(), null);
+                assert.equal(err && err.message, 'InternalError');
+                assert.equal(bucketInfo, undefined);
                 next();
             }),
         ], done);
@@ -126,16 +126,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, 0);
-                assert.strictEqual(Available, 0);
-                assert.strictEqual(Used, 0);
+                assert.strictEqual(Capacity, 0n);
+                assert.strictEqual(Available, 0n);
+                assert.strictEqual(Used, 0n);
                 next();
             }),
         ], done);
     });
 
     test('should successfully collect bucketMetrics and update bucket CapacityInfo', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30;
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30n;
 
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -160,16 +160,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, 30);
-                assert.strictEqual(Available, 10);
-                assert.strictEqual(Used, 20);
+                assert.strictEqual(Capacity, 30n);
+                assert.strictEqual(Available, 10n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
     });
 
-    test('should update bucket Capacity and Available -1 if Capacity value is not valid', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 'not-a-number';
+    test('should update bucket Capacity and Available -1 if Capacity value is not set', done => {
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = -1;
 
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -194,16 +194,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, -1);
-                assert.strictEqual(Available, -1);
-                assert.strictEqual(Used, 20);
+                assert.strictEqual(Capacity, -1n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
     });
 
     test('should update bucket Available -1 if Capacity value is smaller than Used', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 10;
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 10n;
 
         return async.series([
             next => client.createBucket(testBucketName, {
@@ -228,16 +228,16 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, 10);
-                assert.strictEqual(Available, -1);
-                assert.strictEqual(Used, 20);
+                assert.strictEqual(Capacity, 10n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, 20n);
                 next();
             }),
         ], done);
     });
 
     test('should update bucket Used and Available -1 if bucket metrics are not retrievable', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30;
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 30n;
 
         return async.series([
             next => client.updateStorageConsumptionMetrics({}, { bucket: {} }, logger, next),
@@ -263,9 +263,9 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                assert.strictEqual(Capacity, 30);
-                assert.strictEqual(Available, -1);
-                assert.strictEqual(Used, -1);
+                assert.strictEqual(Capacity, 30n);
+                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Used, -1n);
                 next();
             }),
         ], done);

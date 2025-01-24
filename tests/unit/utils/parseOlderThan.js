@@ -9,7 +9,7 @@ describe('parseOlderThan', () => {
         });
     });
     afterAll(() => {
-        clock.restore();
+        clock.uninstall();
     });
 
     test('as a date given in ISO format', () => {
