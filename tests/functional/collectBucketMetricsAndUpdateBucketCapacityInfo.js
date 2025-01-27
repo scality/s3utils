@@ -202,7 +202,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         ], done);
     });
 
-    test('should update bucket Available -1 if Capacity value is smaller than Used', done => {
+    test('should update bucket Available01 if Capacity value is smaller than Used', done => {
         testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = 10n;
 
         return async.series([
@@ -229,7 +229,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 assert.equal(err, null);
                 const { Capacity, Available, Used } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
                 assert.strictEqual(Capacity, 10n);
-                assert.strictEqual(Available, -1n);
+                assert.strictEqual(Available, 0n);
                 assert.strictEqual(Used, 20n);
                 next();
             }),

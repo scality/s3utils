@@ -98,6 +98,8 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                             // if bucket storage used is valid and capacity is bigger than used
                             if (bucketStorageUsed !== -1n && (capacity - bucketStorageUsed) >= 0n) {
                                 available = capacity - bucketStorageUsed;
+                            } else if (bucketStorageUsed !== -1n && (capacity - bucketStorageUsed) < 0n) {
+                                available = 0n;
                             }
                         }
                         return mongoClient.updateBucketCapacityInfo(bucketName, {
