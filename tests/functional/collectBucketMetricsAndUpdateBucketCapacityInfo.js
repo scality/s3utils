@@ -94,8 +94,8 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                 next();
             }),
             next => client.getBucketAttributes(testBucketName, logger, (err, bucketInfo) => {
-                assert.equal(err && err.message, 'InternalError');
-                assert.equal(bucketInfo, undefined);
+                assert.equal(err, null);
+                assert.strictEqual(bucketInfo.getCapabilities().VeeamSOSApi, undefined);
                 next();
             }),
         ], done);
@@ -169,7 +169,7 @@ describe('collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
     });
 
     test('should update bucket Capacity and Available -1 if Capacity value is not set', done => {
-        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = -1;
+        testBucketCapacities.VeeamSOSApi.CapacityInfo.Capacity = -1n;
 
         return async.series([
             next => client.createBucket(testBucketName, {

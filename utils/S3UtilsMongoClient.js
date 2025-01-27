@@ -14,8 +14,8 @@ const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
 
 const BigIntMax = (...args) => args.reduce((max, current) => {
-    const maxAsBigInt = typeof max === 'bigint' ? max : BigInt(max);
-    const currentAsBigInt = typeof current === 'bigint' ? current : BigInt(current);
+    const maxAsBigInt = BigInt(max);
+    const currentAsBigInt = BigInt(current);
     return maxAsBigInt > currentAsBigInt ? max : current;
 });
 
@@ -114,7 +114,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 const id = entry._id;
                 if (id.startsWith('bucket_')) {
                     const inflightDocument = inflightsMap[id];
-                    const inflight = inflightDocument ? BigIntMax(0, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0n;
+                    const inflight = inflightDocument ? BigIntMax(0n, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0n;
                     if (inflight) {
                         // Inflights remaining after the scan are part of the "current" bytes,
                         // and stored in _inflightsDelta

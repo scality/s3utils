@@ -24,6 +24,9 @@ module.exports = {
         _lifecycleConfiguration: null,
         _uid: '',
         _isNFS: null,
+        _capabilities: {
+            VeeamSOSApi: undefined,
+        },
         ingestion: null,
     },
     testAccountCanonicalId: 'd1d40abd2bd8250962f7f5774af1bbbeaec9b77a0853749d41ec46f142e66fe4',

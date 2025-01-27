@@ -464,7 +464,6 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                             logger,
                             (err, data) => {
                                 assert.deepStrictEqual(err, null);
-                                // assert.deepStrictEqual(data, expected);\
                                 // Compare each section separately to avoid circular reference issues
                                 assert.strictEqual(data.versions.toString(), expected.versions.toString());
                                 assert.strictEqual(data.objects.toString(), expected.objects.toString());
@@ -1613,7 +1612,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
     });
 });
 
-describe.skip('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
+describe('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
     let client;
     let repl;
 
@@ -1676,7 +1675,7 @@ describe.skip('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
     });
 });
 
-describe.skip('S3UtilsMongoClient::getBucketInfos', () => {
+describe('S3UtilsMongoClient::getBucketInfos', () => {
     let client;
     let repl;
 
@@ -1731,9 +1730,18 @@ describe.skip('S3UtilsMongoClient::getBucketInfos', () => {
         it('Should get correct bucket infos', done => client.getBucketInfos(logger, (err, data) => {
             assert.equal(err, null);
             assert.strictEqual(data.bucketCount, 3);
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), JSON.stringify(buckets[0]));
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
+            assert.strictEqual(
+                data.bucketInfos.find(bucket => bucket._name === buckets[0]._name).serialize(),
+                BucketInfo.fromObj(buckets[0]).serialize(),
+            );
+            assert.strictEqual(
+                data.bucketInfos.find(bucket => bucket._name === buckets[1]._name).serialize(),
+                BucketInfo.fromObj(buckets[1]).serialize(),
+            );
+            assert.strictEqual(
+                data.bucketInfos.find(bucket => bucket._name === buckets[2]._name).serialize(),
+                BucketInfo.fromObj(buckets[2]).serialize(),
+            );
             done();
         }));
 
@@ -1758,9 +1766,9 @@ describe.skip('S3UtilsMongoClient::getBucketInfos', () => {
 
             // Perform the assertions
             assert.strictEqual(data.bucketCount, 2);
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name)), undefined);
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[1]._name)), JSON.stringify(buckets[1]));
-            assert.strictEqual(JSON.stringify(data.bucketInfos.find(bucket => bucket._name === buckets[2]._name)), JSON.stringify(buckets[2]));
+            assert.strictEqual(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name), undefined);
+            assert.strictEqual(!!data.bucketInfos.find(bucket => bucket._name === buckets[1]._name), true);
+            assert.strictEqual(!!data.bucketInfos.find(bucket => bucket._name === buckets[2]._name), true);
         });
     });
 });

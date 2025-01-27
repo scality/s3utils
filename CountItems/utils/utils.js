@@ -82,7 +82,6 @@ function consolidateDataMetrics(target, source) {
     return resTarget;
 }
 
-
 function serializeBigInts(obj) {
     if (typeof obj !== 'object' || obj === null) {
         return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
