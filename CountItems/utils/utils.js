@@ -82,6 +82,38 @@ function consolidateDataMetrics(target, source) {
     return resTarget;
 }
 
+
+function serializeBigInts(obj) {
+    if (typeof obj !== 'object' || obj === null) {
+        return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
+    }
+    const result = Array.isArray(obj) ? [] : {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = serializeBigInts(obj[key]);
+        }
+    }
+    return result;
+}
+
+function deserializeBigInts(obj) {
+    if (!obj || typeof obj !== 'object') {
+        return obj;
+    }
+    if (obj.__bigint !== undefined) {
+        return BigInt(obj.__bigint);
+    }
+    const result = Array.isArray(obj) ? [] : {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = deserializeBigInts(obj[key]);
+        }
+    }
+    return result;
+}
+
 module.exports = {
     consolidateDataMetrics,
+    serializeBigInts,
+    deserializeBigInts,
 };

@@ -2,6 +2,7 @@ const assert = require('assert');
 const async = require('async');
 const { BucketInfo } = require('arsenal').models;
 const monitoring = require('../utils/monitoring');
+const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 class CountWorker {
     constructor(params) {
@@ -15,35 +16,6 @@ class CountWorker {
         this.countItems = this.countItems.bind(this);
         this.clientTeardown = this.clientTeardown.bind(this);
         this.handleMessage = this.handleMessage.bind(this);
-    }
-
-    _serializeBigInts(obj) {
-        if (typeof obj !== 'object' || obj === null) {
-            return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
-        }
-        const result = Array.isArray(obj) ? [] : {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                result[key] = this._serializeBigInts(obj[key]);
-            }
-        }
-        return result;
-    }
-
-    _deserializeBigInts(obj) {
-        if (!obj || typeof obj !== 'object') {
-            return obj;
-        }
-        if (obj.__bigint !== undefined) {
-            return BigInt(obj.__bigint);
-        }
-        const result = Array.isArray(obj) ? [] : {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                result[key] = this._deserializeBigInts(obj[key]);
-            }
-        }
-        return result;
     }
 
     clientSetup(callback) {
@@ -90,7 +62,7 @@ class CountWorker {
         }
         switch (data.type) {
         case 'count':
-            this.countItems(this._deserializeBigInts(data.bucketInfo), (err, results) => {
+            this.countItems(deserializeBigInts(data.bucketInfo), (err, results) => {
                 if (err) {
                     return this._sendFn({
                         id: data.id,
@@ -105,7 +77,7 @@ class CountWorker {
                     owner: 'scality',
                     type: 'count',
                     status: 'passed',
-                    results: this._serializeBigInts(results),
+                    results: serializeBigInts(results),
                 });
             });
             break;

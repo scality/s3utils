@@ -1,5 +1,6 @@
 const uuid = require('node-uuid');
 const { once } = require('arsenal').jsutil;
+const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 class CountWorkerObj {
     constructor(id, worker) {
@@ -9,35 +10,6 @@ class CountWorkerObj {
         this.callbacks = new Map();
         this._worker = worker;
         this._init();
-    }
-
-    _serializeBigInts(obj) {
-        if (typeof obj !== 'object' || obj === null) {
-            return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
-        }
-        const result = Array.isArray(obj) ? [] : {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                result[key] = this._serializeBigInts(obj[key]);
-            }
-        }
-        return result;
-    }
-
-    _deserializeBigInts(obj) {
-        if (typeof obj !== 'object' || obj === null) {
-            return obj;
-        }
-        if (obj.__bigint !== undefined) {
-            return BigInt(obj.__bigint);
-        }
-        const result = Array.isArray(obj) ? [] : {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                result[key] = this._deserializeBigInts(obj[key]);
-            }
-        }
-        return result;
     }
 
     _init() {
@@ -152,13 +124,13 @@ class CountWorkerObj {
                 return callback(err);
             }
             // Deserialize BigInts from the worker response
-            return callback(null, this._deserializeBigInts(results));
+            return callback(null, deserializeBigInts(results));
         });
         this._worker.send({
             id,
             owner: 'scality',
             type: 'count',
-            bucketInfo: this._serializeBigInts(bucketInfo),
+            bucketInfo: serializeBigInts(bucketInfo),
         });
     }
 
