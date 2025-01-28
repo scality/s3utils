@@ -32,15 +32,19 @@ function isSOSCapacityInfoEnabled(bucketInfo) {
 
 function isValidBucketStorageMetrics(bucketMetric) {
     return bucketMetric
-    && bucketMetric.usedCapacity
-        && typeof bucketMetric.usedCapacity.current === 'number'
-        && typeof bucketMetric.usedCapacity.nonCurrent === 'number'
+        && bucketMetric.usedCapacity
+        // For backward compatibility reeasons, we accept bigint and numbers
+        // But only bigints will be stored in the database
+        && (typeof bucketMetric.usedCapacity.current === 'bigint' || typeof bucketMetric.usedCapacity.current === 'number')
+        && (typeof bucketMetric.usedCapacity.nonCurrent === 'bigint' || typeof bucketMetric.usedCapacity.nonCurrent === 'number')
         && bucketMetric.usedCapacity.current > -1
         && bucketMetric.usedCapacity.nonCurrent > -1;
 }
 
 function isValidCapacityValue(capacity) {
-    return (Number.isSafeInteger(capacity) && capacity >= 0);
+    // For backward compatibility reasons, we accept bigint and numbers
+    // But only bigints (Longs) will be stored in the database
+    return ((typeof capacity === 'bigint' || (typeof capacity === 'number' && Number.isInteger(capacity))) && capacity >= 0);
 }
 
 function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callback) {
@@ -74,22 +78,28 @@ function collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, log, callb
                         return nxt(null, doc);
                     }),
                     (storageMetricDoc, nxt) => {
-                        let bucketStorageUsed = -1;
+                        let bucketStorageUsed = -1n;
                         if (isValidBucketStorageMetrics(storageMetricDoc)) {
                             // Do not count the objects in cold for SOSAPI
-                            bucketStorageUsed = storageMetricDoc.usedCapacity.current
-                                + storageMetricDoc.usedCapacity.nonCurrent;
+                            // numbers are converted into bigints to ensure we support more
+                            // than 9PB of bytes stored and previous clusters where the
+                            // values were stored as numbers.
+                            bucketStorageUsed = BigInt(storageMetricDoc.usedCapacity.current)
+                                + BigInt(storageMetricDoc.usedCapacity.nonCurrent);
                         }
                         // read Capacity from bucket._capabilities
                         const { Capacity } = bucket.getCapabilities().VeeamSOSApi.CapacityInfo;
 
-                        let available = -1;
-                        let capacity = -1;
-                        if (isValidCapacityValue(Capacity)) { // is Capacity value is valid
+                        let available = -1n;
+                        let capacity = -1n;
+                        if (isValidCapacityValue(Capacity)) {
+                            // is Capacity value is valid
                             capacity = Capacity;
                             // if bucket storage used is valid and capacity is bigger than used
-                            if (bucketStorageUsed !== -1 && (capacity - bucketStorageUsed) >= 0) {
+                            if (bucketStorageUsed !== -1n && (capacity - bucketStorageUsed) >= 0n) {
                                 available = capacity - bucketStorageUsed;
+                            } else if (bucketStorageUsed !== -1n && (capacity - bucketStorageUsed) < 0n) {
+                                available = 0n;
                             }
                         }
                         return mongoClient.updateBucketCapacityInfo(bucketName, {

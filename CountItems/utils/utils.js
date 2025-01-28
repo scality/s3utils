@@ -9,32 +9,32 @@ function consolidateDataMetrics(target, source) {
     if (!resTarget.usedCapacity) {
         Object.assign(resTarget, {
             usedCapacity: {
-                current: 0,
-                nonCurrent: 0,
-                _currentCold: 0,
-                _nonCurrentCold: 0,
-                _currentRestored: 0,
-                _currentRestoring: 0,
-                _nonCurrentRestored: 0,
-                _nonCurrentRestoring: 0,
-                _inflightsPreScan: 0,
-                _incompleteMPUParts: 0,
+                current: 0n,
+                nonCurrent: 0n,
+                _currentCold: 0n,
+                _nonCurrentCold: 0n,
+                _currentRestored: 0n,
+                _currentRestoring: 0n,
+                _nonCurrentRestored: 0n,
+                _nonCurrentRestoring: 0n,
+                _inflightsPreScan: 0n,
+                _incompleteMPUParts: 0n,
             },
         });
     }
     if (!resTarget.objectCount) {
         Object.assign(resTarget, {
             objectCount: {
-                current: 0,
-                nonCurrent: 0,
-                _currentCold: 0,
-                _nonCurrentCold: 0,
-                _currentRestored: 0,
-                _currentRestoring: 0,
-                _nonCurrentRestored: 0,
-                _nonCurrentRestoring: 0,
-                _incompleteMPUUploads: 0,
-                deleteMarker: 0,
+                current: 0n,
+                nonCurrent: 0n,
+                _currentCold: 0n,
+                _nonCurrentCold: 0n,
+                _currentRestored: 0n,
+                _currentRestoring: 0n,
+                _nonCurrentRestored: 0n,
+                _nonCurrentRestoring: 0n,
+                _incompleteMPUUploads: 0n,
+                deleteMarker: 0n,
             },
         });
     }
@@ -42,46 +42,77 @@ function consolidateDataMetrics(target, source) {
         return resTarget;
     }
     const { usedCapacity, objectCount, accountOwnerID } = source;
-    resTarget.usedCapacity.current += usedCapacity && usedCapacity.current ? usedCapacity.current : 0;
-    resTarget.usedCapacity.nonCurrent += usedCapacity && usedCapacity.nonCurrent ? usedCapacity.nonCurrent : 0;
-    resTarget.usedCapacity._currentCold += usedCapacity && usedCapacity._currentCold ? usedCapacity._currentCold : 0;
-    resTarget.usedCapacity._nonCurrentCold += usedCapacity && usedCapacity._nonCurrentCold ? usedCapacity._nonCurrentCold : 0;
-    resTarget.usedCapacity._currentRestoring += usedCapacity && usedCapacity._currentRestoring ? usedCapacity._currentRestoring : 0;
-    resTarget.usedCapacity._currentRestored += usedCapacity && usedCapacity._currentRestored ? usedCapacity._currentRestored : 0;
-    resTarget.usedCapacity._nonCurrentRestoring += usedCapacity && usedCapacity._nonCurrentRestoring ? usedCapacity._nonCurrentRestoring : 0;
-    resTarget.usedCapacity._nonCurrentRestored += usedCapacity && usedCapacity._nonCurrentRestored ? usedCapacity._nonCurrentRestored : 0;
-    resTarget.usedCapacity._incompleteMPUParts += usedCapacity && usedCapacity._incompleteMPUParts ? usedCapacity._incompleteMPUParts : 0;
+    resTarget.usedCapacity.current += BigInt(usedCapacity?.current || 0n);
+    resTarget.usedCapacity.nonCurrent += BigInt(usedCapacity?.nonCurrent || 0n);
+    resTarget.usedCapacity._currentCold += BigInt(usedCapacity?._currentCold || 0n);
+    resTarget.usedCapacity._nonCurrentCold += BigInt(usedCapacity?._nonCurrentCold || 0n);
+    resTarget.usedCapacity._currentRestoring += BigInt(usedCapacity?._currentRestoring || 0n);
+    resTarget.usedCapacity._currentRestored += BigInt(usedCapacity?._currentRestored || 0n);
+    resTarget.usedCapacity._nonCurrentRestoring += BigInt(usedCapacity?._nonCurrentRestoring || 0n);
+    resTarget.usedCapacity._nonCurrentRestored += BigInt(usedCapacity?._nonCurrentRestored || 0n);
+    resTarget.usedCapacity._incompleteMPUParts += BigInt(usedCapacity?._incompleteMPUParts || 0n);
 
-    resTarget.objectCount.current += objectCount && objectCount.current ? objectCount.current : 0;
-    resTarget.objectCount.nonCurrent += objectCount && objectCount.nonCurrent ? objectCount.nonCurrent : 0;
-    resTarget.objectCount.deleteMarker += objectCount && objectCount.deleteMarker ? objectCount.deleteMarker : 0;
-    resTarget.objectCount._currentCold += objectCount && objectCount._currentCold ? objectCount._currentCold : 0;
-    resTarget.objectCount._nonCurrentCold += objectCount && objectCount._nonCurrentCold ? objectCount._nonCurrentCold : 0;
-    resTarget.objectCount._currentRestoring += objectCount && objectCount._currentRestoring ? objectCount._currentRestoring : 0;
-    resTarget.objectCount._currentRestored += objectCount && objectCount._currentRestored ? objectCount._currentRestored : 0;
-    resTarget.objectCount._nonCurrentRestoring += objectCount && objectCount._nonCurrentRestoring ? objectCount._nonCurrentRestoring : 0;
-    resTarget.objectCount._nonCurrentRestored += objectCount && objectCount._nonCurrentRestored ? objectCount._nonCurrentRestored : 0;
-    resTarget.objectCount._incompleteMPUUploads += objectCount && objectCount._incompleteMPUUploads ? objectCount._incompleteMPUUploads : 0;
+    resTarget.objectCount.current += BigInt(objectCount?.current || 0n);
+    resTarget.objectCount.nonCurrent += BigInt(objectCount?.nonCurrent || 0n);
+    resTarget.objectCount.deleteMarker += BigInt(objectCount?.deleteMarker || 0n);
+    resTarget.objectCount._currentCold += BigInt(objectCount?._currentCold || 0n);
+    resTarget.objectCount._nonCurrentCold += BigInt(objectCount?._nonCurrentCold || 0n);
+    resTarget.objectCount._currentRestoring += BigInt(objectCount?._currentRestoring || 0n);
+    resTarget.objectCount._currentRestored += BigInt(objectCount?._currentRestored || 0n);
+    resTarget.objectCount._nonCurrentRestoring += BigInt(objectCount?._nonCurrentRestoring || 0n);
+    resTarget.objectCount._nonCurrentRestored += BigInt(objectCount?._nonCurrentRestored || 0n);
+    resTarget.objectCount._incompleteMPUUploads += BigInt(objectCount?._incompleteMPUUploads || 0n);
 
-    resTarget.usedCapacity._inflightsPreScan += usedCapacity && usedCapacity._inflightsPreScan ? usedCapacity._inflightsPreScan : 0;
+    resTarget.usedCapacity._inflightsPreScan += BigInt(usedCapacity?._inflightsPreScan || 0n);
     if (accountOwnerID) {
         resTarget.accountOwnerID = accountOwnerID;
     }
 
     resTarget.usedCapacity.current += usedCapacity
-        ? usedCapacity._currentCold + usedCapacity._currentRestored + usedCapacity._currentRestoring
-        + usedCapacity._incompleteMPUParts : 0;
+        ? BigInt(usedCapacity._currentCold) + BigInt(usedCapacity._currentRestored) + BigInt(usedCapacity._currentRestoring)
+        + BigInt(usedCapacity._incompleteMPUParts) : 0n;
     resTarget.usedCapacity.nonCurrent += usedCapacity
-        ? usedCapacity._nonCurrentCold + usedCapacity._nonCurrentRestored + usedCapacity._nonCurrentRestoring : 0;
+        ? BigInt(usedCapacity._nonCurrentCold) + BigInt(usedCapacity._nonCurrentRestored) + BigInt(usedCapacity._nonCurrentRestoring) : 0n;
     resTarget.objectCount.current += objectCount
-        ? objectCount._currentCold + objectCount._currentRestored + objectCount._currentRestoring
-        + objectCount._incompleteMPUUploads : 0;
+        ? BigInt(objectCount._currentCold) + BigInt(objectCount._currentRestored) + BigInt(objectCount._currentRestoring)
+        + BigInt(objectCount._incompleteMPUUploads) : 0n;
     resTarget.objectCount.nonCurrent += objectCount
-        ? objectCount._nonCurrentCold + objectCount._nonCurrentRestored + objectCount._nonCurrentRestoring : 0;
+        ? BigInt(objectCount._nonCurrentCold) + BigInt(objectCount._nonCurrentRestored) + BigInt(objectCount._nonCurrentRestoring) : 0n;
 
     return resTarget;
 }
 
+function serializeBigInts(obj) {
+    if (typeof obj !== 'object' || obj === null) {
+        return typeof obj === 'bigint' ? { __bigint: obj.toString() } : obj;
+    }
+    const result = Array.isArray(obj) ? [] : {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = serializeBigInts(obj[key]);
+        }
+    }
+    return result;
+}
+
+function deserializeBigInts(obj) {
+    if (!obj || typeof obj !== 'object') {
+        return obj;
+    }
+    if (obj.__bigint !== undefined) {
+        return BigInt(obj.__bigint);
+    }
+    const result = Array.isArray(obj) ? [] : {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = deserializeBigInts(obj[key]);
+        }
+    }
+    return result;
+}
+
 module.exports = {
     consolidateDataMetrics,
+    serializeBigInts,
+    deserializeBigInts,
 };

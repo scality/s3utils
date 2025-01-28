@@ -124,7 +124,11 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                                 CapacityInfo: true,
                             },
                         },
-                        CapacityInfo: {},
+                        CapacityInfo: {
+                            Capacity: 0n,
+                            Available: 0n,
+                            Used: 0n,
+                        },
                     },
                 },
             }));
@@ -145,49 +149,49 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
 
         test('should return false if usedCapacity.current property doesn\'t exist', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { nonCurrent: 0 },
+                usedCapacity: { nonCurrent: 0n },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return false if usedCapacity.nonCurrent property doesn\'t exist', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: 0 },
+                usedCapacity: { current: 0n },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return false if usedCapacity.current value is negative', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: -1, nonCurrent: 0 },
+                usedCapacity: { current: -1n, nonCurrent: 0n },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return false if usedCapacity.nonCurrent value is negative', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: 0, nonCurrent: -1 },
+                usedCapacity: { current: 0n, nonCurrent: -1 },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return false if usedCapacity.current value is not a number', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: 'not-a-number', nonCurrent: 0 },
+                usedCapacity: { current: 'not-a-number', nonCurrent: 0n },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return false if usedCapacity.nonCurrent value is not a number', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: 0, nonCurrent: 'not-a-number' },
+                usedCapacity: { current: 0n, nonCurrent: 'not-a-number' },
             });
             expect(valid).toBeFalsy();
         });
 
         test('should return true if usedCapacity.current and usedCapacity.nonCurrent value are both valid', () => {
             const valid = isValidBucketStorageMetrics({
-                usedCapacity: { current: 0, nonCurrent: 0 },
+                usedCapacity: { current: 0n, nonCurrent: 0n },
             });
             expect(valid).toBeTruthy();
         });
@@ -205,17 +209,13 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should return false if capacity is negative', () => {
-            const valid = isValidCapacityValue(-1);
+            const valid = isValidCapacityValue(-1n);
             expect(valid).toBeFalsy();
         });
 
-        test('should return false if capacity is not a safe integer', () => {
-            const valid = isValidCapacityValue(2 ** 53);
-            expect(valid).toBeFalsy();
-        });
 
         test('should return true if capacity is a valid integer', () => {
-            const valid = isValidCapacityValue(1);
+            const valid = isValidCapacityValue(1n);
             expect(valid).toBeTruthy();
         });
     });
@@ -256,7 +256,11 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                                         CapacityInfo: true,
                                     },
                                 },
-                                CapacityInfo: {},
+                                CapacityInfo: {
+                                    Capacity: 0n,
+                                    Available: 0n,
+                                    Used: 0n,
+                                },
                             },
                         },
                     })],
@@ -281,7 +285,11 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                                         CapacityInfo: true,
                                     },
                                 },
-                                CapacityInfo: {},
+                                CapacityInfo: {
+                                    Capacity: 0n,
+                                    Available: 0n,
+                                    Used: 0n,
+                                },
                             },
                         },
                     })],
@@ -312,7 +320,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         test('should pass with SOSAPI disabled buckets', done => {
             mongoClient.readStorageConsumptionMetrics
                 .mockImplementation((bucketName, log, cb) => cb(null, {
-                    usedCapacity: { current: 0, nonCurrent: 0 },
+                    usedCapacity: { current: 0n, nonCurrent: 0n },
                 }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {
@@ -330,7 +338,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         test('should pass with SOSAPI enabled buckets and update bucket md', done => {
             mongoClient.readStorageConsumptionMetrics
                 .mockImplementation((bucketName, log, cb) => cb(null, {
-                    usedCapacity: { current: 0, nonCurrent: 0 },
+                    usedCapacity: { current: 0n, nonCurrent: 0n },
                 }));
             mongoClient.getBucketInfos
                 .mockImplementation((log, cb) => cb(null, {
@@ -343,7 +351,11 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
                                         CapacityInfo: true,
                                     },
                                 },
-                                CapacityInfo: {},
+                                CapacityInfo: {
+                                    Capacity: 0n,
+                                    Available: 0n,
+                                    Used: 0n,
+                                },
                             },
                         },
                     })],

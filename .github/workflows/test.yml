@@ -15,7 +15,7 @@ env:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       # Need to explicitely add package write permissions for dependabot
       contents: read
@@ -45,7 +45,7 @@ jobs:
 
   tests:
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     services:
       mongodb:
         image: ghcr.io/${{ github.repository }}/ci-mongodb:${{ github.sha }}

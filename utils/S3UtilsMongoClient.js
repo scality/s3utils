@@ -13,37 +13,43 @@ const USERSBUCKET = '__usersbucket';
 const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
 
+const BigIntMax = (...args) => args.reduce((max, current) => {
+    const maxAsBigInt = BigInt(max);
+    const currentAsBigInt = BigInt(current);
+    return maxAsBigInt > currentAsBigInt ? max : current;
+});
+
 const baseMetricsObject = {
-    masterCount: 0,
-    masterData: 0,
-    nullCount: 0,
-    nullData: 0,
-    versionCount: 0,
-    versionData: 0,
-    deleteMarkerCount: 0,
-    masterCountCold: 0,
-    masterDataCold: 0,
-    nullCountCold: 0,
-    nullDataCold: 0,
-    versionCountCold: 0,
-    versionDataCold: 0,
-    deleteMarkerCountCold: 0,
-    masterCountRestoring: 0,
-    masterDataRestoring: 0,
-    nullCountRestoring: 0,
-    nullDataRestoring: 0,
-    versionCountRestoring: 0,
-    versionDataRestoring: 0,
-    deleteMarkerCountRestoring: 0,
-    masterCountRestored: 0,
-    masterDataRestored: 0,
-    nullCountRestored: 0,
-    nullDataRestored: 0,
-    versionCountRestored: 0,
-    versionDataRestored: 0,
-    deleteMarkerCountRestored: 0,
-    mpuUploadCounts: 0,
-    mpuPartsData: 0,
+    masterCount: 0n,
+    masterData: 0n,
+    nullCount: 0n,
+    nullData: 0n,
+    versionCount: 0n,
+    versionData: 0n,
+    deleteMarkerCount: 0n,
+    masterCountCold: 0n,
+    masterDataCold: 0n,
+    nullCountCold: 0n,
+    nullDataCold: 0n,
+    versionCountCold: 0n,
+    versionDataCold: 0n,
+    deleteMarkerCountCold: 0n,
+    masterCountRestoring: 0n,
+    masterDataRestoring: 0n,
+    nullCountRestoring: 0n,
+    nullDataRestoring: 0n,
+    versionCountRestoring: 0n,
+    versionDataRestoring: 0n,
+    deleteMarkerCountRestoring: 0n,
+    masterCountRestored: 0n,
+    masterDataRestored: 0n,
+    nullCountRestored: 0n,
+    nullDataRestored: 0n,
+    versionCountRestored: 0n,
+    versionDataRestored: 0n,
+    deleteMarkerCountRestored: 0n,
+    mpuUploadCounts: 0n,
+    mpuPartsData: 0n,
 };
 
 class S3UtilsMongoClient extends MongoClientInterface {
@@ -83,7 +89,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 return allMetrics;
             }
 
-            cursor = await this.getCollection(INFOSTORE).find({}, {
+            const collection = await this.getCollection(INFOSTORE);
+            if (!collection) {
+                throw new Error('Failed to get infostore collection');
+            }
+            cursor = await collection.find({}, {
                 projection: {
                     'usedCapacity._inflight': 1,
                 },
@@ -92,7 +102,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             const inflights = await cursor.toArray();
             // convert inflights to a map with _id: usedCapacity._inflight
             const inflightsMap = inflights.reduce((map, obj) => {
-                const inflightLong = obj.usedCapacity && obj.usedCapacity._inflight ? obj.usedCapacity._inflight : 0;
+                const inflightLong = obj.usedCapacity?._inflight || 0n;
                 return {
                     ...map,
                     [obj._id]: inflightLong,
@@ -104,20 +114,19 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 const id = entry._id;
                 if (id.startsWith('bucket_')) {
                     const inflightDocument = inflightsMap[id];
-                    const inflight = Long.fromNumber(Number(inflightDocument ? Math.max(0, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0));
+                    const inflight = inflightDocument ? BigIntMax(0n, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0n;
                     if (inflight) {
-                        const inflightLong = Long.fromNumber(Number(inflight));
                         // Inflights remaining after the scan are part of the "current" bytes,
                         // and stored in _inflightsDelta
                         // eslint-disable-next-line no-param-reassign
-                        entry.usedCapacity.current = Long.fromNumber(Number(entry.usedCapacity.current)).add(inflightLong);
+                        entry.usedCapacity.current = BigInt(entry.usedCapacity.current) + inflight;
                         // eslint-disable-next-line no-param-reassign
-                        entry.usedCapacity._inflightsDelta = inflightLong;
+                        entry.usedCapacity._inflightsDelta = inflight;
                         const accountOwnerId = `account_${entry.accountOwnerID}`;
                         if (accountInflights[accountOwnerId]) {
-                            accountInflights[accountOwnerId] = Long.fromNumber(Number(accountInflights[accountOwnerId])).add(inflightLong);
+                            accountInflights[accountOwnerId] = BigInt(accountInflights[accountOwnerId]) + inflight;
                         } else {
-                            accountInflights[accountOwnerId] = inflightLong;
+                            accountInflights[accountOwnerId] = inflight;
                         }
                         // eslint-disable-next-line no-param-reassign
                         delete entry.usedCapacity._inflightsPreScan;
@@ -134,13 +143,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         // Inflights remaining after the scan are part of the "current" bytes,
                         // and stored in _inflightsDelta
                         // eslint-disable-next-line no-param-reassign
-                        entry.usedCapacity.current = Long.fromNumber(Number(entry.usedCapacity.current)).add(accountInflights[id]);
+                        entry.usedCapacity.current = BigInt(entry.usedCapacity.current) + BigInt(accountInflights[id]);
                         // eslint-disable-next-line no-param-reassign
-                        entry.usedCapacity._inflightsDelta = accountInflights[id];
+                        entry.usedCapacity._inflightsDelta = BigInt(accountInflights[id]);
                     }
                 }
             });
-
             return allMetrics;
         } catch (err) {
             log.error('An error occurred', {
@@ -150,7 +158,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             });
             return allMetrics;
         } finally {
-            if (cursor && !cursor.closed) {
+            if (cursor && cursor.close && !cursor.closed) {
                 log.info('Finished processing cursor', {
                     method: 'updateInflightDeltas',
                 });
@@ -187,7 +195,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             };
             let stalledCount = 0;
             let bucketKey;
-            let inflightsPreScan = 0;
+            let inflightsPreScan = 0n;
             let accountBucket;
             const cmpDate = new Date();
             cmpDate.setHours(cmpDate.getHours() - 1);
@@ -318,12 +326,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                     ...baseMetricsObject,
                                 };
                             }
-                            collRes[metricLevel][resourceName][targetData] += data[metricLevel][resourceName];
+                            collRes[metricLevel][resourceName][targetData] += BigInt(data[metricLevel][resourceName]);
                             // Do not count the MPU parts as objects
                             if (!isMPUPart) {
                                 collRes[metricLevel][resourceName][targetCount]++;
                             }
-                            collRes[metricLevel][resourceName].deleteMarkerCount += entry.value.isDeleteMarker ? 1 : 0;
+                            collRes[metricLevel][resourceName].deleteMarkerCount += entry.value.isDeleteMarker ? 1n : 0n;
                         });
                     }
                 });
@@ -338,11 +346,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
                                 ...baseMetricsObject,
                             };
                         }
-                        collRes.account[account].locations[location][targetData] += data.location[location];
+                        collRes.account[account].locations[location][targetData] += BigInt(data.location[location]);
                         if (!isMPUPart) {
                             collRes.account[account].locations[location][targetCount]++;
                         }
-                        collRes.account[account].locations[location].deleteMarkerCount += entry.value.isDeleteMarker ? 1 : 0;
+                        collRes.account[account].locations[location].deleteMarkerCount += entry.value.isDeleteMarker ? 1n : 0n;
                     });
                 });
                 // one bucket has only one account
@@ -412,7 +420,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 Object.keys(retResult.dataMetrics.bucket).forEach(key => {
                     retResult.dataMetrics.bucket[key].usedCapacity = {
                         ...retResult.dataMetrics.bucket[key].usedCapacity,
-                        _inflightsPreScan: inflightsPreScan,
+                        _inflightsPreScan: BigInt(inflightsPreScan),
                     };
                     retResult.dataMetrics.bucket[key].accountOwnerID = accountBucket;
                 });
@@ -533,16 +541,19 @@ class S3UtilsMongoClient extends MongoClientInterface {
     }
 
     _handleResults(res, isVersioned) {
-        let totalNonCurrentCount = 0;
-        let totalCurrentCount = 0;
-        let totalNonCurrentColdCount = 0;
-        let totalCurrentColdCount = 0;
-        let totalRestoringCount = 0;
-        let totalRestoredCount = 0;
-        let totalVersionRestoringCount = 0;
-        let totalVerionsRestoredCount = 0;
+        let totalNonCurrentCount = 0n;
+        let totalCurrentCount = 0n;
+        let totalNonCurrentColdCount = 0n;
+        let totalCurrentColdCount = 0n;
+        let totalRestoringCount = 0n;
+        let totalRestoredCount = 0n;
+        let totalVersionRestoringCount = 0n;
+        let totalVerionsRestoredCount = 0n;
 
-        const totalBytes = { curr: 0, prev: 0 };
+        // Values for current and previous for location are set to bigint, but actually stored as number
+        // because we do not support bigints / Long values here. Having a bigint during computation
+        // allows to have a more precise result.
+        const totalBytes = { curr: 0n, prev: 0n };
         const locationBytes = {};
         const dataMetrics = {
             bucket: {},
@@ -559,138 +570,139 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     if (!dataMetrics[metricLevel][resourceName]) {
                         dataMetrics[metricLevel][resourceName] = {
                             usedCapacity: {
-                                current: 0,
-                                nonCurrent: 0,
-                                _currentCold: 0,
-                                _nonCurrentCold: 0,
-                                _currentRestored: 0,
-                                _currentRestoring: 0,
-                                _nonCurrentRestored: 0,
-                                _nonCurrentRestoring: 0,
-                                _incompleteMPUParts: 0,
+                                current: 0n,
+                                nonCurrent: 0n,
+                                _currentCold: 0n,
+                                _nonCurrentCold: 0n,
+                                _currentRestored: 0n,
+                                _currentRestoring: 0n,
+                                _nonCurrentRestored: 0n,
+                                _nonCurrentRestoring: 0n,
+                                _incompleteMPUParts: 0n,
                             },
                             objectCount: {
-                                current: 0,
-                                nonCurrent: 0,
-                                _currentCold: 0,
-                                _nonCurrentCold: 0,
-                                _currentRestored: 0,
-                                _currentRestoring: 0,
-                                _nonCurrentRestored: 0,
-                                _nonCurrentRestoring: 0,
-                                _incompleteMPUUploads: 0,
-                                deleteMarker: 0,
+                                current: 0n,
+                                nonCurrent: 0n,
+                                _currentCold: 0n,
+                                _nonCurrentCold: 0n,
+                                _currentRestored: 0n,
+                                _currentRestoring: 0n,
+                                _nonCurrentRestored: 0n,
+                                _nonCurrentRestoring: 0n,
+                                _incompleteMPUUploads: 0n,
+                                deleteMarker: 0n,
                             },
                         };
                     }
                     const {
-                        masterCount = 0,
-                        masterData = 0,
-                        nullCount = 0,
-                        nullData = 0,
-                        versionCount = 0,
-                        versionData = 0,
-                        deleteMarkerCount = 0,
-                        masterCountCold = 0,
-                        masterDataCold = 0,
-                        nullCountCold = 0,
-                        nullDataCold = 0,
-                        versionCountCold = 0,
-                        versionDataCold = 0,
-                        deleteMarkerCountCold = 0,
-                        masterCountRestoring = 0,
-                        masterDataRestoring = 0,
-                        nullCountRestoring = 0,
-                        nullDataRestoring = 0,
-                        versionCountRestoring = 0,
-                        versionDataRestoring = 0,
-                        deleteMarkerCountRestoring = 0,
-                        masterCountRestored = 0,
-                        masterDataRestored = 0,
-                        nullCountRestored = 0,
-                        nullDataRestored = 0,
-                        versionCountRestored = 0,
-                        versionDataRestored = 0,
-                        deleteMarkerCountRestored = 0,
-                        mpuUploadCounts = 0,
-                        mpuPartsData = 0,
+                        masterCount = 0n,
+                        masterData = 0n,
+                        nullCount = 0n,
+                        nullData = 0n,
+                        versionCount = 0n,
+                        versionData = 0n,
+                        deleteMarkerCount = 0n,
+                        masterCountCold = 0n,
+                        masterDataCold = 0n,
+                        nullCountCold = 0n,
+                        nullDataCold = 0n,
+                        versionCountCold = 0n,
+                        versionDataCold = 0n,
+                        deleteMarkerCountCold = 0n,
+                        masterCountRestoring = 0n,
+                        masterDataRestoring = 0n,
+                        nullCountRestoring = 0n,
+                        nullDataRestoring = 0n,
+                        versionCountRestoring = 0n,
+                        versionDataRestoring = 0n,
+                        deleteMarkerCountRestoring = 0n,
+                        masterCountRestored = 0n,
+                        masterDataRestored = 0n,
+                        nullCountRestored = 0n,
+                        nullDataRestored = 0n,
+                        versionCountRestored = 0n,
+                        versionDataRestored = 0n,
+                        deleteMarkerCountRestored = 0n,
+                        mpuUploadCounts = 0n,
+                        mpuPartsData = 0n,
                     } = res[metricLevel][resourceName];
 
-                    dataMetrics[metricLevel][resourceName].usedCapacity.current += nullData + masterData;
-                    dataMetrics[metricLevel][resourceName].usedCapacity._currentCold += nullDataCold + masterDataCold;
-                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestoring += nullDataRestoring + masterDataRestoring;
-                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestored += nullDataRestored + masterDataRestored;
-                    dataMetrics[metricLevel][resourceName].usedCapacity._incompleteMPUParts += mpuPartsData;
-                    dataMetrics[metricLevel][resourceName].objectCount.current += nullCount + masterCount;
-                    dataMetrics[metricLevel][resourceName].objectCount._currentCold += nullCountCold + masterCountCold;
-                    dataMetrics[metricLevel][resourceName].objectCount._currentRestoring += nullCountRestoring + masterCountRestoring;
-                    dataMetrics[metricLevel][resourceName].objectCount._currentRestored += nullCountRestored + masterCountRestored;
-                    dataMetrics[metricLevel][resourceName].objectCount._incompleteMPUUploads += mpuUploadCounts;
+                    dataMetrics[metricLevel][resourceName].usedCapacity.current += BigInt(nullData) + BigInt(masterData);
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentCold += BigInt(nullDataCold) + BigInt(masterDataCold);
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestoring += BigInt(nullDataRestoring) + BigInt(masterDataRestoring);
+                    dataMetrics[metricLevel][resourceName].usedCapacity._currentRestored += BigInt(nullDataRestored) + BigInt(masterDataRestored);
+                    dataMetrics[metricLevel][resourceName].usedCapacity._incompleteMPUParts += BigInt(mpuPartsData);
+                    dataMetrics[metricLevel][resourceName].objectCount.current += BigInt(nullCount) + BigInt(masterCount);
+                    dataMetrics[metricLevel][resourceName].objectCount._currentCold += BigInt(nullCountCold) + BigInt(masterCountCold);
+                    dataMetrics[metricLevel][resourceName].objectCount._currentRestoring += BigInt(nullCountRestoring) + BigInt(masterCountRestoring);
+                    dataMetrics[metricLevel][resourceName].objectCount._currentRestored += BigInt(nullCountRestored) + BigInt(masterCountRestored);
+                    dataMetrics[metricLevel][resourceName].objectCount._incompleteMPUUploads += BigInt(mpuUploadCounts);
 
                     if (isVersioned) {
                         dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent
-                            += versionData - masterData; // masterData is duplicated in versionedData
+                            += BigInt(versionData) - BigInt(masterData); // masterData is duplicated in versionedData
                         dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold
-                            += versionDataCold - masterDataCold;
+                            += BigInt(versionDataCold) - BigInt(masterDataCold);
                         dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring
-                            += versionDataRestoring - masterDataRestoring;
+                            += BigInt(versionDataRestoring) - BigInt(masterDataRestoring);
                         dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored
-                            += versionDataRestored - masterDataRestored;
+                            += BigInt(versionDataRestored) - BigInt(masterDataRestored);
 
-                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold, 0);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring, 0);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored, 0);
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored, 0n);
 
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent
-                            += versionCount - masterCount - deleteMarkerCount;
+                            += BigInt(versionCount) - BigInt(masterCount) - BigInt(deleteMarkerCount);
                         dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold
-                            += versionCountCold - masterCountCold;
+                            += BigInt(versionCountCold) - BigInt(masterCountCold);
                         dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring
-                            += versionCountRestoring - masterCountRestoring;
+                            += BigInt(versionCountRestoring) - BigInt(masterCountRestoring);
                         dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored
-                            += versionCountRestored - masterCountRestored;
+                            += BigInt(versionCountRestored) - BigInt(masterCountRestored);
 
-                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = Math.max(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold, 0);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring, 0);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored = Math.max(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored, 0);
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored, 0n);
 
-                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCount;
-                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountCold;
-                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountRestoring;
-                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += deleteMarkerCountRestored;
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCount);
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCountCold);
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCountRestoring);
+                        dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCountRestored);
                     }
 
                     if (metricLevel === 'location') { // calculate usedCapacity metrics at global and location level
                         // we only count the restoring and restored for non-cold locations
-                        totalBytes.curr += (nullData + masterData + nullDataCold + masterDataCold + nullDataRestoring + masterDataRestoring + nullDataRestored + masterDataRestored);
+                        totalBytes.curr += BigInt(nullData) + BigInt(masterData) + BigInt(nullDataCold) + BigInt(masterDataCold) + BigInt(nullDataRestoring) + BigInt(masterDataRestoring) + BigInt(nullDataRestored) + BigInt(masterDataRestored);
                         if (!locationBytes[resourceName]) {
-                            locationBytes[resourceName] = { curr: 0, prev: 0 };
+                            locationBytes[resourceName] = { curr: 0n, prev: 0n };
                         }
-                        locationBytes[resourceName].curr += (nullData + masterData + nullDataCold + masterDataCold + nullDataRestoring + masterDataRestoring + nullDataRestored + masterDataRestored);
+                        locationBytes[resourceName].curr += BigInt(nullData) + BigInt(masterData) + BigInt(nullDataCold) + BigInt(masterDataCold) + BigInt(nullDataRestoring) + BigInt(masterDataRestoring) + BigInt(nullDataRestored) + BigInt(masterDataRestored);
                         if (isVersioned) {
-                            totalBytes.prev += (versionData + versionDataCold + versionDataRestoring + versionDataRestored);
-                            totalBytes.prev -= (masterData + masterDataCold + masterDataRestoring + masterDataRestored);
-                            totalBytes.prev = Math.max(0, totalBytes.prev);
-                            locationBytes[resourceName].prev += (versionData + versionDataCold + versionDataRestoring + versionDataRestored);
-                            locationBytes[resourceName].prev -= (masterData + masterDataCold + masterDataRestoring + masterDataRestored);
-                            locationBytes[resourceName].prev = Math.max(0, locationBytes[resourceName].prev);
+                            totalBytes.prev += BigInt(versionData) + BigInt(versionDataCold) + BigInt(versionDataRestoring) + BigInt(versionDataRestored);
+                            totalBytes.prev -= BigInt(masterData) + BigInt(masterDataCold) + BigInt(masterDataRestoring) + BigInt(masterDataRestored);
+                            totalBytes.prev = BigIntMax(0n, totalBytes.prev);
+                            locationBytes[resourceName].prev += BigInt(versionData) + BigInt(versionDataCold) + BigInt(versionDataRestoring) + BigInt(versionDataRestored);
+                            locationBytes[resourceName].prev -= BigInt(masterData) + BigInt(masterDataCold) + BigInt(masterDataRestoring) + BigInt(masterDataRestored);
+                            locationBytes[resourceName].prev = BigIntMax(0n, locationBytes[resourceName].prev);
                         }
                     }
                     if (metricLevel === 'bucket') { // count objects up of all buckets
-                        totalCurrentCount += (masterCount + nullCount);
-                        totalNonCurrentCount += isVersioned ? (versionCount - masterCount - deleteMarkerCount) : 0;
-                        totalCurrentColdCount += (masterCountCold + nullCountCold);
-                        totalNonCurrentColdCount += isVersioned ? (versionCountCold - masterCountCold) : 0;
-                        totalRestoringCount += (masterCountRestoring + nullCountRestoring);
-                        totalRestoredCount += (masterCountRestored + nullCountRestored);
-                        totalVersionRestoringCount += isVersioned ? (versionCountRestoring - masterCountRestoring) : 0;
-                        totalVerionsRestoredCount += isVersioned ? (versionCountRestored - masterCountRestored) : 0;
+                        totalCurrentCount += BigInt(masterCount + nullCount);
+                        totalNonCurrentCount += isVersioned ? BigInt(versionCount - masterCount - deleteMarkerCount) : 0n;
+                        totalCurrentColdCount += BigInt(masterCountCold + nullCountCold);
+                        totalNonCurrentColdCount += isVersioned ? BigInt(versionCountCold - masterCountCold) : 0n;
+                        totalRestoringCount += BigInt(masterCountRestoring + nullCountRestoring);
+                        totalRestoredCount += BigInt(masterCountRestored + nullCountRestored);
+                        totalVersionRestoringCount += isVersioned ? BigInt(versionCountRestoring - masterCountRestoring) : 0n;
+                        totalVerionsRestoredCount += isVersioned ? BigInt(versionCountRestored - masterCountRestored) : 0n;
                     }
                 });
             }
         });
+
 
         // parse all locations and reflect the data in the account
         Object.keys((res.account || {})).forEach(account => {
@@ -704,29 +716,29 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 const accountLocation = dataMetrics.account[account].locations[location];
                 if (!accountLocation.usedCapacity) {
                     accountLocation.usedCapacity = {
-                        current: 0,
-                        nonCurrent: 0,
-                        _currentCold: 0,
-                        _nonCurrentCold: 0,
-                        _currentRestored: 0,
-                        _currentRestoring: 0,
-                        _nonCurrentRestored: 0,
-                        _nonCurrentRestoring: 0,
-                        _incompleteMPUParts: 0,
+                        current: 0n,
+                        nonCurrent: 0n,
+                        _currentCold: 0n,
+                        _nonCurrentCold: 0n,
+                        _currentRestored: 0n,
+                        _currentRestoring: 0n,
+                        _nonCurrentRestored: 0n,
+                        _nonCurrentRestoring: 0n,
+                        _incompleteMPUParts: 0n,
                     };
                 }
                 if (!accountLocation.objectCount) {
                     accountLocation.objectCount = {
-                        current: 0,
-                        nonCurrent: 0,
-                        _currentCold: 0,
-                        _nonCurrentCold: 0,
-                        _currentRestored: 0,
-                        _currentRestoring: 0,
-                        _nonCurrentRestored: 0,
-                        _nonCurrentRestoring: 0,
-                        _incompleteMPUUploads: 0,
-                        deleteMarker: 0,
+                        current: 0n,
+                        nonCurrent: 0n,
+                        _currentCold: 0n,
+                        _nonCurrentCold: 0n,
+                        _currentRestored: 0n,
+                        _currentRestoring: 0n,
+                        _nonCurrentRestored: 0n,
+                        _nonCurrentRestoring: 0n,
+                        _incompleteMPUUploads: 0n,
+                        deleteMarker: 0n,
                     };
                 }
                 accountLocation.usedCapacity.current += dataMetrics.location[location].usedCapacity.current;
@@ -754,11 +766,23 @@ class S3UtilsMongoClient extends MongoClientInterface {
         });
 
         return {
-            versions: Math.max(0, totalNonCurrentCount + totalNonCurrentColdCount + totalVersionRestoringCount + totalVerionsRestoredCount),
-            objects: totalCurrentCount + totalCurrentColdCount + totalRestoringCount + totalRestoredCount,
+            // We do not support bigint for the global count items document
+            versions: Number(totalNonCurrentCount + totalNonCurrentColdCount + totalVersionRestoringCount + totalVerionsRestoredCount),
+            objects: Number(totalCurrentCount + totalCurrentColdCount + totalRestoringCount + totalRestoredCount),
             dataManaged: {
-                total: totalBytes,
-                locations: locationBytes,
+                total: {
+                    curr: Number(totalBytes.curr),
+                    prev: Number(totalBytes.prev),
+                },
+                // covert each bigint to a number
+                locations: Object.keys(locationBytes).reduce((acc, location) => {
+                    // eslint-disable-next-line no-param-reassign
+                    acc[location] = {
+                        curr: Number(locationBytes[location].curr),
+                        prev: Number(locationBytes[location].prev),
+                    };
+                    return acc;
+                }, {}),
             },
             dataMetrics,
         };
@@ -773,9 +797,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 $set: {
                     '_id': bucketName,
                     'value.capabilities.VeeamSOSApi.CapacityInfo': {
-                        Capacity: capacityInfo.Capacity,
-                        Available: capacityInfo.Available,
-                        Used: capacityInfo.Used,
+                        Capacity: new Long(capacityInfo.Capacity),
+                        Available: new Long(capacityInfo.Available),
+                        Used: new Long(capacityInfo.Used),
                         LastModified: (new Date()).toISOString(),
                     },
                 },
@@ -811,6 +835,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
             if (typeof obj[key] === 'number') {
                 // convert number to Long
                 newObj[key] = Long.fromNumber(obj[key]);
+            } else if (typeof obj[key] === 'bigint') {
+                newObj[key] = Long.fromString(obj[key].toString());
             } else {
                 // recursively convert nested object properties to Long
                 newObj[key] = S3UtilsMongoClient.convertNumberToLong(obj[key]);
@@ -870,7 +896,23 @@ class S3UtilsMongoClient extends MongoClientInterface {
             if (!doc) {
                 return cb(errors.NoSuchEntity);
             }
-            return cb(null, doc);
+
+            // Keep only relevant metrics: the values are either
+            // number or Long, so we first stringify them and
+            // create a BigInt for processing.
+            const convertedDoc = {
+                usedCapacity: {
+                    current: BigInt(doc.usedCapacity?.current?.toString() || '0'),
+                    nonCurrent: BigInt(doc.usedCapacity?.nonCurrent?.toString() || '0'),
+                },
+                objectCount: {
+                    current: BigInt(doc.objectCount?.current?.toString() || '0'),
+                    nonCurrent: BigInt(doc.objectCount?.nonCurrent?.toString() || '0'),
+                    deleteMarker: BigInt(doc.objectCount?.deleteMarker?.toString() || '0'),
+                },
+            };
+
+            return cb(null, convertedDoc);
         } catch (err) {
             log.error('readStorageConsumptionMetrics: error reading metrics', {
                 error: err,
@@ -886,16 +928,16 @@ class S3UtilsMongoClient extends MongoClientInterface {
             const i = this.getCollection(INFOSTORE);
             const doc = await i.findOne({ _id: entityName });
             if (!doc || !doc.usedCapacity || !doc.usedCapacity._inflight) {
-                return 0;
+                return 0n;
             }
-            return doc.usedCapacity._inflight;
+            return BigInt(doc.usedCapacity._inflight.toString());
         } catch (err) {
             log.error('readStorageConsumptionInflights: error reading metrics', {
                 error: err,
                 errDetails: { ...err },
                 errorString: err.toString(),
             });
-            return 0;
+            return 0n;
         }
     }
 

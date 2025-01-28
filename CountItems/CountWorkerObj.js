@@ -1,5 +1,6 @@
 const uuid = require('node-uuid');
 const { once } = require('arsenal').jsutil;
+const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 class CountWorkerObj {
     constructor(id, worker) {
@@ -118,12 +119,18 @@ class CountWorkerObj {
 
     count(bucketInfo, callback) {
         const id = uuid.v4();
-        this._addCallback(id, 'count', callback);
+        this._addCallback(id, 'count', (err, results) => {
+            if (err) {
+                return callback(err);
+            }
+            // Deserialize BigInts from the worker response
+            return callback(null, deserializeBigInts(results));
+        });
         this._worker.send({
             id,
             owner: 'scality',
             type: 'count',
-            bucketInfo,
+            bucketInfo: serializeBigInts(bucketInfo),
         });
     }
 

@@ -2,6 +2,7 @@ const assert = require('assert');
 const async = require('async');
 const { BucketInfo } = require('arsenal').models;
 const monitoring = require('../utils/monitoring');
+const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 class CountWorker {
     constructor(params) {
@@ -61,7 +62,7 @@ class CountWorker {
         }
         switch (data.type) {
         case 'count':
-            this.countItems(data.bucketInfo, (err, results) => {
+            this.countItems(deserializeBigInts(data.bucketInfo), (err, results) => {
                 if (err) {
                     return this._sendFn({
                         id: data.id,
@@ -76,7 +77,7 @@ class CountWorker {
                     owner: 'scality',
                     type: 'count',
                     status: 'passed',
-                    results,
+                    results: serializeBigInts(results),
                 });
             });
             break;

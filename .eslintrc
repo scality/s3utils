@@ -7,7 +7,7 @@
         "jest/globals": true
     },
     "parserOptions": {
-        "ecmaVersion": 9
+        "ecmaVersion": 2020
     },
     "rules": {
         "no-plusplus": 0,
@@ -23,7 +23,11 @@
         "no-lonely-if": 0,
         "max-classes-per-file": 0,
         "prefer-spread": 0,
-        "no-constructor-return": 0
+        "no-constructor-return": 0,
+        "new-cap": 0
+    },
+    "globals": {
+        "BigInt": "readonly"
     }
 }
 
