@@ -59,7 +59,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '22'
           cache: 'yarn'
       - run: sudo apt-get update -q
       # Ubuntu 24.04 doesn't have libssl1.1 which is needed by mongo-memory-server
