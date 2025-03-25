@@ -53,6 +53,20 @@ const expectedDataMetrics = {
     [`bucket_test-bucket-0_${testBucketCreationDate}`]: {
         objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 0n },
         usedCapacity: { current: 1000n, nonCurrent: 0n },
+        locations: {
+            'secondary-location-1': {
+                objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+                usedCapacity: { current: 3000n, nonCurrent: 3000n },
+            },
+            'secondary-location-2': {
+                objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+                usedCapacity: { current: 3000n, nonCurrent: 3000n },
+            },
+            'us-east-1': {
+                objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n },
+                usedCapacity: { current: 9000n, nonCurrent: 6000n },
+            },
+        },
     },
     [`bucket_test-bucket-1_${testBucketCreationDate}`]: {
         objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 0n },
