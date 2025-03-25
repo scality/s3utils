@@ -324,6 +324,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             if (!collRes[metricLevel][resourceName]) {
                                 collRes[metricLevel][resourceName] = {
                                     ...baseMetricsObject,
+                                    ...(metricLevel === 'bucket' || metricLevel === 'account' ? { locations: {} } : {}),
                                 };
                             }
                             collRes[metricLevel][resourceName][targetData] += BigInt(data[metricLevel][resourceName]);
@@ -334,6 +335,24 @@ class S3UtilsMongoClient extends MongoClientInterface {
                             collRes[metricLevel][resourceName].deleteMarkerCount += entry.value.isDeleteMarker ? 1n : 0n;
                         });
                     }
+                });
+                // Handle bucket locations
+                Object.keys(data.bucket).forEach(bucket => {
+                    if (!collRes.bucket[bucket].locations) {
+                        collRes.bucket[bucket].locations = {};
+                    }
+                    Object.keys(data.location).forEach(location => {
+                        if (!collRes.bucket[bucket].locations[location]) {
+                            collRes.bucket[bucket].locations[location] = {
+                                ...baseMetricsObject,
+                            };
+                        }
+                        collRes.bucket[bucket].locations[location][targetData] += BigInt(data.location[location]);
+                        if (!isMPUPart) {
+                            collRes.bucket[bucket].locations[location][targetCount]++;
+                        }
+                        collRes.bucket[bucket].locations[location].deleteMarkerCount += entry.value.isDeleteMarker ? 1n : 0n;
+                    });
                 });
                 Object.keys(data.account).forEach(account => {
                     if (!collRes.account[account].locations) {
@@ -762,6 +781,67 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 accountLocation.objectCount._incompleteMPUUploads += dataMetrics.location[location].objectCount._incompleteMPUUploads;
 
                 accountLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
+            });
+        });
+
+        // parse all location and reflect the data in the bucket
+        Object.keys((res.bucket || {})).forEach(bucket => {
+            if (!dataMetrics.bucket[bucket].locations) {
+                dataMetrics.bucket[bucket].locations = {};
+            }
+            Object.keys(res.location || {}).forEach(location => {
+                if (!dataMetrics.bucket[bucket].locations[location]) {
+                    dataMetrics.bucket[bucket].locations[location] = {};
+                }
+                const bucketLocation = dataMetrics.bucket[bucket].locations[location];
+                if (!bucketLocation.usedCapacity) {
+                    bucketLocation.usedCapacity = {
+                        current: 0n,
+                        nonCurrent: 0n,
+                        _currentCold: 0n,
+                        _nonCurrentCold: 0n,
+                        _currentRestored: 0n,
+                        _currentRestoring: 0n,
+                        _nonCurrentRestored: 0n,
+                        _nonCurrentRestoring: 0n,
+                        _incompleteMPUParts: 0n,
+                    };
+                }
+                if (!bucketLocation.objectCount) {
+                    bucketLocation.objectCount = {
+                        current: 0n,
+                        nonCurrent: 0n,
+                        _currentCold: 0n,
+                        _nonCurrentCold: 0n,
+                        _currentRestored: 0n,
+                        _currentRestoring: 0n,
+                        _nonCurrentRestored: 0n,
+                        _nonCurrentRestoring: 0n,
+                        _incompleteMPUUploads: 0n,
+                        deleteMarker: 0n,
+                    };
+                }
+                bucketLocation.usedCapacity.current += dataMetrics.location[location].usedCapacity.current;
+                bucketLocation.usedCapacity.nonCurrent += dataMetrics.location[location].usedCapacity.nonCurrent;
+                bucketLocation.usedCapacity._currentCold += dataMetrics.location[location].usedCapacity._currentCold;
+                bucketLocation.usedCapacity._nonCurrentCold += dataMetrics.location[location].usedCapacity._nonCurrentCold;
+                bucketLocation.usedCapacity._currentRestoring += dataMetrics.location[location].usedCapacity._currentRestoring;
+                bucketLocation.usedCapacity._nonCurrentRestoring += dataMetrics.location[location].usedCapacity._nonCurrentRestoring;
+                bucketLocation.usedCapacity._currentRestored += dataMetrics.location[location].usedCapacity._currentRestored;
+                bucketLocation.usedCapacity._nonCurrentRestored += dataMetrics.location[location].usedCapacity._nonCurrentRestored;
+                bucketLocation.usedCapacity._incompleteMPUParts += dataMetrics.location[location].usedCapacity._incompleteMPUParts;
+
+                bucketLocation.objectCount.current += dataMetrics.location[location].objectCount.current;
+                bucketLocation.objectCount.nonCurrent += dataMetrics.location[location].objectCount.nonCurrent;
+                bucketLocation.objectCount._currentCold += dataMetrics.location[location].objectCount._currentCold;
+                bucketLocation.objectCount._nonCurrentCold += dataMetrics.location[location].objectCount._nonCurrentCold;
+                bucketLocation.objectCount._currentRestoring += dataMetrics.location[location].objectCount._currentRestoring;
+                bucketLocation.objectCount._nonCurrentRestoring += dataMetrics.location[location].objectCount._nonCurrentRestoring;
+                bucketLocation.objectCount._currentRestored += dataMetrics.location[location].objectCount._currentRestored;
+                bucketLocation.objectCount._nonCurrentRestored += dataMetrics.location[location].objectCount._nonCurrentRestored;
+                bucketLocation.objectCount._incompleteMPUUploads += dataMetrics.location[location].objectCount._incompleteMPUUploads;
+
+                bucketLocation.objectCount.deleteMarker += dataMetrics.location[location].objectCount.deleteMarker;
             });
         });
 

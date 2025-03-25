@@ -9,7 +9,10 @@ class CountManager {
         this.log = params.log;
         this.workers = params.workers;
         this.maxConcurrent = params.maxConcurrent;
-        this.temporaryStore = {};
+        this.temporaryStore = {
+            account: {},
+            bucket: {},
+        };
         this.store = {
             objects: 0,
             versions: 0,
@@ -94,14 +97,14 @@ class CountManager {
                             this.dataMetrics[metricLevel][resourceName],
                             results.dataMetrics[metricLevel][resourceName],
                         );
-                        // if metricLevel is account, add the locations details
-                        if (metricLevel === 'account') {
+                        // if metricLevel is account or bucket, add the locations details
+                        if (metricLevel === 'account' || metricLevel === 'bucket') {
                             Object.keys((results.dataMetrics[metricLevel][resourceName].locations || {})).forEach(locationName => {
-                                if (!this.temporaryStore[resourceName]) {
-                                    this.temporaryStore[resourceName] = {};
+                                if (!this.temporaryStore[metricLevel][resourceName]) {
+                                    this.temporaryStore[metricLevel][resourceName] = {};
                                 }
-                                this.temporaryStore[resourceName][locationName] = consolidateDataMetrics(
-                                    this.temporaryStore[resourceName][locationName],
+                                this.temporaryStore[metricLevel][resourceName][locationName] = consolidateDataMetrics(
+                                    this.temporaryStore[metricLevel][resourceName][locationName],
                                     results.dataMetrics[metricLevel][resourceName].locations[locationName],
                                 );
                             });
@@ -110,8 +113,12 @@ class CountManager {
                 }
             });
             // Add the accounts details for locations from the temporary store
-            Object.keys(this.temporaryStore).forEach(accountName => {
-                this.dataMetrics.account[accountName].locations = this.temporaryStore[accountName];
+            Object.keys(this.temporaryStore.account).forEach(accountName => {
+                this.dataMetrics.account[accountName].locations = this.temporaryStore.account[accountName];
+            });
+            // Add the locations details for buckets from the temporary store
+            Object.keys(this.temporaryStore.bucket).forEach(bucketName => {
+                this.dataMetrics.bucket[bucketName].locations = this.temporaryStore.bucket[bucketName];
             });
         } else {
             this.dataMetrics = results.dataMetrics;
