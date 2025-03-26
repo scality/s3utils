@@ -734,6 +734,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 }
                 const accountLocation = dataMetrics.account[account].locations[location];
                 if (!accountLocation.usedCapacity) {
+                    // the capacities are created inline to avoid runtime
+                    // deep copy of the baseMetricsObject
                     accountLocation.usedCapacity = {
                         current: 0n,
                         nonCurrent: 0n,
