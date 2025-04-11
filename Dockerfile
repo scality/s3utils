@@ -1,4 +1,4 @@
-ARG NODE_VERSION=16.20.2-bullseye-slim
+ARG NODE_VERSION=22.15.0-bookworm-slim
 
 # Use separate builder to retrieve & build node modules
 FROM node:${NODE_VERSION} AS builder
@@ -34,6 +34,7 @@ RUN apt-get update && \
         jq \
         python3 \
         python3-pip \
+        python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 ENV BALLOT_VERSION 1.0.4
@@ -48,6 +49,8 @@ COPY --from=builder /usr/src/app/supervisord /usr/local/bin/
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
 
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install -r utapi/requirements.txt
 
 ## This section duplicates S3C Federation Dockerfile, this needs to be refactored

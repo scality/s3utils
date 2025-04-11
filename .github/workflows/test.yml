@@ -59,7 +59,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '22'
           cache: 'yarn'
       - run: sudo apt-get update -q
       # Ubuntu 24.04 doesn't have libssl1.1 which is needed by mongo-memory-server
@@ -73,7 +73,7 @@ jobs:
       - run: yarn --silent test:unit
       - run: yarn --silent test:functional
         env:
-          MONGODB_REPLICASET: "localhost:27018"
+          MONGODB_REPLICASET: "127.0.0.1:27018"
       - name: "Debug: SSH to runner"
         uses: scality/actions/action-ssh-to-runner@1.9.0
         continue-on-error: true
