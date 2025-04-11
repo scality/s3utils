@@ -154,8 +154,6 @@ function repairObject(objInfo, cb) {
             // use "versionId" from the parsed metadata instead of
             // `objInfo.firstVersionId`, since it may have changed
             // since the scan ran
-            //
-             
             [md.versionId] = versionIds;
             return putObjectMetadata(objInfo.objectUrl, md, err => {
                 if (err) {

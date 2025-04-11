@@ -1,4 +1,3 @@
-/* eslint-disable consistent-return */
 const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
 const { Long } = require('mongodb');
 const { errors, constants } = require('arsenal');
@@ -887,6 +886,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 },
             }, {
                 upsert: false,
+                returnDocument: 'after',
+                includeResultMetadata: true
             });
             if (!updateResult.ok) {
                 log.error('updateBucketCapacityInfo: failed to update bucket CapacityInfo', {
@@ -978,7 +979,6 @@ class S3UtilsMongoClient extends MongoClientInterface {
             if (!doc) {
                 return cb(errors.NoSuchEntity);
             }
-
             // Keep only relevant metrics: the values are either
             // number or Long, so we first stringify them and
             // create a BigInt for processing.
@@ -993,7 +993,6 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     deleteMarker: BigInt(doc.objectCount?.deleteMarker?.toString() || '0'),
                 },
             };
-
             return cb(null, convertedDoc);
         } catch (err) {
             log.error('readStorageConsumptionMetrics: error reading metrics', {

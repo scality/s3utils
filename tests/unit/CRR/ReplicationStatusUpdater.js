@@ -2,16 +2,12 @@ const AWS = require('aws-sdk');
 const werelogs = require('werelogs');
 const assert = require('assert');
 
-const BackbeatClient = require('../../../BackbeatClient');
-const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
 const {
     initializeCrrWithMocks,
     listVersionRes,
     listVersionsRes,
     listVersionWithMarkerRes,
-    getBucketReplicationRes,
     getMetadataRes,
-    putMetadataRes,
 } = require('../../utils/crr');
 
 const logger = new werelogs.Logger('ReplicationStatusUpdater::tests', 'debug', 'debug');
@@ -71,7 +67,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: '',
                 dataStoreVersionId: '',
-                isNFS: null,
             };
             expect(crr.bb.putMetadata).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -151,7 +146,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         }, {
             description: 'for an object with empty replication info',
@@ -164,7 +158,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: '',
                 storageType: '',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
             replicationStatusToProcess: ['NEW'],
             expectedReplicationInfo: {
@@ -182,7 +175,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         }, {
             description: 'for an object with a failed replication',
@@ -201,7 +193,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
             replicationStatusToProcess: ['FAILED'],
             expectedReplicationInfo: {
@@ -219,7 +210,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         }, {
             description: 'for an object with a completed replication',
@@ -238,7 +228,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
             replicationStatusToProcess: ['COMPLETED'],
             expectedReplicationInfo: {
@@ -256,7 +245,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         }, {
             description: 'of a single site for an object with multiple replication destinations',
@@ -280,7 +268,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
             replicationStatusToProcess: ['FAILED'],
             expectedReplicationInfo: {
@@ -302,7 +289,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         }, {
             description: 'of a single non initialized site for an object with multiple replication destinations',
@@ -326,7 +312,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,azure',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
             replicationStatusToProcess: ['NEW'],
             expectedReplicationInfo: {
@@ -352,7 +337,6 @@ describe('ReplicationStatusUpdater', () => {
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,azure,aws_s3',
                 dataStoreVersionId: '',
-                isNFS: null,
             },
         },
     ].forEach(params => {

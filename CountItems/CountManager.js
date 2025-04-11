@@ -174,7 +174,9 @@ class CountManager {
         }));
         this.store.buckets += bucketCount;
         this.store.bucketList = this.store.bucketList.concat(transformedInfos);
-        this.q.push(bucketInfos);
+        bucketInfos.forEach(bucketInfo => {
+            this.q.push(bucketInfo);
+        });
         this.log.debug('added work', {
             workInQueue: this.q.length(),
             workInProgress: this.q.running(),
@@ -195,18 +197,22 @@ class CountManager {
             Object.values(this.workers)
                 .forEach(worker => this.workerList.push(worker.id));
         }
-        this.q.error = err => {
+        this.q.error(err => {
+            this.log.error('error processing bucket', {
+                error: err,
+                method: 'CountManager::addWork',
+            });
             this.q.pause();
             this.q.kill();
             return process.nextTick(onceCB, err);
-        };
-        this.q.drain = () => {
+        });
+        this.q.drain(() => {
             if (this.q.idle()) {
                 this.q.pause();
                 this.q.kill();
                 process.nextTick(onceCB);
             }
-        };
+        });
         this.q.resume();
     }
 }

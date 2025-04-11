@@ -27,7 +27,7 @@ class BlockDigestsStorage extends stream.Writable {
     constructor(params) {
         super({ objectMode: true });
         const { levelPath, db } = params;
-        if (params.levelPath) {
+        if (levelPath) {
             this.db = new Level(params.levelPath);
         } else {
             this.db = db;
@@ -38,16 +38,16 @@ class BlockDigestsStorage extends stream.Writable {
     }
 
     _write(blockInfo, encoding, callback) {
-        const { size, digest } = blockInfo;
+        const { size, digest, lastKey } = blockInfo;
         this.cargo.push({
             type: 'put',
-            key: blockInfo.lastKey, // index by last block key for efficient lookup
+            key: lastKey, // index by last block key for efficient lookup
             value: JSON.stringify({ size, digest }),
         });
         // heuristic to have basic flow control: delay the callback
         // while queue size is above a reasonable size
         async.whilst(
-            () => this.cargo.length() > MAX_QUEUE_SIZE,
+            async () => this.cargo.length() > MAX_QUEUE_SIZE,
             cb => setTimeout(cb, 100),
             () => callback(),
         );
@@ -57,9 +57,9 @@ class BlockDigestsStorage extends stream.Writable {
         if (this.cargo.idle()) {
             this.db.close(callback);
         } else {
-            this.cargo.drain = () => {
+            this.cargo.drain(() => {
                 this.db.close(callback);
-            };
+            });
         }
     }
 }

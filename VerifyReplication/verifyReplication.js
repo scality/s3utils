@@ -88,7 +88,7 @@ function handlePrefixes(prefixList, cb) {
             bucket: statusObj.srcBucket,
             prefix,
             listingLimit,
-        };       
+        };
         return listAndCompare(params, done);
     }, cb);
 }

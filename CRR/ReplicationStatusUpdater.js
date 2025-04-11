@@ -352,7 +352,7 @@ class ReplicationStatusUpdater {
                     });
                 },
             ),
-            () => {
+            async () => {
                 if (this._nUpdated >= this.maxUpdates || this._nProcessed >= this.maxScanned) {
                     this._logProgress();
                     let remainingBuckets;

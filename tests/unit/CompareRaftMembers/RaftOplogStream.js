@@ -106,7 +106,7 @@ describe('RaftOplogStream', () => {
     ].forEach(testCase => {
         test(testCase.desc, done => {
             const oplogStream = new RaftOplogStream({
-                bucketdHost: 'localhost',
+                bucketdHost: '127.0.0.1',
                 bucketdPort: httpServer.address().port,
                 raftSessionId: 1,
                 startSeq: testCase.startSeq,
@@ -160,7 +160,7 @@ describe('RaftOplogStream', () => {
     });
     test('stream should emit error after all retries fail', done => {
         const oplogStream = new RaftOplogStream({
-            bucketdHost: 'localhost',
+            bucketdHost: '127.0.0.1',
             // change port to get connection errors
             bucketdPort: httpServer.address().port + 1,
             raftSessionId: 1,

@@ -1,7 +1,3 @@
-/* eslint-disable max-len */
-/* eslint-disable no-console */
-/* eslint-disable comma-dangle */
-
 const async = require('async');
 
 const { listBucketMasterKeys } = require('./utils');
@@ -91,14 +87,13 @@ function compareBuckets(params, log, cb) {
                     if (srcDone || srcContents.length > 0) {
                         return process.nextTick(_done);
                     }
-
                     return listBucketMasterKeys(
                         bucketdSrcParams,
                         (err, isTruncated, marker, contents) => {
                             if (err) {
+                                log.error('Error fetching src bucket', { error: err });
                                 return _done(err);
                             }
-
                             srcContents = contents;
                             srcDone = !isTruncated;
                             bucketdSrcParams.marker = marker;
@@ -116,9 +111,9 @@ function compareBuckets(params, log, cb) {
                         bucketdDstParams,
                         (err, isTruncated, marker, contents) => {
                             if (err) {
+                                log.error('Error fetching dst bucket', { error: err });
                                 return _done(err);
                             }
-
                             dstContents = contents;
                             dstDone = !isTruncated;
                             bucketdDstParams.marker = marker;
@@ -129,6 +124,7 @@ function compareBuckets(params, log, cb) {
                 },
             }, err => {
                 if (err) {
+                    log.error('Parallel fetch error', { error: err });
                     return done(err);
                 }
 
@@ -224,7 +220,7 @@ function compareBuckets(params, log, cb) {
                 return process.nextTick(() => done(null));
             });
         },
-        () => (!srcDone || !dstDone || srcContents.length > 0 || dstContents.length > 0),
+        async () => (!srcDone || !dstDone || srcContents.length > 0 || dstContents.length > 0),
         err => {
             statusObj.dstBucketInProgress = null;
             statusObj.srcBucketInProgress = null;
@@ -232,7 +228,6 @@ function compareBuckets(params, log, cb) {
         }
     );
 }
-
 module.exports = {
     compareBuckets,
     compareObjectsReport,

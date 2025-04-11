@@ -21,9 +21,13 @@ class CountWorkerObj {
             }
         });
         this._worker.on('message', data => {
-            if (data.owner !== 'scality') {return;}
+            if (data.owner !== 'scality') {
+                return;
+            }
             const cb = this._getCallback(data.id);
-            if (!cb) {return;}
+            if (!cb) {
+                return;
+            }
             switch (data.type) {
             case 'setup':
                 if (data.status === 'passed') {
@@ -81,7 +85,9 @@ class CountWorkerObj {
     }
 
     _getCallback(id) {
-        if (!this.callbacks.has(id)) {return null;}
+        if (!this.callbacks.has(id)) {
+            return null;
+        }
         const ret = this.callbacks.get(id);
         this.callbacks.delete(id);
         return ret.callback;

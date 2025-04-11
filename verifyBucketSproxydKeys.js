@@ -417,7 +417,6 @@ function listBucketIter(bucket, cb) {
             if (vidSepPos === -1) {
                 const reVersionIds = /"versionId":"([^"]*)"/g;
                 const versionIds = [];
-                 
                 while (true) {
                     const reVersionIdMatch = reVersionIds.exec(item.value);
                     if (!reVersionIdMatch) {

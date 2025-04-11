@@ -36,8 +36,7 @@ async function* listBuckets(log) {
 
     while (true) {
         let res;
-
-        try {             
+        try {   
             res = await listObjects(usersBucket, { ...listingParams, gt }, log);
         } catch (error) {
             if (error.NoSuchBucket) {

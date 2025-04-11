@@ -5,7 +5,8 @@ const CountManager = require('../../../CountItems/CountManager');
 const DummyLogger = require('../../mocks/DummyLogger');
 const CountWorkerObj = require('../../mocks/CountWorkerObj');
 
-const { testBucketMD } = require('../../constants');
+const { testBucketMD, internalTestBucketMD } = require('../../constants');
+const stringifiedBucketMD = JSON.stringify(internalTestBucketMD);
 
 const createWorkers = numWorkers => {
     const workers = {};
@@ -965,8 +966,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 10,
-            bucketInfos: Array(10)
-                .map(() => BucketInfo.deSerialize(testBucketMD)),
+            bucketInfos: Array(10).fill()
+                .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
         expect(m.q.length()).toEqual(10);
@@ -1004,8 +1005,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 1,
-            bucketInfos: Array(1)
-                .map(() => BucketInfo.deSerialize(testBucketMD)),
+            bucketInfos: Array(1).fill()
+                .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
         m.start(err => {
@@ -1028,8 +1029,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 1,
-            bucketInfos: Array(1)
-                .map(() => BucketInfo.deSerialize(testBucketMD)),
+            bucketInfos: Array(1).fill()
+                .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
         m.start(err => {
@@ -1054,8 +1055,8 @@ describe('CountItems::CountManager', () => {
             });
             const bucketList = {
                 bucketCount: 1,
-                bucketInfos: Array(1)
-                    .map(() => BucketInfo.deSerialize(testBucketMD)),
+                bucketInfos: Array(1).fill()
+                    .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
             };
             m.addWork(bucketList);
             m.start(err => {

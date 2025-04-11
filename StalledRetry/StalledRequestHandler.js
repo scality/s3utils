@@ -17,7 +17,9 @@ class StalledRequestHandler {
     }
 
     queueSetup() {
-        this._queue = async.queue(({ bucket, batch, getNext }, done) => {
+        this._queue = async.queue((task, done) => {
+            const { bucket, batch, getNext } = task;
+            
             if (this.queueError !== null) {
                 return done();
             }
@@ -42,7 +44,8 @@ class StalledRequestHandler {
             });
         }, this.concurrentRequests);
 
-        this._queue.error = (err, { bucket, batch }) => {
+        this._queue.error((err, task) => {
+            const { bucket, batch } = task;
             this.log.error('error occurred while processing request', {
                 error: err,
                 lastBatch: batch,
@@ -50,7 +53,7 @@ class StalledRequestHandler {
             });
             this.queueError = err;
             this.kill();
-        };
+        });
     }
 
     isInProgress() {
@@ -68,7 +71,7 @@ class StalledRequestHandler {
 
     _waitForCompletion(cb) {
         async.whilst(
-            () => (!this.killed && this.isInProgress()),
+            async () => (!this.killed && this.isInProgress()),
             done => setTimeout(done, 1000),
             cb,
         );
@@ -110,7 +113,7 @@ class StalledRequestHandler {
 
         return async.times(
             this.concurrentRequests,
-            (_, cb) => nextBatch(cb),
+            (n, next) => nextBatch(next),
             err => {
                 if (err) {
                     this.log.error('failed to populate queue', {

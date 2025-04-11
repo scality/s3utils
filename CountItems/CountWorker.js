@@ -36,7 +36,7 @@ class CountWorker {
         if (bucketInfoObj._websiteConfiguration) {
             Object.assign(bucketInfoObj, { _websiteConfiguration: null });
         }
-        const bucketInfo = BucketInfo.fromObj(bucketInfoObj);
+        const bucketInfo = BucketInfo.fromObj(bucketInfoObj.bucketInfo || bucketInfoObj);
         const bucketName = bucketInfo.getName();
         this.log.info(`${process.pid} handling ${bucketName}`);
         return async.waterfall([
