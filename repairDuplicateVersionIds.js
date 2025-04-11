@@ -136,7 +136,6 @@ function repairObject(objInfo, cb) {
         (rawMD, next) => {
             const reVersionIds = /"versionId":"([^"]*)"/g;
             const versionIds = [];
-            // eslint-disable-next-line no-constant-condition
             while (true) {
                 const reVersionIdMatch = reVersionIds.exec(rawMD);
                 if (!reVersionIdMatch) {
@@ -156,7 +155,7 @@ function repairObject(objInfo, cb) {
             // `objInfo.firstVersionId`, since it may have changed
             // since the scan ran
             //
-            // eslint-disable-next-line no-param-reassign
+             
             [md.versionId] = versionIds;
             return putObjectMetadata(objInfo.objectUrl, md, err => {
                 if (err) {

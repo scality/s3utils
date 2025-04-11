@@ -88,8 +88,7 @@ function handlePrefixes(prefixList, cb) {
             bucket: statusObj.srcBucket,
             prefix,
             listingLimit,
-        };
-        // eslint-disable-next-line no-use-before-define
+        };       
         return listAndCompare(params, done);
     }, cb);
 }

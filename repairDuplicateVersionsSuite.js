@@ -1,7 +1,3 @@
-/* eslint-disable max-len */
-/* eslint-disable no-console */
-/* eslint-disable comma-dangle */
-
 const async = require('async');
 const crypto = require('crypto');
 const fs = require('fs');

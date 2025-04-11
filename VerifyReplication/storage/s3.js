@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 const AWS = require('aws-sdk');
 const fs = require('fs');
 const http = require('http');

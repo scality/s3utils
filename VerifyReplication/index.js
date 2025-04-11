@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 const { Logger } = require('werelogs');
 
 const { defaults, mandatoryVars } = require('./constants');

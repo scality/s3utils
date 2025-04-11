@@ -1,6 +1,6 @@
-jest.mock('node-uuid', () => require('../../mocks/uuid'));
+jest.mock('uuid', () => require('../../mocks/uuid'));
 
-const uuid = require('node-uuid');
+const { v4: uuid } = require('uuid');
 const Subprocess = require('../../mocks/subprocess');
 
 const CountWorkerObj = require('../../../CountItems/CountWorkerObj');
@@ -14,7 +14,7 @@ const createWorker = () => {
 describe('CountItems::CountWorkerObj', () => {
     beforeEach(() => {
         jest.resetModules();
-        uuid.v4.mockReset();
+        uuid.mockReset();
     });
 
     test('should add callback object to list', () => {
@@ -146,7 +146,7 @@ describe('CountItems::CountWorkerObj', () => {
         const { p, w } = createWorker();
         w.clientConnected = testCase.connected;
         const pSendFn = jest.spyOn(p, 'send');
-        uuid.v4.mockImplementationOnce(() => testCase.id);
+        uuid.mockImplementationOnce(() => testCase.id);
         w[testCase.type](...testCase.args, err => {
             if (testCase.error) {
                 expect(err).toEqual(new Error(testCase.error));
@@ -183,7 +183,7 @@ describe('CountItems::CountWorkerObj', () => {
         w.clientConnected = true;
         const testCallbackFn = jest.fn();
         let id = 0;
-        uuid.v4.mockImplementation(() => id++);
+        uuid.mockImplementation(() => id++);
         w.init(testCallbackFn);
         w.setup(testCallbackFn);
         w.teardown(testCallbackFn);

@@ -1,4 +1,4 @@
-const uuid = require('node-uuid');
+const { v4: uuid } = require('uuid');
 const { once } = require('arsenal').jsutil;
 const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
@@ -21,9 +21,9 @@ class CountWorkerObj {
             }
         });
         this._worker.on('message', data => {
-            if (data.owner !== 'scality') return;
+            if (data.owner !== 'scality') {return;}
             const cb = this._getCallback(data.id);
-            if (!cb) return;
+            if (!cb) {return;}
             switch (data.type) {
             case 'setup':
                 if (data.status === 'passed') {
@@ -81,7 +81,7 @@ class CountWorkerObj {
     }
 
     _getCallback(id) {
-        if (!this.callbacks.has(id)) return null;
+        if (!this.callbacks.has(id)) {return null;}
         const ret = this.callbacks.get(id);
         this.callbacks.delete(id);
         return ret.callback;
@@ -95,7 +95,7 @@ class CountWorkerObj {
     }
 
     setup(callback) {
-        const id = uuid.v4();
+        const id = uuid();
         this._addCallback(id, 'setup', callback);
         this._worker.send({
             id,
@@ -108,7 +108,7 @@ class CountWorkerObj {
         if (!this.clientConnected || !this._worker.isConnected()) {
             return callback();
         }
-        const id = uuid.v4();
+        const id = uuid();
         this._addCallback(id, 'teardown', callback);
         return this._worker.send({
             id,
@@ -118,7 +118,7 @@ class CountWorkerObj {
     }
 
     count(bucketInfo, callback) {
-        const id = uuid.v4();
+        const id = uuid();
         this._addCallback(id, 'count', (err, results) => {
             if (err) {
                 return callback(err);

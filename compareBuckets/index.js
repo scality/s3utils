@@ -1,6 +1,4 @@
-/* eslint-disable max-len */
 /* eslint-disable no-console */
-/* eslint-disable comma-dangle */
 
 const { Logger } = require('werelogs');
 

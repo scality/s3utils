@@ -37,8 +37,7 @@ async function* listBuckets(log) {
     while (true) {
         let res;
 
-        try {
-            // eslint-disable-next-line no-await-in-loop
+        try {             
             res = await listObjects(usersBucket, { ...listingParams, gt }, log);
         } catch (error) {
             if (error.NoSuchBucket) {

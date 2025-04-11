@@ -2,7 +2,9 @@ const cluster = require('cluster');
 const CountWorkerObj = require('../CountWorkerObj');
 
 function createWorkers(numWorkers) {
-    if (!cluster.isMaster) return {};
+    if (!cluster.isMaster) {
+        return {};
+    }
     const workers = {};
     for (let i = 0; i < numWorkers; ++i) {
         const worker = cluster.fork(process.env);

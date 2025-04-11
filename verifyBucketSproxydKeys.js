@@ -1,7 +1,4 @@
-/* eslint-disable max-len */
 /* eslint-disable no-console */
-/* eslint-disable comma-dangle */
-
 const http = require('http');
 const { http: httpArsn } = require('httpagent');
 const async = require('async');
@@ -420,7 +417,7 @@ function listBucketIter(bucket, cb) {
             if (vidSepPos === -1) {
                 const reVersionIds = /"versionId":"([^"]*)"/g;
                 const versionIds = [];
-                // eslint-disable-next-line no-constant-condition
+                 
                 while (true) {
                     const reVersionIdMatch = reVersionIds.exec(item.value);
                     if (!reVersionIdMatch) {
@@ -438,8 +435,7 @@ function listBucketIter(bucket, cb) {
                     });
                     status.objectsWithDupVersionIds += 1;
                     // replace with the (assumed legit) first version
-                    // ID to allow correct skipping of version keys
-                    // eslint-disable-next-line prefer-destructuring
+                    // ID to allow correct skipping of version keys         
                     md.versionId = versionIds[0];
                 }
                 lastMasterKey = item.key;
