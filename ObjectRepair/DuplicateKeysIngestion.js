@@ -1,5 +1,6 @@
 const { waterfall } = require('async');
 const { Logger } = require('werelogs');
+const { errors } = require('arsenal');
 const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');
@@ -73,10 +74,26 @@ class RaftJournalReader {
                 log.error('unable to fetch cseq', { err, requestUrl });
                 return cb(err);
             }
+            if (res.statusCode === 416) {
+                // RAFT session is empty: start at 1
+                this.cseq = 1;
+            } else {
+                if (res.statusCode !== 200) {
+                    log.error(
+                        'unable to fetch cseq: error HTTP status code returned',
+                        { statusCode: res.statusCode },
+                    );
+                    return cb(errors.InternalError);
+                }
 
-            const body = JSON.parse(res.body);
-
-            this._setCseq(body);
+                try {
+                    const body = JSON.parse(res.body);
+                    this._setCseq(body);
+                } catch (err) {
+                    log.error('unable to fetch cseq: invalid JSON in response body');
+                    return cb(errors.InternalError);
+                }
+            }
 
             // make sure begin is at least 1 since Raft Journal logs are 1-indexed
             this.begin = Math.max(1, this.cseq - this.lookBack);
@@ -134,7 +151,12 @@ class RaftJournalReader {
                 return cb(new Error(`GET ${requestUrl} returned empty body at ${this.begin}`));
             }
 
-            const body = JSON.parse(res.body);
+            let body;
+            try {
+                body = JSON.parse(res.body);
+            } catch (err) {
+                return cb(new Error(`GET ${requestUrl}: invalid JSON in response body`));
+            }
             // FIXME this special case should be taken care of once S3C-3928 is fixed
             if (body.log.length === 0) {
                 return cb(new RangeError(`GET ${requestUrl} found no new records at ${this.begin}`));

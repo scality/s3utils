@@ -1,13 +1,18 @@
 const fs = require('fs');
+const { errors } = require('arsenal');
 const { RaftJournalReader } = require('../../../ObjectRepair/DuplicateKeysIngestion');
 const { subscribers } = require('../../../ObjectRepair/SproxydKeysSubscribers');
 
 function getMockResponse(mockStatusCode) {
-    const mockBody = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
     const mockResponse = {
-        body: mockBody,
         statusCode: mockStatusCode,
     };
+    if (Math.floor(mockStatusCode / 100) === 2) {
+        const mockBody = fs.readFileSync(`${__dirname}/RaftJournalTestData.json`, 'utf8');
+        mockResponse.body = mockBody;
+    } else {
+        mockResponse.body = '';
+    }
     return mockResponse;
 }
 
@@ -79,6 +84,50 @@ describe('RaftJournalReader', () => {
                 done();
             });
         });
+
+        test('when begin is undefined and route returns an unexpected error', done => {
+            reader._httpRequest = mockHttpRequest(new Error('OOPS'), undefined);
+            reader.begin = undefined;
+
+            reader.setBegin(err => {
+                expect(err).toEqual(new Error('OOPS'));
+                done();
+            });
+        });
+
+        test('when begin is undefined and route returns a 416 HTTP status with empty response body', done => {
+            reader._httpRequest = mockHttpRequest(null, getMockResponse(416));
+            reader.begin = undefined;
+
+            reader.setBegin(err => {
+                expect(err).toBe(undefined);
+                expect(reader.begin).toEqual(1);
+                done();
+            });
+        });
+
+        test('when begin is undefined and route returns a 500 HTTP status with empty response body', done => {
+            reader._httpRequest = mockHttpRequest(null, getMockResponse(500));
+            reader.begin = undefined;
+
+            reader.setBegin(err => {
+                expect(err).toEqual(errors.InternalError);
+                done();
+            });
+        });
+
+        test('when begin is undefined and route returns a 200 OK HTTP status with invalid JSON in response body', done => {
+            reader._httpRequest = mockHttpRequest(null, {
+                statusCode: 200,
+                body: '{BADJSON}',
+            });
+            reader.begin = undefined;
+
+            reader.setBegin(err => {
+                expect(err).toEqual(errors.InternalError);
+                done();
+            });
+        });
     });
     describe('::getBatch', () => {
         const reader = setupJournalReader(getMockResponse(200));
@@ -142,6 +191,17 @@ describe('RaftJournalReader', () => {
         // FIXME this special case should be taken care of once S3C-3928 is fixed
         test('should return error with response containing empty log', done => {
             reader._httpRequest = mockHttpRequest(null, getEmptyRsMockResponse());
+            reader.getBatch((err, body) => {
+                returnedError(err, body);
+                done();
+            });
+        });
+
+        test('should return error with response containing invalid JSON', done => {
+            reader._httpRequest = mockHttpRequest(null, {
+                statusCode: 200,
+                body: '{BADJSON}',
+            });
             reader.getBatch((err, body) => {
                 returnedError(err, body);
                 done();
