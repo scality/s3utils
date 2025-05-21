@@ -39,35 +39,36 @@ describe('RaftJournalReader', () => {
     describe('::setBegin', () => {
         const reader = setupJournalReader();
 
-        beforeEach(() => {
-            reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
-        });
-
         afterEach(() => {
             reader._httpRequest.mockReset();
         });
 
-        test('when begin is undefined, begin = latest cseq - lookBack', () => {
+        test('when begin is undefined, begin = latest cseq - lookBack', done => {
+            reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             reader.begin = undefined;
             reader.lookBack = 5;
 
             reader.setBegin(err => {
                 expect(err).toBe(undefined);
                 expect(reader.begin).toEqual(reader.cseq - reader.lookBack);
+                done();
             });
         });
 
-        test('begin is at minimum 1, even with lookback > latest cseq', () => {
+        test('begin is at minimum 1, even with lookback > latest cseq', done => {
+            reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             reader.begin = undefined;
             reader.lookBack = Infinity;
 
             reader.setBegin(err => {
                 expect(err).toBe(undefined);
                 expect(reader.begin).toEqual(1);
+                done();
             });
         });
 
-        test('if begin is set from a previous call, use the existing begin and ignore lookBack', () => {
+        test('if begin is set from a previous call, use the existing begin and ignore lookBack', done => {
+            reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             reader.begin = 3;
             reader.lookBack = Infinity;
 
@@ -75,6 +76,7 @@ describe('RaftJournalReader', () => {
                 expect(err).toBe(undefined);
                 expect(reader._httpRequest).not.toHaveBeenCalled();
                 expect(reader.begin).toEqual(3);
+                done();
             });
         });
     });
@@ -96,7 +98,7 @@ describe('RaftJournalReader', () => {
             expect(body).toBe(undefined);
         };
 
-        test('should correctly read mocked data', () => {
+        test('should correctly read mocked data', done => {
             reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             reader.getBatch((err, body) => {
                 expect(reader._httpRequest).toHaveBeenCalled();
@@ -109,35 +111,40 @@ describe('RaftJournalReader', () => {
                 expect(err).toBe(null);
                 expect(body).not.toBe(null);
                 expect(body.log).not.toBe(null);
+                done();
             });
         });
 
-        test('should return error with a non-200 status code', () => {
+        test('should return error with a non-200 status code', done => {
             reader._httpRequest = mockHttpRequest(null, getMockResponse(500));
             reader.getBatch((err, body) => {
                 returnedError(err, body);
+                done();
             });
         });
 
-        test('should return error with a missing body', () => {
+        test('should return error with a missing body', done => {
             reader._httpRequest = mockHttpRequest(null, { statusCode: 200 });
             reader.getBatch((err, body) => {
                 returnedError(err, body);
+                done();
             });
         });
 
-        test('should return error with null response', () => {
+        test('should return error with null response', done => {
             reader._httpRequest = mockHttpRequest(null, null);
             reader.getBatch((err, body) => {
                 returnedError(err, body);
+                done();
             });
         });
 
         // FIXME this special case should be taken care of once S3C-3928 is fixed
-        test('should return error with response containing empty log', () => {
+        test('should return error with response containing empty log', done => {
             reader._httpRequest = mockHttpRequest(null, getEmptyRsMockResponse());
             reader.getBatch((err, body) => {
                 returnedError(err, body);
+                done();
             });
         });
     });
@@ -211,7 +218,7 @@ describe('RaftJournalReader', () => {
         reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
         afterEach(() => reader._httpRequest.mockReset());
 
-        test('inserts correct sproxyd key data into SproxydKeyProcessor', () => {
+        test('inserts correct sproxyd key data into SproxydKeyProcessor', done => {
             expect(reader.begin).toEqual(1);
             reader.runOnce((err, timeout) => {
                 expect(err).toBe(null);
@@ -219,6 +226,7 @@ describe('RaftJournalReader', () => {
                 expect(reader._httpRequest).toHaveBeenCalled();
                 expect(reader.processor.insert).toHaveBeenCalled();
                 expect(reader.begin).toBeGreaterThan(1);
+                done();
             });
         });
 
@@ -229,19 +237,21 @@ describe('RaftJournalReader', () => {
             expect(reader.processor.insert).not.toHaveBeenCalled();
         };
 
-        test('should set a timeout of 5000 milliseconds when there is any error during ingestion', () => {
+        test('should set a timeout of 5000 milliseconds when there is any error during ingestion', done => {
             reader._httpRequest = mockHttpRequest(null, getMockResponse(500));
             reader.processor.insert.mockReset();
             reader.runOnce((err, timeout) => {
                 waitsFiveSeconds(err, timeout);
+                done();
             });
         });
 
-        test('should set a timeout of 5000 milliseconds when there is no new data from raft journal', () => {
+        test('should set a timeout of 5000 milliseconds when there is no new data from raft journal', done => {
             reader._httpRequest = mockHttpRequest(null, null);
             reader.processor.insert.mockReset();
             reader.runOnce((err, timeout) => {
                 waitsFiveSeconds(err, timeout);
+                done();
             });
         });
     });
