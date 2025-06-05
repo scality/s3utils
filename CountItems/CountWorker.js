@@ -4,6 +4,7 @@ const { BucketInfo } = require('arsenal').models;
 const monitoring = require('../utils/monitoring');
 const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
+const PENSIEVE = 'PENSIEVE';
 class CountWorker {
     constructor(params) {
         this.log = params.log;
@@ -27,6 +28,40 @@ class CountWorker {
         return this.client.setup(callback);
     }
 
+    getIsTransient(bucketInfo, cb) {
+        const locConstraint = bucketInfo.getLocationConstraint();
+
+        if (this.client.isLocationTransient) {
+            this.client.isLocationTransient(locConstraint, this.log, cb);
+            return;
+        }
+        this.pensieveLocationIsTransient(locConstraint, cb);
+    }
+
+    pensieveLocationIsTransient(locConstraint, cb) {
+        const overlayVersionId = 'configuration/overlay-version';
+
+        async.waterfall([
+            next => this.client.getObject(PENSIEVE, overlayVersionId, null, this.log, next),
+            (version, next) => {
+                const overlayConfigId = `configuration/overlay/${version}`;
+                return this.client.getObject(PENSIEVE, overlayConfigId, null, this.log, next);
+            },
+        ], (err, res) => {
+            if (err) {
+                this.log.error('error getting configuration overlay', {
+                    method: 'pensieveLocationIsTransient',
+                    error: err,
+                });
+                return cb(err);
+            }
+            const isTransient =
+                Boolean(res?.locations[locConstraint]?.isTransient);
+
+            return cb(null, isTransient);
+        });
+    }
+
     countItems(bucketInfoObj, callback) {
         if (!this.client.client) {
             return callback(new Error('NotConnected'));
@@ -40,7 +75,7 @@ class CountWorker {
         const bucketName = bucketInfo.getName();
         this.log.info(`${process.pid} handling ${bucketName}`);
         return async.waterfall([
-            next => this.client._getIsTransient(bucketInfo, this.log, next),
+            next => this.getIsTransient(bucketInfo, next),
             (isTransient, next) => this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),
         ], (err, results) => {
             monitoring.bucketsCount.inc({ status: err ? 'error' : 'success' });
