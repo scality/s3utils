@@ -1,6 +1,7 @@
 const getObjectURL = require('../../VerifyBucketSproxydKeys/getObjectURL');
 const getBucketdURL = require('../../VerifyBucketSproxydKeys/getBucketdURL');
 const FindDuplicateSproxydKeys = require('../../VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
+const validateLocations = require('../../VerifyBucketSproxydKeys/validateLocations');
 
 describe('verifyBucketSproxydKeys', () => {
     test('getObjectURL', () => {
@@ -76,5 +77,94 @@ describe('verifyBucketSproxydKeys', () => {
         // only obj9.k7 is now present in the map
         expect(finder.sproxydKeys).toEqual({ k7: 'obj9' });
         expect(finder.versionsWindow).toEqual({ 11: ['k7'], 12: ['k7'] });
+    });
+
+    describe('validateLocations', () => {
+        const key1 = {
+            key: '8df148c188a7369ef6b632b08e9a2a867c065761',
+            size: 2097,
+            start: 0,
+            dataStoreName: 'us-east-1',
+            dataStoreType: 'scality',
+            dataStoreETag: '1:35bf6d36c0c721deceda5d15fa642a18',
+        };
+        const key2 = {
+            key: '8df148c188a7369ef6b632b08e9a2a867c065762',
+            size: 2098,
+            start: 0,
+            dataStoreName: 'us-east-1',
+            dataStoreType: 'scality',
+            dataStoreETag: '1:35bf6d36c0c721deceda5d15fa642a19',
+        };
+        let status;
+        let findDuplicateSproxydKeys;
+
+        beforeEach(() => {
+            status = { objectsScanned: 0, objectsWithBrokenMetadata: 0 };
+            findDuplicateSproxydKeys = { skipVersion: jest.fn() };
+        });
+
+        test('should return true for valid locations array', () => {
+            const result = validateLocations('s3://bucket/key', [key1], status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(true);
+            expect(status.objectsScanned).toEqual(0);
+            expect(status.objectsWithBrokenMetadata).toEqual(0);
+            expect(findDuplicateSproxydKeys.skipVersion).not.toHaveBeenCalled();
+        });
+
+        test('should return true for multiple valid locations', () => {
+            const result = validateLocations('s3://bucket/valid-key', [key1, key2], status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(true);
+            expect(status.objectsScanned).toEqual(0);
+            expect(status.objectsWithBrokenMetadata).toEqual(0);
+            expect(findDuplicateSproxydKeys.skipVersion).not.toHaveBeenCalled();
+        });
+
+        test('should return false for undefined locations', () => {
+            const result = validateLocations('s3://bucket/broken-key', undefined, status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(false);
+            expect(status.objectsScanned).toEqual(1);
+            expect(status.objectsWithBrokenMetadata).toEqual(1);
+            expect(findDuplicateSproxydKeys.skipVersion).toHaveBeenCalledTimes(1);
+        });
+
+        test('should return false for null locations', () => {
+            const result = validateLocations('s3://bucket/null-key', null, status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(false);
+            expect(status.objectsScanned).toEqual(1);
+            expect(status.objectsWithBrokenMetadata).toEqual(1);
+            expect(findDuplicateSproxydKeys.skipVersion).toHaveBeenCalledTimes(1);
+        });
+
+        test('should return false for empty array locations', () => {
+            const result = validateLocations('s3://bucket/empty-key', [], status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(false);
+            expect(status.objectsScanned).toEqual(1);
+            expect(status.objectsWithBrokenMetadata).toEqual(1);
+            expect(findDuplicateSproxydKeys.skipVersion).toHaveBeenCalledTimes(1);
+        });
+
+        test('should return false for non-array locations', () => {
+            const result = validateLocations('s3://bucket/string-key', 'not-an-array', status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(false);
+            expect(status.objectsScanned).toEqual(1);
+            expect(status.objectsWithBrokenMetadata).toEqual(1);
+            expect(findDuplicateSproxydKeys.skipVersion).toHaveBeenCalledTimes(1);
+        });
+
+        test('should return false for object instead of array', () => {
+            const result = validateLocations('s3://bucket/object-key', { key: 'sproxyd-key' }, status, findDuplicateSproxydKeys);
+
+            expect(result).toEqual(false);
+            expect(status.objectsScanned).toEqual(1);
+            expect(status.objectsWithBrokenMetadata).toEqual(1);
+            expect(findDuplicateSproxydKeys.skipVersion).toHaveBeenCalledTimes(1);
+        });
     });
 });
