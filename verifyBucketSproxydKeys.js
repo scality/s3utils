@@ -11,6 +11,7 @@ const { Logger } = require('werelogs');
 const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');
 const getBucketdURL = require('./VerifyBucketSproxydKeys/getBucketdURL');
 const FindDuplicateSproxydKeys = require('./VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
+const validateLocations = require('./VerifyBucketSproxydKeys/validateLocations');
 const BlockDigestsStream = require('./CompareRaftMembers/BlockDigestsStream');
 const BlockDigestsStorage = require('./CompareRaftMembers/BlockDigestsStorage');
 
@@ -138,6 +139,7 @@ const status = {
     objectsWithDupKeys: 0,
     objectsWithEmptyMetadata: 0,
     objectsWithDupVersionIds: 0,
+    objectsWithBrokenMetadata: 0,
     objectsErrors: 0,
     bucketInProgress: null,
     KeyMarker: '',
@@ -193,6 +195,7 @@ function logProgress(message) {
         haveDupKeys: status.objectsWithDupKeys,
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
         haveDupVersionIds: status.objectsWithDupVersionIds,
+        haveBrokenMetadata: status.objectsWithBrokenMetadata,
         errors: status.objectErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
@@ -296,6 +299,10 @@ function fetchObjectLocations(bucket, objectKey, cb) {
 }
 
 function checkSproxydKeys(objectUrl, locations, cb) {
+    if (!validateLocations(objectUrl, locations, status, findDuplicateSproxydKeys)) {
+        return process.nextTick(cb);
+    }
+
     let keyError = false;
     let keyMissing = false;
     let dupKey = false;
@@ -643,6 +650,9 @@ function main() {
             }
             if (status.objectsWithEmptyMetadata) {
                 process.exit(104);
+            }
+            if (status.objectsWithBrokenMetadata) {
+                process.exit(105);
             }
             if (status.objectsErrors) {
                 process.exit(103);
