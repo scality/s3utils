@@ -1,7 +1,6 @@
 const {
     doWhilst, eachSeries, eachLimit, waterfall, series,
 } = require('async');
-const werelogs = require('werelogs');
 const { ObjectMD } = require('arsenal').models;
 
 const { setupClients } = require('./clients');
@@ -44,6 +43,7 @@ class ReplicationStatusUpdater {
             maxScanned,
             keyMarker,
             versionIdMarker,
+            currentVersionOnly,
         } = params;
 
         // inputs
@@ -61,6 +61,7 @@ class ReplicationStatusUpdater {
         this.maxScanned = maxScanned;
         this.inputKeyMarker = keyMarker;
         this.inputVersionIdMarker = versionIdMarker;
+        this.currentVersionOnly = currentVersionOnly;
         this.log = log;
 
         this._setupClients();
@@ -305,7 +306,12 @@ class ReplicationStatusUpdater {
                     this.log.warn(`missing SITE_NAME environment variable, triggering replication to the ${storageClass} storage class`);
                 }
                 return eachLimit(versions, this.workers, (i, apply) => {
-                    const { Key, VersionId } = i;
+                    const { Key, VersionId, IsLatest } = i;
+                    if (this.currentVersionOnly && !IsLatest) {
+                        ++this._nSkipped;
+                        apply();
+                        return;
+                    }
                     this._markObjectPending(bucket, Key, VersionId, storageClass, repConfig, apply);
                 }, next);
             },
