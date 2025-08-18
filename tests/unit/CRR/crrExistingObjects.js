@@ -75,6 +75,7 @@ describe('crrExistingObjects', () => {
         process.env.KEY_MARKER = 'testKeyMarker';
         process.env.VERSION_ID_MARKER = 'testVersionIdMarker';
         process.env.DEBUG = '0';
+        process.env.CURRENT_VERSION_ONLY = 'true';
 
         require('../../../crrExistingObjects');
 
@@ -96,6 +97,7 @@ describe('crrExistingObjects', () => {
             maxScanned: 1000,
             keyMarker: 'testKeyMarker',
             versionIdMarker: 'testVersionIdMarker',
+            currentVersionOnly: true,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();
@@ -131,6 +133,7 @@ describe('crrExistingObjects', () => {
             maxScanned: undefined,
             keyMarker: undefined,
             versionIdMarker: undefined,
+            currentVersionOnly: false,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();
@@ -182,5 +185,29 @@ describe('crrExistingObjects', () => {
 
         expect(mockFatal).toHaveBeenCalledWith('SECRET_KEY not defined');
         expect(process.exit).toHaveBeenCalledWith(1);
+    });
+
+    test('should handle currentVersionOnly with value "1" as true', () => {
+        process.argv[2] = 'bucket1';
+
+        process.env.ACCESS_KEY = 'testAccessKey';
+        process.env.SECRET_KEY = 'testSecretKey';
+        process.env.ENDPOINT = 'http://fake.endpoint';
+        process.env.CURRENT_VERSION_ONLY = '1';
+
+        require('../../../crrExistingObjects');
+
+        const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
+
+        expect(ReplicationStatusUpdater).toHaveBeenCalledWith(
+            expect.objectContaining({
+                currentVersionOnly: true,
+            }),
+            expect.anything(),
+        );
+        expect(mockFatal).not.toHaveBeenCalled();
+        expect(mockError).not.toHaveBeenCalled();
+        expect(process.exit).not.toHaveBeenCalled();
+        expect(mockCrrRun).toHaveBeenCalled();
     });
 });
