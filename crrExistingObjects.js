@@ -23,6 +23,7 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
     && Number.parseInt(process.env.MAX_SCANNED, 10));
 const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
+const CURRENT_VERSION_ONLY = process.env.CURRENT_VERSION_ONLY === 'true' || process.env.CURRENT_VERSION_ONLY === '1' || false;
 
 const {
     ACCESS_KEY,
@@ -56,6 +57,11 @@ if (!STORAGE_TYPE) {
 if (!TARGET_REPLICATION_STATUS) {
     TARGET_REPLICATION_STATUS = 'NEW';
 }
+if (CURRENT_VERSION_ONLY) {
+    log.info('CURRENT_VERSION_ONLY is enabled, only latest versions will be processed');
+} else {
+    log.info('CURRENT_VERSION_ONLY is disabled, all versions will be processed');
+}
 
 const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
 replicationStatusToProcess.forEach(state => {
@@ -85,6 +91,7 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     maxScanned: MAX_SCANNED,
     keyMarker: KEY_MARKER,
     versionIdMarker: VERSION_ID_MARKER,
+    currentVersionOnly: CURRENT_VERSION_ONLY,
 }, log);
 
 replicationStatusUpdater.run(err => {

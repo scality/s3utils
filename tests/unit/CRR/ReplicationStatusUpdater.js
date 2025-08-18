@@ -1,17 +1,12 @@
-const AWS = require('aws-sdk');
 const werelogs = require('werelogs');
 const assert = require('assert');
 
-const BackbeatClient = require('../../../BackbeatClient');
-const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
 const {
     initializeCrrWithMocks,
     listVersionRes,
     listVersionsRes,
     listVersionWithMarkerRes,
-    getBucketReplicationRes,
     getMetadataRes,
-    putMetadataRes,
 } = require('../../utils/crr');
 
 const logger = new werelogs.Logger('ReplicationStatusUpdater::tests', 'debug', 'debug');
@@ -530,6 +525,177 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 VersionIdMarker: 'vid1',
             }, expect.any(Function));
 
+            done();
+        });
+    });
+});
+
+describe('ReplicationStatusUpdater with currentVersionOnly', () => {
+    it('should process only latest versions when currentVersionOnly is true', done => {
+        const listVersionsWithMixedLatest = {
+            IsTruncated: false,
+            Versions: [
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key0',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
+                    IsLatest: true,
+                    LastModified: '2024-01-05T13:11:31.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key0',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItV',
+                    IsLatest: false,
+                    LastModified: '2024-01-05T13:11:30.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key1',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItU',
+                    IsLatest: true,
+                    LastModified: '2024-01-05T13:11:32.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key1',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItT',
+                    IsLatest: false,
+                    LastModified: '2024-01-05T13:11:31.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+            ],
+            DeleteMarkers: [],
+            Name: 'bucket0',
+            MaxKeys: 1000,
+            CommonPrefixes: [],
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            currentVersionOnly: true,
+        }, logger);
+
+        crr.s3.listObjectVersions = jest.fn((params, cb) => cb(null, listVersionsWithMixedLatest));
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.s3.listObjectVersions).toHaveBeenCalledTimes(1);
+            expect(crr.s3.getBucketReplication).toHaveBeenCalledTimes(1);
+
+            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(1, {
+                Bucket: 'bucket0',
+                Key: 'key0',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
+            }, expect.any(Function));
+            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(2, {
+                Bucket: 'bucket0',
+                Key: 'key1',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItU',
+            }, expect.any(Function));
+
+            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+
+            assert.strictEqual(crr._nProcessed, 2);
+            assert.strictEqual(crr._nSkipped, 2);
+            assert.strictEqual(crr._nUpdated, 2);
+            assert.strictEqual(crr._nErrors, 0);
+            done();
+        });
+    });
+
+    it('should process all versions when currentVersionOnly is false', done => {
+        const listVersionsWithMixedLatest = {
+            IsTruncated: false,
+            Versions: [
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key0',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
+                    IsLatest: true,
+                    LastModified: '2024-01-05T13:11:31.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+                {
+                    ETag: '"dabcc341ecab339daf766e1cddd5d1bb"',
+                    ChecksumAlgorithm: [],
+                    Size: 3263,
+                    StorageClass: 'STANDARD',
+                    Key: 'key0',
+                    VersionId: 'aJdO148N3LjN00000000001I4j3QKItV',
+                    IsLatest: false,
+                    LastModified: '2024-01-05T13:11:30.861Z',
+                    Owner: {
+                        DisplayName: 'bart',
+                        ID: '0',
+                    },
+                },
+            ],
+            DeleteMarkers: [],
+            Name: 'bucket0',
+            MaxKeys: 1000,
+            CommonPrefixes: [],
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            currentVersionOnly: false,
+        }, logger);
+
+        crr.s3.listObjectVersions = jest.fn((params, cb) => cb(null, listVersionsWithMixedLatest));
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.s3.listObjectVersions).toHaveBeenCalledTimes(1);
+            expect(crr.s3.getBucketReplication).toHaveBeenCalledTimes(1);
+
+            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+
+            assert.strictEqual(crr._nProcessed, 2);
+            assert.strictEqual(crr._nSkipped, 0);
+            assert.strictEqual(crr._nUpdated, 2);
+            assert.strictEqual(crr._nErrors, 0);
             done();
         });
     });
