@@ -1,6 +1,7 @@
 const async = require('async');
 
 const storage = require('./storage');
+const { NotFound } = require('@aws-sdk/client-s3');
 
 let bucketMatch = false;
 let compareSize = false;
@@ -41,7 +42,7 @@ function verifyObjects(objectList, cb) {
 
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
-            if (err && err.code !== 'NotFound') {
+            if (err) {
                 ++statusObj.dstFailedMdRetrievalsCount;
                 logger.error('error getting metadata', {
                     error: err,
@@ -49,16 +50,10 @@ function verifyObjects(objectList, cb) {
                     key: dstKey,
                     srcLastModified,
                 });
+                if (err instanceof NotFound) {
+                    ++statusObj.missingInDstCount;
+                }
                 // log the error and continue processing objects
-                return done();
-            }
-            if (err && err.code === 'NotFound') {
-                ++statusObj.missingInDstCount;
-                logger.info('object missing in destination', {
-                    key,
-                    size,
-                    srcLastModified,
-                });
                 return done();
             }
             const srcSize = Number.parseInt(size, 10);
@@ -81,6 +76,9 @@ function verifyObjects(objectList, cb) {
 }
 
 function handlePrefixes(prefixList, cb) {
+    if (!prefixList || prefixList.length === 0) {
+        return process.nextTick(cb);
+    }
     const prefixes = prefixList.map(p => p.Prefix);
     return async.eachLimit(prefixes, listingWorkers, (prefix, done) => {
         const params = {
@@ -106,7 +104,7 @@ function listAndCompare(params, cb) {
         }
         const {
             IsTruncated,
-            NextContinuationToken: nextContinuationToken,
+            NextContinuationToken,
             Contents,
             CommonPrefixes,
         } = data;
@@ -118,7 +116,7 @@ function listAndCompare(params, cb) {
                 return cb(error);
             }
             if (IsTruncated) {
-                const listingParams = { ...params, nextContinuationToken };
+                const listingParams = { ...params, nextContinuationToken: NextContinuationToken };
                 return listAndCompare(listingParams, cb);
             }
             logger.info('completed listing and compare', {
