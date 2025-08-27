@@ -1,6 +1,7 @@
 const async = require('async');
-const AWS = require('aws-sdk');
-const { http } = require('httpagent');
+const { S3Client, ListObjectVersionsCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const http = require('http');
 
 const { Logger } = require('werelogs');
 
@@ -32,31 +33,29 @@ if (!SECRET_KEY) {
     process.exit(1);
 }
 
-const s3 = new AWS.S3({
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
+const s3 = new S3Client({
     region: 'us-east-1',
-    sslEnabled: false,
-    endpoint: ENDPOINT,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
-    httpOptions: {
-        maxRetries: 0,
-        timeout: 0,
-        agent: new http.Agent({ keepAlive: true }),
+    credentials: {
+        accessKeyId: ACCESS_KEY,
+        secretAccessKey: SECRET_KEY,
     },
+    endpoint: ENDPOINT,
+    forcePathStyle: true,
+    tls: false,
+    requestHandler: new NodeHttpHandler({
+        httpAgent: new http.Agent({ keepAlive: true }),
+        requestTimeout: 60000,
+    }),
 });
 
 // list object versions
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    s3.listObjectVersions({
+    s3.send(new ListObjectVersionsCommand({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         VersionIdMarker,
         KeyMarker,
-    }, cb);
+    })).then(data => cb(null, data)).catch(cb);
 }
 
 // return object with key and version_id
@@ -82,21 +81,19 @@ function listBucket(bucket, cb) {
                     log.error('error occured while listing', { error: err, bucketName });
                     return done(err);
                 }
-                const keys = _getKeys(data.Versions);
+                const keys = _getKeys(data.Versions || []);
                 return async.mapLimit(keys, 10, (k, next) => {
                     const { Key, VersionId } = k;
-                    s3.headObject(
-                        { Bucket: bucketName, Key, VersionId },
-                        (err, res) => {
-                            if (err) {
-                                return next(err);
-                            }
-                            if (res.ReplicationStatus === 'FAILED') {
-                                console.log({ Key, ...res });
-                            }
-                            return next();
-                        },
-                    );
+                    s3.send(new HeadObjectCommand({
+                        Bucket: bucketName,
+                        Key,
+                        VersionId,
+                    })).then(res => {
+                        if (res.ReplicationStatus === 'FAILED') {
+                            log.info('failed replication object found', { Key, ...res });
+                        }
+                        return next();
+                    }).catch(next);
                 }, err => {
                     if (err) {
                         return done(err);
