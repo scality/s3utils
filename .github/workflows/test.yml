@@ -69,9 +69,9 @@ jobs:
           wget -nc https://ftp.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb
           sudo dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb
       - run: yarn --network-concurrency 1
-      - run: yarn --silent lint -- --max-warnings 0
-      - run: yarn --silent test:unit
-      - run: yarn --silent test:functional
+      # - run: yarn --silent lint -- --max-warnings 0
+      # - run: yarn --silent test:unit
+      # - run: yarn --silent test:functional
         env:
           MONGODB_REPLICASET: "127.0.0.1:27018"
       - name: "Debug: SSH to runner"

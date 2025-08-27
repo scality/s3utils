@@ -266,13 +266,33 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
+        this.log.info('AAAAAA 1: Starting listObjectVersions', {
+            bucket,
+            VersionIdMarker,
+            KeyMarker,
+            targetPrefix: this.targetPrefix,
+            listingLimit: this.listingLimit,
+        });
         return this.s3.listObjectVersions({
             Bucket: bucket,
             MaxKeys: this.listingLimit,
             Prefix: this.targetPrefix,
             VersionIdMarker,
             KeyMarker,
-        }, cb);
+        }, (err, data) => {
+            if (err) {
+                this.log.error('AAAAAA 2: Error in listObjectVersions', { error: err });
+                return cb(err);
+            }
+            this.log.info('AAAAAA 3: listObjectVersions response', {
+                versionsCount: (data.Versions || []).length,
+                deleteMarkersCount: (data.DeleteMarkers || []).length,
+                isTruncated: data.IsTruncated,
+                nextVersionIdMarker: data.NextVersionIdMarker,
+                nextKeyMarker: data.NextKeyMarker,
+            });
+            cb(null, data);
+        });
     }
 
     /**
@@ -284,6 +304,17 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _markPending(bucket, versions, cb) {
+        this.log.info('AAAAAA 4: Starting _markPending', { 
+            bucket, 
+            versionsCount: versions.length,
+            versions: versions.map(v => ({ Key: v.Key, VersionId: v.VersionId, IsLatest: v.IsLatest }))
+        });
+        
+        if (versions.length === 0) {
+            this.log.info('AAAAAA 5: No versions to process, returning early');
+            return cb();
+        }
+        
         const options = { Bucket: bucket };
         waterfall([
             next => this.s3.getBucketReplication(options, (err, res) => {
@@ -307,11 +338,14 @@ class ReplicationStatusUpdater {
                 }
                 return eachLimit(versions, this.workers, (i, apply) => {
                     const { Key, VersionId, IsLatest } = i;
+                    this.log.info('AAAAAA 6: Processing object', { Key, VersionId, IsLatest, currentVersionOnly: this.currentVersionOnly });
                     if (this.currentVersionOnly && !IsLatest) {
+                        this.log.info('AAAAAA 7: Skipping non-current version', { Key, VersionId });
                         ++this._nSkipped;
                         apply();
                         return;
                     }
+                    this.log.info('AAAAAA 8: Calling _markObjectPending', { Key, VersionId, storageClass });
                     this._markObjectPending(bucket, Key, VersionId, storageClass, repConfig, apply);
                 }, next);
             },
@@ -348,10 +382,21 @@ class ReplicationStatusUpdater {
                         this.log.error('error listing object versions', { error: err });
                         return done(err);
                     }
-                    return this._markPending(bucket, data.Versions.concat(data.DeleteMarkers), err => {
+                    const versions = (data.Versions || []).concat(data.DeleteMarkers || []);
+                    this.log.info('AAAAAA 9: About to call _markPending', {
+                        versionsCount: versions.length,
+                        isTruncated: data.IsTruncated,
+                    });
+                    return this._markPending(bucket, versions, err => {
                         if (err) {
+                            this.log.error('AAAAAA 10: Error in _markPending', { error: err });
                             return done(err);
                         }
+                        this.log.info('AAAAAA 11: _markPending completed, updating markers', {
+                            nextVersionIdMarker: data.NextVersionIdMarker,
+                            nextKeyMarker: data.NextKeyMarker,
+                            isTruncated: data.IsTruncated,
+                        });
                         this._VersionIdMarker = data.NextVersionIdMarker;
                         this._KeyMarker = data.NextKeyMarker;
                         return done();
@@ -359,6 +404,14 @@ class ReplicationStatusUpdater {
                 },
             ),
             async () => {
+                this.log.info('AAAAAA 12: Checking doWhilst condition', {
+                    nUpdated: this._nUpdated,
+                    maxUpdates: this.maxUpdates,
+                    nProcessed: this._nProcessed,
+                    maxScanned: this.maxScanned,
+                    versionIdMarker: this._VersionIdMarker,
+                    keyMarker: this._KeyMarker,
+                });
                 if (this._nUpdated >= this.maxUpdates || this._nProcessed >= this.maxScanned) {
                     this._logProgress();
                     let remainingBuckets;
@@ -384,11 +437,14 @@ class ReplicationStatusUpdater {
                             + `VERSION_ID_MARKER=${this._VersionIdMarker}`;
                     }
                     this.log.info(message);
+                    this.log.info('AAAAAA 13: Stopping due to limits reached');
                     return false;
                 }
                 if (this._VersionIdMarker || this._KeyMarker) {
+                    this.log.info('AAAAAA 14: Continuing loop - has markers');
                     return true;
                 }
+                this.log.info('AAAAAA 15: Stopping loop - no more markers');
                 return false;
             },
             err => {
