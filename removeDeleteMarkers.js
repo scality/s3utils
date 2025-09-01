@@ -1,8 +1,15 @@
 /* eslint-disable no-console */
 
-const { http } = require('httpagent');
+const { http, https } = require('httpagent');
 const async = require('async');
-const AWS = require('aws-sdk');
+const crypto = require('crypto');
+const { 
+    S3Client, 
+    GetBucketVersioningCommand,
+    ListObjectVersionsCommand, 
+    DeleteObjectsCommand 
+} = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::removeDeleteMarkers');
@@ -78,22 +85,21 @@ const LOG_PROGRESS_INTERVAL = (
         && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
       || DEFAULT_LOG_PROGRESS_INTERVAL;
 
-AWS.config.update({
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
+const s3 = new S3Client({
+    credentials: {
+        accessKeyId: ACCESS_KEY,
+        secretAccessKey: SECRET_KEY,
+    },
     endpoint: ENDPOINT,
     region: 'us-east-1',
-    sslEnabled: false,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
-});
-
-const s3 = new AWS.S3({
-    httpOptions: {
-        agent: new http.Agent({ keepAlive: true }),
-    },
+    forcePathStyle: true,
+    requestHandler: new NodeHttpHandler({
+        httpAgent: new http.Agent({ keepAlive: true }),
+        httpsAgent: new https.Agent({ 
+            keepAlive: true,
+            rejectUnauthorized: false
+        }),
+    }),
 });
 
 const status = {
@@ -136,36 +142,50 @@ const taskQueue = async.queue((task, done) => {
                 return next();
             }
             logProgress('start scanning bucket');
-            return s3.getBucketVersioning({
+            return s3.send(new GetBucketVersioningCommand({
                 Bucket: bucket,
-            }, (err, data) => {
-                if (err) {
+            }))
+                .then(data => {
+                    if (data.Status !== 'Suspended') {
+                        log.error('bucket versioning status is not "Suspended", skipping bucket', {
+                            bucket,
+                            versioningStatus: data.Status,
+                        });
+                        bucketDone = true;
+                        return next(new Error('bucket not processed'));
+                    }
+                    return next();
+                })
+                .catch(err => {
                     log.error('error getting bucket versioning', {
                         bucket,
                         error: err.message,
                     });
                     bucketDone = true;
                     return next(err);
-                }
-                if (data.Status !== 'Suspended') {
-                    log.error('bucket versioning status is not "Suspended", skipping bucket', {
-                        bucket,
-                        versioningStatus: data.Status,
-                    });
-                    bucketDone = true;
-                    return next(new Error('bucket not processed'));
-                }
-                return next();
-            });
+                });
         },
-        next => s3.listObjectVersions({
+        next => s3.send(new ListObjectVersionsCommand({
             Bucket: bucket,
             MaxKeys: LISTING_LIMIT,
             Prefix: TARGET_PREFIX,
             KeyMarker: keyMarker,
             VersionIdMarker: versionIdMarker,
-        }, (err, data) => {
-            if (err) {
+        }))
+            .then(data => {
+                status.objectsListed += (data.Versions || []).length + (data.DeleteMarkers || []).length;
+                if (data.NextKeyMarker || data.NextVersionIdMarker) {
+                    taskQueue.push({
+                        bucket,
+                        keyMarker: data.NextKeyMarker,
+                        versionIdMarker: data.NextVersionIdMarker,
+                    });
+                } else {
+                    bucketDone = true;
+                }
+                return next(null, data.DeleteMarkers || []);
+            })
+            .catch(err => {
                 log.error('error listing object versions', {
                     bucket,
                     keyMarker,
@@ -174,24 +194,12 @@ const taskQueue = async.queue((task, done) => {
                 });
                 bucketDone = true;
                 return next(err);
-            }
-            status.objectsListed += data.Versions.length + data.DeleteMarkers.length;
-            if (data.NextKeyMarker || data.NextVersionIdMarker) {
-                taskQueue.push({
-                    bucket,
-                    keyMarker: data.NextKeyMarker,
-                    versionIdMarker: data.NextVersionIdMarker,
-                });
-            } else {
-                bucketDone = true;
-            }
-            return next(null, data.DeleteMarkers);
-        }),
+            }),
         (deleteMarkers, next) => {
             if (deleteMarkers.length === 0) {
                 return next();
             }
-            return s3.deleteObjects({
+            const command = new DeleteObjectsCommand({
                 Bucket: bucket,
                 Delete: {
                     Objects: deleteMarkers.map(item => ({
@@ -199,8 +207,35 @@ const taskQueue = async.queue((task, done) => {
                         VersionId: item.VersionId,
                     })),
                 },
-            }, (err, data) => {
-                if (err) {
+            });
+            
+            return s3.send(command)
+                .then(data => {
+                    if (data.Deleted) {
+                        status.deleteMarkersDeleted += data.Deleted.length;
+                        data.Deleted.forEach(entry => {
+                            log.info('delete marker deleted', {
+                                bucket,
+                                objectKey: entry.Key,
+                                versionId: entry.VersionId,
+                            });
+                        });
+                    }
+                    if (data.Errors) {
+                        status.deleteMarkersErrors += data.Errors.length;
+                        data.Errors.forEach(entry => {
+                            log.error('error deleting delete marker', {
+                                bucket,
+                                objectKey: entry.Key,
+                                versionId: entry.VersionId,
+                                error: entry.Code,
+                                errorDesc: entry.Message,
+                            });
+                        });
+                    }
+                    return next();
+                })
+                .catch(err => {
                     log.error('batch delete request error', {
                         bucket,
                         keyMarker,
@@ -217,31 +252,7 @@ const taskQueue = async.queue((task, done) => {
                         });
                     });
                     return next();
-                }
-                if (data.Deleted) {
-                    status.deleteMarkersDeleted += data.Deleted.length;
-                    data.Deleted.forEach(entry => {
-                        log.info('delete marker deleted', {
-                            bucket,
-                            objectKey: entry.Key,
-                            versionId: entry.VersionId,
-                        });
-                    });
-                }
-                if (data.Errors) {
-                    status.deleteMarkersErrors += data.Errors.length;
-                    data.Errors.forEach(entry => {
-                        log.error('error deleting delete marker', {
-                            bucket,
-                            objectKey: entry.Key,
-                            versionId: entry.VersionId,
-                            error: entry.Code,
-                            errorDesc: entry.Message,
-                        });
-                    });
-                }
-                return next();
-            });
+                });
         },
     ], err => {
         if (bucketDone) {
