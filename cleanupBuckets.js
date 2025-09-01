@@ -1,7 +1,12 @@
-const { http } = require('httpagent');
-
-const async = require('async');
-const AWS = require('aws-sdk');
+const { http, https } = require('httpagent');
+const { 
+    S3Client, 
+    ListObjectVersionsCommand, 
+    DeleteObjectsCommand, 
+    ListMultipartUploadsCommand,
+    AbortMultipartUploadCommand, 
+} = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::emptyBucket');
@@ -29,35 +34,22 @@ if (!SECRET_KEY) {
 }
 const LISTING_LIMIT = 1000;
 
-AWS.config.update({
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
+const s3 = new S3Client({
+    credentials: {
+        accessKeyId: ACCESS_KEY,
+        secretAccessKey: SECRET_KEY,
+    },
     endpoint: ENDPOINT,
     region: 'us-east-1',
-    sslEnabled: false,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
+    forcePathStyle: true,
+    requestHandler: new NodeHttpHandler({
+        httpAgent: new http.Agent({ keepAlive: true }),
+        httpsAgent: new https.Agent({ 
+            keepAlive: true,
+            rejectUnauthorized: false
+        }),
+    }),
 });
-
-const s3 = new AWS.S3({
-    httpOptions: {
-        maxRetries: 0,
-        timeout: 0,
-        agent: new http.Agent({ keepAlive: true }),
-    },
-});
-
-// list object versions
-function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    return s3.listObjectVersions({
-        Bucket: bucket,
-        MaxKeys: LISTING_LIMIT,
-        VersionIdMarker,
-        KeyMarker,
-    }, cb);
-}
 
 // return object with key and version_id
 function _getKeys(keys) {
@@ -68,97 +60,91 @@ function _getKeys(keys) {
 }
 
 // delete all versions of an object
-function _deleteVersions(bucket, objectsToDelete, cb) {
-    // multi object delete can delete max 1000 objects
+async function _deleteVersions(bucket, objectsToDelete) {
     const params = {
         Bucket: bucket,
         Delete: { Objects: objectsToDelete },
     };
-    s3.deleteObjects(params, err => {
-        if (err) {
-            log.error('batch delete err', err);
-            return cb(err);
-        }
+    const command = new DeleteObjectsCommand(params);
+    try {
+        await s3.send(command);
         objectsToDelete.forEach(v => log.info(`deleted key: ${v.Key}`));
-        return cb();
-    });
+    } catch (err) {
+        log.error('batch delete err', err);
+        throw err;
+    }
 }
 
-function cleanupVersions(bucket, cb) {
+async function cleanupVersions(bucket) {
     let VersionIdMarker = null;
     let KeyMarker = null;
-    async.doWhilst(
-        done => _listObjectVersions(
-            bucket,
+    let IsTruncated = true;
+    
+    while (IsTruncated) {
+        const data = await s3.send(new ListObjectVersionsCommand({
+            Bucket: bucket,
+            MaxKeys: LISTING_LIMIT,
             VersionIdMarker,
             KeyMarker,
-            (err, data) => {
-                if (err) {
-                    return done(err);
-                }
-                VersionIdMarker = data.NextVersionIdMarker;
-                KeyMarker = data.NextKeyMarker;
-                const keysToDelete = _getKeys(data.Versions);
-                const markersToDelete = _getKeys(data.DeleteMarkers);
-                return _deleteVersions(
-                    bucket,
-                    keysToDelete.concat(markersToDelete),
-                    done,
-                );
-            },
-        ),
-        () => {
-            if (VersionIdMarker || KeyMarker) {
-                return true;
-            }
-            return false;
-        },
-        cb,
-    );
+        }));
+    
+        VersionIdMarker = data.NextVersionIdMarker;
+        KeyMarker = data.NextKeyMarker;
+        IsTruncated = data.IsTruncated;
+        const keysToDelete = _getKeys(data.Versions || []);
+        const markersToDelete = _getKeys(data.DeleteMarkers || []);
+        const allObjectsToDelete = keysToDelete.concat(markersToDelete);
+        
+        if (allObjectsToDelete.length > 0) {
+            await _deleteVersions(bucket, allObjectsToDelete);
+        } else {
+            log.info(`No objects to delete for bucket ${bucket}`);
+        }
+    }
 }
 
-function abortAllMultipartUploads(bucket, cb) {
-    s3.listMultipartUploads({ Bucket: bucket }, (err, res) => {
-        if (err) {
-            return cb(err);
-        }
-        if (!res || !res.Uploads) {
-            return cb();
-        }
-        return async.mapLimit(
-            res.Uploads,
-            10,
-            (item, done) => {
-                const { Key, UploadId } = item;
-                const params = { Bucket: bucket, Key, UploadId };
-                s3.abortMultipartUpload(params, done);
-            },
-            cb,
-        );
-    });
+async function abortAllMultipartUploads(bucket) {
+    const res = await s3.send(new ListMultipartUploadsCommand({ Bucket: bucket }));
+    log.info(`Found ${res.Uploads ? res.Uploads.length : 0} multipart uploads to abort`);
+
+    if (!res || !res.Uploads || res.Uploads.length === 0) {
+        return;
+    }
+    
+    const CONCURRENCY = 10;
+    for (let i = 0; i < res.Uploads.length; i += CONCURRENCY) {
+        const batch = res.Uploads.slice(i, i + CONCURRENCY);
+        const deleteMpuPromises = batch.map(async item => {
+            const { Key, UploadId } = item;
+            const params = { Bucket: bucket, Key, UploadId };
+            return await s3.send(new AbortMultipartUploadCommand(params));
+        });
+        await Promise.all(deleteMpuPromises);
+    }
 }
 
-function _cleanupBucket(bucket, cb) {
-    async.parallel([
-        done => cleanupVersions(bucket, done),
-        done => abortAllMultipartUploads(bucket, done),
-    ], err => {
-        if (err) {
-            log.error('error occured deleting objects', err);
-            return cb(err);
-        }
+async function _cleanupBucket(bucket) {
+    try {
+        await Promise.all([
+            cleanupVersions(bucket),
+            abortAllMultipartUploads(bucket),
+        ]);
         log.info(`completed cleaning up of bucket: ${bucket}`);
-        return cb();
-    });
+    } catch (err) {
+        log.error('error occured deleting objects', err);
+        throw err;
+    }
 }
 
-function cleanupBuckets(buckets) {
-    async.mapLimit(buckets, 1, _cleanupBucket, err => {
-        if (err) {
-            return log.error('error occured deleting objects', err);
+async function cleanupBuckets(buckets) {
+    try {
+        for (const bucket of buckets) {
+            await _cleanupBucket(bucket);
         }
-        return log.info('completed cleaning up the given buckets');
-    });
+        log.info('completed cleaning all buckets');
+    } catch (err) {
+        log.error('error occured deleting objects', err);
+    }
 }
 
 cleanupBuckets(BUCKETS);
