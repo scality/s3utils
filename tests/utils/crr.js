@@ -159,25 +159,37 @@ const putMetadataRes = { versionId: '98295539708053999999RG001  ' };
  *
  * This function creates an instance of the ReplicationStatusUpdater class using the provided configuration.
  * It then replaces certain methods of this instance with Jest mock functions. These mocked methods include
- * `listObjectVersions`, `getBucketReplication` for the S3 client, and `getMetadata`, `putMetadata` for the
- * Backbeat client. These mock functions are designed to simulate the behavior of the actual AWS S3 and Backbeat
+ * the S3 client's generic `send` method for 'listObjectVersions' and 'getBucketReplication', as well as 
+ * `getMetadata`, `putMetadata` for the Backbeat client.
+ * These mock functions are designed to simulate the behavior of the actual AWS S3 and Backbeat
  * clients without making real API calls, which is useful for isolated testing of the ReplicationStatusUpdater
  * functionality.
  *
  * @param {Object} config - The configuration object used to initialize the ReplicationStatusUpdater instance.
  * @param {Logger} log - The logging object to be used by the ReplicationStatusUpdater.
+ * @param {Object} customS3Responses - Optional custom responses for S3 commands.
  * @returns {ReplicationStatusUpdater} An instance of ReplicationStatusUpdater with mocked methods.
  */
-function initializeCrrWithMocks(config, log) {
+function initializeCrrWithMocks(config, log, customS3Responses = {}) {
     const crr = new ReplicationStatusUpdater(config, log);
+    const defaultResponses = {
+        ListObjectVersionsCommand: listVersionRes,
+        GetBucketReplicationCommand: getBucketReplicationRes,
+    };
 
-    const listObjectVersionsMock = jest.fn((params, cb) => cb(null, listVersionRes));
-    const getBucketReplicationMock = jest.fn((params, cb) => cb(null, getBucketReplicationRes));
+    const responses = { ...defaultResponses, ...customS3Responses };
+    const sendMock = jest.fn(command => {
+        const commandName = command.constructor.name;
+        if (responses[commandName]) {
+            return Promise.resolve(responses[commandName]);
+        }
+        return Promise.reject(new Error(`Unknown command: ${commandName}`));
+    });
+
     const getMetadataMock = jest.fn((params, cb) => cb(null, getMetadataRes));
     const putMetadataMock = jest.fn((params, cb) => cb(null, putMetadataRes));
 
-    crr.s3.listObjectVersions = listObjectVersionsMock;
-    crr.s3.getBucketReplication = getBucketReplicationMock;
+    crr.s3.send = sendMock;
     crr.bb.getMetadata = getMetadataMock;
     crr.bb.putMetadata = putMetadataMock;
 

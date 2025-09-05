@@ -1,9 +1,12 @@
 const {
-    doWhilst, eachSeries, eachLimit, waterfall, series,
+    doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
 const { ObjectMD } = require('arsenal').models;
-
 const { setupClients } = require('./clients');
+const { 
+    ListObjectVersionsCommand, 
+    GetBucketReplicationCommand 
+} = require('@aws-sdk/client-s3');
 
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
@@ -26,6 +29,7 @@ class ReplicationStatusUpdater {
      * @param {number} [params.maxScanned] - (Optional) Maximum number of items to scan.
      * @param {string} [params.keyMarker] - (Optional) Key marker for resuming object listing.
      * @param {string} [params.versionIdMarker] - (Optional) Version ID marker for resuming object listing.
+     * @param {boolean} [params.currentVersionOnly] - (Optional) Whether to process only the current version of objects.
      */
     constructor(params, log) {
         const {
@@ -266,13 +270,15 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-        return this.s3.listObjectVersions({
+        this.s3.send(new ListObjectVersionsCommand({
             Bucket: bucket,
             MaxKeys: this.listingLimit,
             Prefix: this.targetPrefix,
             VersionIdMarker,
             KeyMarker,
-        }, cb);
+        }))
+            .then(data => cb(null, data))
+            .catch(cb);
     }
 
     /**
@@ -284,15 +290,16 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _markPending(bucket, versions, cb) {
-        const options = { Bucket: bucket };
         waterfall([
-            next => this.s3.getBucketReplication(options, (err, res) => {
-                if (err) {
+            async () => {
+                try {
+                    const res = await this.s3.send(new GetBucketReplicationCommand({ Bucket: bucket }));
+                    return res.ReplicationConfiguration;
+                } catch (err) {
                     this.log.error('error getting bucket replication', { error: err });
-                    return next(err);
+                    throw err;
                 }
-                return next(null, res.ReplicationConfiguration);
-            }),
+            },
             (repConfig, next) => {
                 const { Rules } = repConfig;
                 const storageClass = this.siteName || Rules[0].Destination.StorageClass;
@@ -348,7 +355,8 @@ class ReplicationStatusUpdater {
                         this.log.error('error listing object versions', { error: err });
                         return done(err);
                     }
-                    return this._markPending(bucket, data.Versions.concat(data.DeleteMarkers), err => {
+                    const versions = (data.Versions || []).concat(data.DeleteMarkers || []);
+                    return this._markPending(bucket, versions, err => {
                         if (err) {
                             return done(err);
                         }
