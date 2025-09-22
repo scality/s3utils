@@ -6,7 +6,6 @@ const http = require('http');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils:listFailedObjects');
-/* eslint-disable no-console */
 
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
@@ -129,4 +128,3 @@ async.mapSeries(
         }
     },
 );
-/* eslint-enable no-console */

@@ -43,15 +43,16 @@ function verifyObjects(objectList, cb) {
         return destinationStorage.getObjMd(params, (err, dstMd) => {
             ++statusObj.dstProcessedCount;
             if (err) {
-                ++statusObj.dstFailedMdRetrievalsCount;
-                logger.error('error getting metadata', {
-                    error: err,
-                    bucket: statusObj.dstBucket,
-                    key: dstKey,
-                    srcLastModified,
-                });
                 if (err instanceof NotFound) {
                     ++statusObj.missingInDstCount;
+                } else {
+                    ++statusObj.dstFailedMdRetrievalsCount;
+                    logger.error('error getting metadata', {
+                        error: err,
+                        bucket: statusObj.dstBucket,
+                        key: dstKey,
+                        srcLastModified,
+                    });
                 }
                 // log the error and continue processing objects
                 return done();
