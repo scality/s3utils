@@ -2,14 +2,15 @@ const fs = require('fs');
 const { http, https } = require('httpagent');
 const { ObjectMD } = require('arsenal').models;
 
-const AWS = require('aws-sdk');
+const { S3Client, ListObjectVersionsCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { ConfiguredRetryStrategy } = require('@smithy/util-retry');
 const { doWhilst, eachSeries, filterLimit } = require('async');
 
 const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
 const parseOlderThan = require('./utils/parseOlderThan');
-const { safeListObjectVersions } = require('./utils/safeList');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
 
@@ -173,6 +174,31 @@ if (s3EndpointIsHttps) {
     agent = new http.Agent({ keepAlive: true });
 }
 
+const s3 = new S3Client({
+    credentials: {
+        accessKeyId: ACCESS_KEY,
+        secretAccessKey: SECRET_KEY,
+    },
+    endpoint: S3_ENDPOINT,
+    region: 'us-east-1',
+    forcePathStyle: true,
+    tls: s3EndpointIsHttps,
+    requestHandler: new NodeHttpHandler({
+        httpAgent: agent,
+        httpsAgent: agent,
+        requestTimeout: 60000,
+    }),
+    retryStrategy: new ConfiguredRetryStrategy(
+        AWS_SDK_REQUEST_RETRIES,
+        // Custom backoff with exponential delay capped at 1mn max
+        // between retries, and a little added jitter
+        attempt => Math.min(
+            AWS_SDK_REQUEST_INITIAL_DELAY_MS * 2 ** attempt,
+            60000
+        ) * (0.9 + Math.random() * 0.2)
+    ),
+});
+
 const options = {
     accessKeyId: ACCESS_KEY,
     secretAccessKey: SECRET_KEY,
@@ -207,7 +233,6 @@ const s3Options = {
 
 const opt = Object.assign(options, s3Options);
 
-const s3 = new AWS.S3(opt);
 const bb = new BackbeatClient(opt);
 
 let nListed = 0;
@@ -244,13 +269,17 @@ const logProgressInterval = setInterval(
 );
 
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-    return safeListObjectVersions(s3, {
+    const command = new ListObjectVersionsCommand({
         Bucket: bucket,
         MaxKeys: LISTING_LIMIT,
         Prefix: TARGET_PREFIX,
         KeyMarker,
         VersionIdMarker,
-    }, cb);
+    });
+    
+    s3.send(command)
+        .then(data => cb(null, data))
+        .catch(cb);
 }
 
 function _getMetadata(bucket, key, versionId, cb) {
@@ -297,13 +326,21 @@ function _doBatchDelete(bucket) {
     batchDeleteInProgress = true;
     // multi object delete can delete max 1000 objects
     const batchDeleteObjects = deleteQueue.splice(0, 1000);
-    const params = {
+    const command = new DeleteObjectsCommand({
         Bucket: bucket,
         Delete: { Objects: batchDeleteObjects },
-    };
-    s3.deleteObjects(params, err => {
-        if (err) {
-            log.error('batch delete error', { error: err });
+    });
+    s3.send(command)
+        .then(() => {
+            nDeleted += batchDeleteObjects.length;
+            batchDeleteObjects.forEach(v => log.info('object deleted', {
+                bucket,
+                key: v.Key,
+                versionId: v.VersionId,
+            }));
+        })
+        .catch(err => {
+            log.error('batch delete error', { error: err});
             nErrors += 1;
             batchDeleteObjects.forEach(
                 v => log.error('object may not be deleted', {
@@ -312,29 +349,23 @@ function _doBatchDelete(bucket) {
                     versionId: v.VersionId,
                 }),
             );
-        } else {
-            nDeleted += batchDeleteObjects.length;
-            batchDeleteObjects.forEach(v => log.info('object deleted', {
-                bucket,
-                key: v.Key,
-                versionId: v.VersionId,
-            }));
-        }
-        if (batchDeleteOnDrain && deleteQueue.length <= 1000) {
-            process.nextTick(batchDeleteOnDrain);
-            batchDeleteOnDrain = null;
-        }
-        if (batchDeleteOnFullDrain && deleteQueue.length === 0) {
-            process.nextTick(batchDeleteOnFullDrain);
-            batchDeleteOnFullDrain = null;
-        }
-        if (deleteQueue.length > 0) {
-            // there are more objects to delete, keep going
-            _doBatchDelete(bucket);
-        } else {
-            batchDeleteInProgress = false;
-        }
-    });
+        })
+        .finally(() => {
+            if (batchDeleteOnDrain && deleteQueue.length <= 1000) {
+                process.nextTick(batchDeleteOnDrain);
+                batchDeleteOnDrain = null;
+            }
+            if (batchDeleteOnFullDrain && deleteQueue.length === 0) {
+                process.nextTick(batchDeleteOnFullDrain);
+                batchDeleteOnFullDrain = null;
+            }
+            if (deleteQueue.length > 0) {
+                // there are more objects to delete, keep going
+                _doBatchDelete(bucket);
+            } else {
+                batchDeleteInProgress = false;
+            }
+        });
 }
 
 function _triggerDeletes(bucket, versionsToDelete, cb) {
@@ -565,11 +596,13 @@ function triggerDeletesOnBucket(bucketName, cb) {
                     });
                     return done(err);
                 }
-                nListed += data.Versions.length + data.DeleteMarkers.length;
+                const versions = data.Versions || [];
+                const deleteMarkers = data.DeleteMarkers || [];
+                nListed += versions.length + deleteMarkers.length;
                 const ret = _triggerDeletesOnEligibleObjects(
                     bucket,
-                    data.Versions,
-                    data.DeleteMarkers,
+                    versions,
+                    deleteMarkers,
                     !data.IsTruncated,
                     err => {
                         if (err) {
