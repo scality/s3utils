@@ -73,7 +73,7 @@ function getClient(params) {
     return new S3Client(clientConfig);
 }
 
-async function getObjMd(params, cb) {
+function getObjMd(params, cb) {
     const {
         client,
         bucket,
@@ -86,27 +86,26 @@ async function getObjMd(params, cb) {
         return cb(new Error(errMsg));
     }
 
-    try {
-        const commandParams = {
-            Bucket: bucket,
-            Key: key,
-            VersionId: versionId
-        };
-        
-        const data = await client.send(new HeadObjectCommand(commandParams));
-        const resp = {
-            size: data.ContentLength,
-            lastModified: data.LastModified,
-            versionId: data.VersionId,
-            md: data.Metadata,
-        };
-        return cb(null, resp);
-    } catch (err) {
-        return cb(err);
-    }
+    const commandParams = {
+        Bucket: bucket,
+        Key: key,
+        VersionId: versionId
+    };
+    
+    return client.send(new HeadObjectCommand(commandParams))
+        .then(data => {
+            const resp = {
+                size: data.ContentLength,
+                lastModified: data.LastModified,
+                versionId: data.VersionId,
+                md: data.Metadata,
+            };
+            return cb(null, resp);
+        })
+        .catch(cb);
 }
 
-async function listObjects(params, cb) {
+function listObjects(params, cb) {
     const {
         client,
         bucket,
@@ -124,19 +123,16 @@ async function listObjects(params, cb) {
         return cb(new Error(errMsg));
     }
 
-    try {
-        // TODO: support listing all versions
-        const data = await client.send(new ListObjectsV2Command({
-            Bucket: bucket,
-            MaxKeys: listingLimit,
-            Prefix: prefix,
-            Delimiter: delimiter,
-            ContinuationToken: nextContinuationToken,
-        }));
-        return cb(null, data);
-    } catch (err) {
-        return cb(err);
-    }
+    // TODO: support listing all versions
+    return client.send(new ListObjectsV2Command({
+        Bucket: bucket,
+        MaxKeys: listingLimit,
+        Prefix: prefix,
+        Delimiter: delimiter,
+        ContinuationToken: nextContinuationToken,
+    }))
+        .then(data => cb(null, data))
+        .catch(cb);
 }
 
 module.exports = {
