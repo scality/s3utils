@@ -97,7 +97,7 @@ const getBucketReplicationRes = {
                 Prefix: '',
                 Status: 'Enabled',
                 Destination: {
-                    Bucket: 'arn:aws:s3:::sourcebucket',
+                    Bucket: 'arn:aws:s3:::destination',
                     StorageClass: 'aws-location',
                 },
             },
@@ -204,4 +204,5 @@ module.exports = {
     getBucketReplicationRes,
     getMetadataRes,
     putMetadataRes,
+    objectMd,
 };
