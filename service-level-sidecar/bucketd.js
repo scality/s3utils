@@ -50,7 +50,11 @@ async function* listBuckets(log) {
         log.debug('got list of buckets from bucketd', { length: res.length });
 
         yield res.map(data => {
-            const { key, value } = data;
+            const { value, key: rawKey } = data;
+            let key = rawKey;
+            if (key.startsWith('\x7fM')) {
+                key = key.slice(2);
+            }
             const [account, name] = key.split(mdKeySplitter);
             return {
                 account,
