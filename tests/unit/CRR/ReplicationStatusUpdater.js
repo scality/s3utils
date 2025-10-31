@@ -7,15 +7,14 @@ const {
     listVersionsRes,
     listVersionWithMarkerRes,
     getMetadataRes,
+    objectMd,
 } = require('../../utils/crr');
 
 const logger = new werelogs.Logger('ReplicationStatusUpdater::tests', 'debug', 'debug');
 
 describe('ReplicationStatusUpdater', () => {
-    let crr;
-
-    beforeEach(() => {
-        crr = initializeCrrWithMocks({
+    it('should process bucket for CRR', done => {
+        const crr = initializeCrrWithMocks({
             buckets: ['bucket0'],
             workers: 10,
             replicationStatusToProcess: ['NEW'],
@@ -23,9 +22,7 @@ describe('ReplicationStatusUpdater', () => {
             listingLimit: 10,
             siteName: 'aws-location',
         }, logger);
-    });
 
-    it('should process bucket for CRR', done => {
         crr.run(err => {
             assert.ifError(err);
 
@@ -66,7 +63,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: '',
@@ -88,7 +85,7 @@ describe('ReplicationStatusUpdater', () => {
     });
 
     it('should process bucket for CRR with multiple objects', done => {
-        crr = initializeCrrWithMocks({
+        const crr = initializeCrrWithMocks({
             buckets: ['bucket0'],
             workers: 10,
             replicationStatusToProcess: ['NEW'],
@@ -159,7 +156,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -188,7 +185,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -206,7 +203,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -223,7 +220,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -241,7 +238,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -258,7 +255,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'aws_s3',
@@ -281,7 +278,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'azure-location,aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,aws_s3',
@@ -302,7 +299,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'azure-location,aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,aws_s3',
@@ -325,7 +322,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'azure-location,azure-location-2',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,azure',
@@ -350,7 +347,7 @@ describe('ReplicationStatusUpdater', () => {
                     },
                 ],
                 content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::sourcebucket',
+                destination: 'arn:aws:s3:::destination',
                 storageClass: 'azure-location,azure-location-2,aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
                 storageType: 'azure,azure,aws_s3',
@@ -359,6 +356,14 @@ describe('ReplicationStatusUpdater', () => {
         },
     ].forEach(params => {
         it(`should trigger replication ${params.description}`, done => {
+            const crr = initializeCrrWithMocks({
+                buckets: ['bucket0'],
+                workers: 10,
+                replicationStatusToProcess: ['NEW'],
+                targetPrefix: 'toto',
+                listingLimit: 10,
+                siteName: 'aws-location',
+            }, logger);
             crr.bb.getMetadata = jest.fn((p, cb) => {
                 const objectMd = JSON.parse(getMetadataRes.Body);
                 objectMd.replicationInfo = params.replicationInfo;
@@ -573,6 +578,63 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 })
             }));
 
+            done();
+        });
+    });
+});
+
+describe('ReplicationStatusUpdater with forceUsingConfiguration', () => {
+    it('should overwrite replication destination and role when forceUsingConfiguration is true', done => {
+        // Deep copy objectMd from utils to avoid affecting the original
+        const objectMdWithOldReplication = JSON.parse(JSON.stringify(objectMd));
+        
+        // Only modify the replicationInfo part
+        objectMdWithOldReplication.replicationInfo = {
+            status: 'COMPLETED',
+            backends: [
+                {
+                    site: 'sf',
+                    status: 'COMPLETED',
+                    dataStoreVersionId: '',
+                },
+            ],
+            content: ['DATA', 'METADATA'],
+            destination: 'arn:aws:s3:::destination2',
+            storageClass: 'sf',
+            role: 'arn:aws:iam::123456789012:role/src-resource,arn:aws:iam::123456789012:role/dest-resource',
+            storageType: '',
+            dataStoreVersionId: '',
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            forceUsingConfiguration: true,
+        }, logger);
+
+        // Override getMetadata to return object with old replication info
+        crr.bb.getMetadata = jest.fn((params, cb) => cb(null, {
+            Body: JSON.stringify(objectMdWithOldReplication),
+        }));
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            
+            // Verify that putMetadata was called with updated destination and role from bucket config
+            const putMetadataCall = crr.bb.putMetadata.mock.calls[0][0];
+            const updatedMetadata = JSON.parse(putMetadataCall.Body);
+            
+            // Check that replicationInfo contains the bucket configuration values
+            expect(updatedMetadata.replicationInfo.destination).toBe('arn:aws:s3:::destination');
+            expect(updatedMetadata.replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
+            
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nSkipped, 0);
+            assert.strictEqual(crr._nUpdated, 1);
+            assert.strictEqual(crr._nErrors, 0);
             done();
         });
     });

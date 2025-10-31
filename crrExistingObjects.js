@@ -15,6 +15,7 @@ const { SITE_NAME } = process.env;
 let { STORAGE_TYPE } = process.env;
 let { TARGET_REPLICATION_STATUS } = process.env;
 const { TARGET_PREFIX } = process.env;
+const FORCE_USING_CONFIGURATION = process.env.FORCE_USING_CONFIGURATION === 'true' || process.env.FORCE_USING_CONFIGURATION === '1' || false;
 const WORKERS = (process.env.WORKERS
     && Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES
@@ -92,6 +93,7 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     keyMarker: KEY_MARKER,
     versionIdMarker: VERSION_ID_MARKER,
     currentVersionOnly: CURRENT_VERSION_ONLY,
+    forceUsingConfiguration: FORCE_USING_CONFIGURATION,
 }, log);
 
 replicationStatusUpdater.run(err => {

@@ -30,6 +30,7 @@ class ReplicationStatusUpdater {
      * @param {string} [params.keyMarker] - (Optional) Key marker for resuming object listing.
      * @param {string} [params.versionIdMarker] - (Optional) Version ID marker for resuming object listing.
      * @param {boolean} [params.currentVersionOnly] - (Optional) Whether to process only the current version of objects.
+     * @param {boolean} [params.forceUsingConfiguration] - (Optional) Force reset replication target to bucket's configuration.
      */
     constructor(params, log) {
         const {
@@ -48,6 +49,7 @@ class ReplicationStatusUpdater {
             keyMarker,
             versionIdMarker,
             currentVersionOnly,
+            forceUsingConfiguration,
         } = params;
 
         // inputs
@@ -66,6 +68,7 @@ class ReplicationStatusUpdater {
         this.inputKeyMarker = keyMarker;
         this.inputVersionIdMarker = versionIdMarker;
         this.currentVersionOnly = currentVersionOnly;
+        this.forceUsingConfiguration = forceUsingConfiguration;
         this.log = log;
 
         this._setupClients();
@@ -188,9 +191,10 @@ class ReplicationStatusUpdater {
                 // This is particularly important if the object was created before
                 // enabling replication on the bucket.
                 let replicationInfo = objMD.getReplicationInfo();
+                const { Rules, Role } = repConfig;
+                const destination = Rules[0].Destination.Bucket;
+                
                 if (!replicationInfo || !replicationInfo.status) {
-                    const { Rules, Role } = repConfig;
-                    const destination = Rules[0].Destination.Bucket;
                     // set replication properties
                     const ops = objMD.getContentLength() === 0 ? ['METADATA']
                         : ['METADATA', 'DATA'];
@@ -204,6 +208,12 @@ class ReplicationStatusUpdater {
                         storageType: '',
                     };
                     objMD.setReplicationInfo(replicationInfo);
+                }
+
+                // Force reset object's replication configuration to match bucket's configuration
+                if (this.forceUsingConfiguration) {
+                    objMD.setReplicationTargetBucket(destination);
+                    objMD.setReplicationRoles(Role);
                 }
                 // Update replication info with site specific info
                 if (!objMD.getReplicationSiteStatus(storageClass)) {

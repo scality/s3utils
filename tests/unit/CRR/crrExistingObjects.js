@@ -76,6 +76,7 @@ describe('crrExistingObjects', () => {
         process.env.VERSION_ID_MARKER = 'testVersionIdMarker';
         process.env.DEBUG = '0';
         process.env.CURRENT_VERSION_ONLY = 'true';
+        process.env.FORCE_USING_CONFIGURATION = 'true';
 
         require('../../../crrExistingObjects');
 
@@ -98,6 +99,7 @@ describe('crrExistingObjects', () => {
             keyMarker: 'testKeyMarker',
             versionIdMarker: 'testVersionIdMarker',
             currentVersionOnly: true,
+            forceUsingConfiguration: true,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();
@@ -134,6 +136,7 @@ describe('crrExistingObjects', () => {
             keyMarker: undefined,
             versionIdMarker: undefined,
             currentVersionOnly: false,
+            forceUsingConfiguration: false,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();
