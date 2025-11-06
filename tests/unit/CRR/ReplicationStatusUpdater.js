@@ -1,5 +1,6 @@
 const werelogs = require('werelogs');
 const assert = require('assert');
+const { models } = require('arsenal');
 
 const {
     initializeCrrWithMocks,
@@ -815,6 +816,90 @@ describe('ReplicationStatusUpdater with currentVersionOnly', () => {
             assert.strictEqual(crr._nProcessed, 2);
             assert.strictEqual(crr._nSkipped, 0);
             assert.strictEqual(crr._nUpdated, 2);
+            assert.strictEqual(crr._nErrors, 0);
+            done();
+        });
+    });
+});
+
+describe('ReplicationStatusUpdater model version guard', () => {
+    let getModelVersionSpy;
+
+    afterEach(() => {
+        if (getModelVersionSpy) {
+            getModelVersionSpy.mockRestore();
+            getModelVersionSpy = null;
+        }
+    });
+
+    it('should refuse to overwrite when new model version is lower than original', done => {
+        // Original object metadata version from test fixture is 3
+        // Force ObjectMD to report a lower version to trigger the guard
+        getModelVersionSpy = jest.spyOn(models.ObjectMD.prototype, 'getModelVersion')
+            .mockReturnValue(2);
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger);
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.bb.putMetadata).not.toHaveBeenCalled();
+
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nUpdated, 0);
+            assert.strictEqual(crr._nSkipped, 0);
+            assert.strictEqual(crr._nErrors, 1);
+            done();
+        });
+    });
+
+    it('should proceed when new model version equals original', done => {
+        // Match the test fixture version (3) to allow write
+        getModelVersionSpy = jest.spyOn(models.ObjectMD.prototype, 'getModelVersion')
+            .mockReturnValue(3);
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger);
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nUpdated, 1);
+            assert.strictEqual(crr._nSkipped, 0);
+            assert.strictEqual(crr._nErrors, 0);
+            done();
+        });
+    });
+
+    it('should proceed when new model version is higher than original', done => {
+        // Higher than the test fixture version (3)
+        getModelVersionSpy = jest.spyOn(models.ObjectMD.prototype, 'getModelVersion')
+            .mockReturnValue(4);
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger);
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nUpdated, 1);
+            assert.strictEqual(crr._nSkipped, 0);
             assert.strictEqual(crr._nErrors, 0);
             done();
         });

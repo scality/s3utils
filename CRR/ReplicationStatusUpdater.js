@@ -167,22 +167,24 @@ class ReplicationStatusUpdater {
                 VersionId: versionId,
             }, next),
             (mdRes, next) => {
-                // NOTE: The Arsenal Object Metadata schema version 8.1 is being used for both Ring S3C and Artesca,
-                // it is acceptable because the 8.1 schema only adds extra properties to the 7.10 schema.
-                // This is beneficial because:
-                // - Forward compatibility: Having the 8.1 properties in place now ensures that
-                //   S3C is compatible with the 8.1 schema, which could be useful if we plan to upgrade
-                //   from 7.10 to 8.1 in the future.
-                // - No impact on current functionality: The extra properties from the 8.1
-                //   schema do not interfere with the current functionalities of the 7.10 environment,
-                //   so there is no harm in keeping them. S3C should ignore them without causing any issues.
-                // - Simple codebase: Not having to remove these properties simplifies the codebase of s3utils.
-                //   Less complexity and potential errors linked with conditionally removing metadata properties
-                //   based on the version.
-                // - Single schema approach: Keeping a single, unified schema approach in s3utils can make the
-                //   codebase easier to maintain and upgrade, as opposed to having multiple branches or versions of
-                //   the code for different schema versions.
-                objMD = new ObjectMD(JSON.parse(mdRes.Body));
+                const originalMD = JSON.parse(mdRes.Body);
+                const originalMDVersion = originalMD['md-model-version'];
+                objMD = new ObjectMD(originalMD);
+                const newMDVersion = objMD.getModelVersion();
+
+                // Prevent schema downgrade: do not write metadata if this model version
+                // is older than the object's original version, to avoid losing newer fields.
+                if (newMDVersion < originalMDVersion) {
+                    this.log.error('model version regression: newMDVersion < originalMDVersion', {
+                        bucket,
+                        key,
+                        versionId,
+                        newMDVersion,
+                        originalMDVersion,
+                    });
+                    return next(new Error('model version regression: refusing to overwrite newer metadata'));
+                }
+
                 if (!this._objectShouldBeUpdated(objMD, storageClass)) {
                     skip = true;
                     return process.nextTick(next);
