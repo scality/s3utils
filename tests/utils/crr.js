@@ -171,6 +171,10 @@ const putMetadataRes = { versionId: '98295539708053999999RG001  ' };
  * @returns {ReplicationStatusUpdater} An instance of ReplicationStatusUpdater with mocked methods.
  */
 function initializeCrrWithMocks(config, log, customS3Responses = {}) {
+    if (config.endpoint === undefined) {
+        // eslint-disable-next-line no-param-reassign
+        config.endpoint = 'http://dummyEndpoint:8000';
+    }
     const crr = new ReplicationStatusUpdater(config, log);
     const defaultResponses = {
         ListObjectVersionsCommand: listVersionRes,
@@ -190,8 +194,8 @@ function initializeCrrWithMocks(config, log, customS3Responses = {}) {
     const putMetadataMock = jest.fn((params, cb) => cb(null, putMetadataRes));
 
     crr.s3.send = sendMock;
-    crr.bb.getMetadata = getMetadataMock;
-    crr.bb.putMetadata = putMetadataMock;
+    crr.cloudserverclient.getMetadata = getMetadataMock;
+    crr.cloudserverclient.putMetadata = putMetadataMock;
 
     return crr;
 }
