@@ -2,11 +2,12 @@ const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
 const { ObjectMD } = require('arsenal').models;
-const { setupClients } = require('./clients');
 const { 
     ListObjectVersionsCommand, 
     GetBucketReplicationCommand 
 } = require('@aws-sdk/client-s3');
+const CloudserverClient = require('../Clients/CloudserverClient');
+const createS3Client = require('../Clients/s3Client');
 
 const LOG_PROGRESS_INTERVAL_MS = 10000;
 
@@ -86,19 +87,17 @@ class ReplicationStatusUpdater {
     }
 
     /**
-     * Sets up and initializes the S3 and Backbeat client instances.
+     * Sets up and initializes the S3 and Cloudserver client instances.
      *
-     * @returns {void} This method does not return a value; instead, it sets the S3 and Backbeat clients.
+     * @returns {void} This method does not return a value; instead, it sets the S3 and Cloudserver clients.
      */
     _setupClients() {
-        const { s3, bb } = setupClients({
+        this.s3 = createS3Client({
             accessKey: this.accessKey,
             secretKey: this.secretKey,
             endpoint: this.endpoint,
         }, this.log);
-
-        this.s3 = s3;
-        this.bb = bb;
+        this.cloudserverclient = new CloudserverClient(this.endpoint, this.accessKey, this.secretKey);
     }
 
     /**
@@ -161,7 +160,7 @@ class ReplicationStatusUpdater {
         let skip = false;
         return waterfall([
             // get object blob
-            next => this.bb.getMetadata({
+            next => this.cloudserverclient.getMetadata({
                 Bucket: bucket,
                 Key: key,
                 VersionId: versionId,
@@ -245,11 +244,10 @@ class ReplicationStatusUpdater {
                 objMD.setReplicationStatus('PENDING');
                 objMD.updateMicroVersionId();
                 const md = objMD.getSerialized();
-                return this.bb.putMetadata({
+                return this.cloudserverclient.putMetadata({
                     Bucket: bucket,
                     Key: key,
                     VersionId: versionId,
-                    ContentLength: Buffer.byteLength(md),
                     Body: md,
                 }, next);
             },

@@ -10,6 +10,7 @@ const { doWhilst, eachSeries, filterLimit } = require('async');
 const { Logger } = require('werelogs');
 
 const BackbeatClient = require('./BackbeatClient');
+const CloudserverClient = require('./Clients/CloudserverClient');
 const parseOlderThan = require('./utils/parseOlderThan');
 
 const log = new Logger('s3utils::cleanupNoncurrentVersions');
@@ -199,41 +200,12 @@ const s3 = new S3Client({
     ),
 });
 
-const options = {
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
-    endpoint: S3_ENDPOINT,
-    region: 'us-east-1',
-    sslEnabled: s3EndpointIsHttps,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
-    httpOptions: {
-        timeout: 0,
-        agent,
-    },
-};
-/**
- *  Options specific to s3 requests
- *  `maxRetries` & `customBackoff` are set only to s3 requests
- *  default aws sdk retry count is 3 with an exponential delay of 2^n * 30 ms
- */
-const s3Options = {
-    maxRetries: AWS_SDK_REQUEST_RETRIES,
-    customBackoff: (retryCount, error) => {
-        log.error('aws sdk request error', { error, retryCount });
-        // retry with exponential backoff delay capped at 1mn max
-        // between retries, and a little added jitter
-        return Math.min(AWS_SDK_REQUEST_INITIAL_DELAY_MS
-                        * 2 ** retryCount, 60000)
-            * (0.9 + Math.random() * 0.2);
-    },
-};
-
-const opt = Object.assign(options, s3Options);
-
-const bb = new BackbeatClient(opt);
+const cloudserverclient = new CloudserverClient(
+    S3_ENDPOINT,
+    ACCESS_KEY,
+    SECRET_KEY,
+    agent,
+);
 
 let nListed = 0;
 let nDeletesTriggered = 0;
@@ -283,7 +255,7 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
 }
 
 function _getMetadata(bucket, key, versionId, cb) {
-    return bb.getMetadata({
+    return cloudserverclient.getMetadata({
         Bucket: bucket,
         Key: key,
         VersionId: versionId,

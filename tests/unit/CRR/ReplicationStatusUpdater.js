@@ -46,14 +46,14 @@ describe('ReplicationStatusUpdater', () => {
                 })
             }));
 
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(1);
-            expect(crr.bb.getMetadata).toHaveBeenCalledWith({
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledWith({
                 Bucket: 'bucket0',
                 Key: listVersionRes.Versions[0].Key,
                 VersionId: listVersionRes.Versions[0].VersionId,
             }, expect.any(Function));
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
             const expectedReplicationInfo = {
                 status: 'PENDING',
                 backends: [
@@ -70,7 +70,7 @@ describe('ReplicationStatusUpdater', () => {
                 storageType: '',
                 dataStoreVersionId: '',
             };
-            expect(crr.bb.putMetadata).toHaveBeenCalledWith(
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledWith(
                 expect.objectContaining({
                     Body: expect.stringContaining(JSON.stringify(expectedReplicationInfo)),
                 }),
@@ -119,20 +119,20 @@ describe('ReplicationStatusUpdater', () => {
                 })
             }));
 
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
-            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(1, {
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenNthCalledWith(1, {
                 Bucket: 'bucket0',
                 Key: listVersionsRes.Versions[0].Key,
                 VersionId: listVersionsRes.Versions[0].VersionId,
             }, expect.any(Function));
 
-            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(2, {
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenNthCalledWith(2, {
                 Bucket: 'bucket0',
                 Key: listVersionsRes.Versions[1].Key,
                 VersionId: listVersionsRes.Versions[1].VersionId,
             }, expect.any(Function));
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(2);
 
             assert.strictEqual(crr._nProcessed, 2);
             assert.strictEqual(crr._nSkipped, 0);
@@ -365,7 +365,7 @@ describe('ReplicationStatusUpdater', () => {
                 listingLimit: 10,
                 siteName: 'aws-location',
             }, logger);
-            crr.bb.getMetadata = jest.fn((p, cb) => {
+            crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
                 const objectMd = JSON.parse(getMetadataRes.Body);
                 objectMd.replicationInfo = params.replicationInfo;
                 cb(null, { Body: JSON.stringify(objectMd) });
@@ -395,9 +395,9 @@ describe('ReplicationStatusUpdater', () => {
                     })
                 }));
                 
-                expect(crr.bb.getMetadata).toHaveBeenCalledTimes(1);
-                expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
-                expect(crr.bb.putMetadata).toHaveBeenCalledWith(
+                expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
+                expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+                expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledWith(
                     expect.objectContaining({
                         Body: expect.stringContaining(JSON.stringify(params.expectedReplicationInfo)),
                     }),
@@ -436,8 +436,8 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
             }));
             
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(1);
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nSkipped, 0);
@@ -486,8 +486,8 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
             }));
 
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(2);
 
             assert.strictEqual(crr._nProcessed, 2);
             assert.strictEqual(crr._nSkipped, 0);
@@ -517,8 +517,8 @@ describe('ReplicationStatusUpdater with specifics', () => {
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
                 constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
             }));
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(1);
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nSkipped, 0);
@@ -615,17 +615,17 @@ describe('ReplicationStatusUpdater with forceUsingConfiguration', () => {
         }, logger);
 
         // Override getMetadata to return object with old replication info
-        crr.bb.getMetadata = jest.fn((params, cb) => cb(null, {
+        crr.cloudserverclient.getMetadata = jest.fn((params, cb) => cb(null, {
             Body: JSON.stringify(objectMdWithOldReplication),
         }));
 
         crr.run(err => {
             assert.ifError(err);
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
             
             // Verify that putMetadata was called with updated destination and role from bucket config
-            const putMetadataCall = crr.bb.putMetadata.mock.calls[0][0];
+            const putMetadataCall = crr.cloudserverclient.putMetadata.mock.calls[0][0];
             const updatedMetadata = JSON.parse(putMetadataCall.Body);
             
             // Check that replicationInfo contains the bucket configuration values
@@ -729,19 +729,19 @@ describe('ReplicationStatusUpdater with currentVersionOnly', () => {
                 constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
             }));
 
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
-            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(1, {
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenNthCalledWith(1, {
                 Bucket: 'bucket0',
                 Key: 'key0',
                 VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
             }, expect.any(Function));
-            expect(crr.bb.getMetadata).toHaveBeenNthCalledWith(2, {
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenNthCalledWith(2, {
                 Bucket: 'bucket0',
                 Key: 'key1',
                 VersionId: 'aJdO148N3LjN00000000001I4j3QKItU',
             }, expect.any(Function));
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(2);
 
             assert.strictEqual(crr._nProcessed, 2);
             assert.strictEqual(crr._nSkipped, 2);
@@ -810,8 +810,8 @@ describe('ReplicationStatusUpdater with currentVersionOnly', () => {
                 constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
             }));
 
-            expect(crr.bb.getMetadata).toHaveBeenCalledTimes(2);
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(2);
 
             assert.strictEqual(crr._nProcessed, 2);
             assert.strictEqual(crr._nSkipped, 0);
@@ -847,7 +847,7 @@ describe('ReplicationStatusUpdater model version guard', () => {
         crr.run(err => {
             assert.ifError(err);
 
-            expect(crr.bb.putMetadata).not.toHaveBeenCalled();
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nUpdated, 0);
@@ -871,7 +871,7 @@ describe('ReplicationStatusUpdater model version guard', () => {
         crr.run(err => {
             assert.ifError(err);
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nUpdated, 1);
@@ -895,7 +895,7 @@ describe('ReplicationStatusUpdater model version guard', () => {
         crr.run(err => {
             assert.ifError(err);
 
-            expect(crr.bb.putMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nUpdated, 1);

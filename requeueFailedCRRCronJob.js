@@ -11,7 +11,7 @@ const VID_SEP = require('arsenal').versioning.VersioningConstants
     .VersionId.Separator;
 const { Logger } = require('werelogs');
 
-const BackbeatClient = require('./BackbeatClient');
+const CloudserverClient = require('./Clients/CloudserverClient');
 
 const log = new Logger('s3utils::requeueFailedCRRCronJob');
 const {
@@ -54,23 +54,11 @@ const PRODUCER_RETRY_DELAY_MS = 5000;
 const PRODUCER_MAX_RETRIES = 60;
 const PRODUCER_POLL_INTERVAL_MS = 2000;
 
-const bbOptions = {
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
-    endpoint: CLOUDSERVER_ENDPOINT,
-    region: 'us-east-1',
-    sslEnabled: false,
-    s3ForcePathStyle: true,
-    apiVersions: { s3: '2006-03-01' },
-    signatureVersion: 'v4',
-    signatureCache: false,
-    httpOptions: {
-        timeout: 0,
-        agent: new httpArsn.Agent({ keepAlive: true }),
-    },
-};
-
-const bb = new BackbeatClient(bbOptions);
+const cloudserverclient = new CloudserverClient(
+    CLOUDSERVER_ENDPOINT,
+    ACCESS_KEY,
+    SECRET_KEY,
+);
 
 const producer = new Producer({
     'metadata.broker.list': KAFKA_HOSTS,
@@ -88,7 +76,7 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
     }
     return waterfall([
         // get object blob
-        next => bb.getMetadata({
+        next => cloudserverclient.getMetadata({
             Bucket: bucket,
             Key: key,
             VersionId: versionId,
