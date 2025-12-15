@@ -1,0 +1,10 @@
+---
+
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+parsers:
+  javascript:
+    enable_partials: yes
