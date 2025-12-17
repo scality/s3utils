@@ -593,7 +593,7 @@ function triggerDeletesOnBucket(bucketName, cb) {
                 return undefined;
             });
         },
-        () => {
+        async () => {
             if (nDeletesTriggered >= MAX_DELETES || nListed >= MAX_LISTED) {
                 return false;
             }

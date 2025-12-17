@@ -228,7 +228,7 @@ function _requeueAll() {
             });
             failedReq.end();
         },
-        isTruncated => isTruncated && !stopRequest,
+        async isTruncated => isTruncated && !stopRequest,
         () => {
             requeueInProgress = false;
             if (stopRequest) {

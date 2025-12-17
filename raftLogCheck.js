@@ -214,7 +214,7 @@ async.waterfall([
     },
     (leaderHost, leaderPort, connected, _bseq, _vseq, next) => {
         let seq = _bseq;
-        async.until(() => {
+        async.until(async () => {
             log.debug('test', { seq, _vseq });
             return seq >= _vseq;
         }, cb => {

@@ -103,7 +103,7 @@ function listBucket(bucket, cb) {
                 });
             },
         ),
-        () => {
+        async () => {
             if (!VersionIdMarker || !KeyMarker) {
                 log.debug(
                     'completed listing failed objects for bucket',

@@ -549,7 +549,7 @@ function listBucket(bucket, cb) {
             _done => listBucketIter(bucket, _done),
             done
         ),
-        IsTruncated => IsTruncated,
+        async IsTruncated => IsTruncated,
         err => {
             status.bucketInProgress = null;
             status.KeyMarker = '';
