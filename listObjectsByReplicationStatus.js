@@ -5,7 +5,7 @@ const http = require('http');
 
 const { Logger } = require('werelogs');
 
-const log = new Logger('s3utils:listFailedObjects');
+const log = new Logger('s3utils:listObjectsByReplicationStatus');
 
 // configurable params
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
@@ -13,6 +13,7 @@ const { ACCESS_KEY } = process.env;
 const { SECRET_KEY } = process.env;
 const { ENDPOINT } = process.env;
 const LISTING_LIMIT = 1000;
+let { REPLICATION_STATUS } = process.env;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     log.error('No buckets given as input! Please provide '
@@ -31,6 +32,21 @@ if (!SECRET_KEY) {
     log.error('SECRET_KEY not defined');
     process.exit(1);
 }
+if (!REPLICATION_STATUS) {
+    REPLICATION_STATUS = 'FAILED';
+}
+
+const replicationStatusToProcess = REPLICATION_STATUS.split(',');
+replicationStatusToProcess.forEach(state => {
+    if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
+        log.error('invalid REPLICATION_STATUS environment: must be a '
+            + 'comma-separated list of replication statuses to list, '
+            + 'as NEW,PENDING,COMPLETED,FAILED,REPLICA.');
+        process.exit(1);
+    }
+});
+log.info('Objects with replication status '
+    + `${replicationStatusToProcess.join(' or ')} will be listed`);
 
 const s3 = new S3Client({
     region: 'us-east-1',
@@ -69,7 +85,10 @@ function listBucket(bucket, cb) {
     const bucketName = bucket.trim();
     let VersionIdMarker = null;
     let KeyMarker = null;
-    log.info('listing failed objects from bucket', { bucket });
+    log.info('listing objects by replication status from bucket', {
+        bucket,
+        replicationStatus: replicationStatusToProcess.join(',')
+    });
     async.doWhilst(
         done => _listObjectVersions(
             bucketName,
@@ -88,8 +107,12 @@ function listBucket(bucket, cb) {
                         Key,
                         VersionId,
                     })).then(res => {
-                        if (res.ReplicationStatus === 'FAILED') {
-                            log.info('failed replication object found', { Key, ...res });
+                        if (replicationStatusToProcess.includes(res.ReplicationStatus)) {
+                            log.info('object with matching replication status found', {
+                                Key,
+                                ReplicationStatus: res.ReplicationStatus,
+                                ...res
+                            });
                         }
                         return next();
                     }).catch(next);
@@ -106,7 +129,7 @@ function listBucket(bucket, cb) {
         async () => {
             if (!VersionIdMarker || !KeyMarker) {
                 log.debug(
-                    'completed listing failed objects for bucket',
+                    'completed listing objects by replication status for bucket',
                     { bucket },
                 );
                 return false;
@@ -122,7 +145,7 @@ async.mapSeries(
     (bucket, done) => listBucket(bucket, done),
     err => {
         if (err) {
-            log.error('error occured while listing failed objects', {
+            log.error('error occured while listing objects by replication status', {
                 error: err,
             });
         }
