@@ -1,0 +1,56 @@
+global:
+  log_level: info
+
+features:
+  scuba:
+    enabled: false
+    enable_service_user: true
+
+  bucket_notifications:
+    enabled: false
+    destinationAuth:
+      type: none
+      username: admin
+      password: admin123
+
+  cross_region_replication:
+    enabled: true
+
+  utapi:
+    enabled: false
+
+  migration:
+    enabled: false
+
+cloudserver:
+  image: ghcr.io/scality/cloudserver:9.2.6
+
+vault:
+  image: ghcr.io/scality/vault:7.83.0
+
+backbeat:
+  image: ghcr.io/scality/backbeat:9.0.21-federation
+
+s3_metadata:
+  image: ghcr.io/scality/metadata:8.22.0-standalone
+
+scuba:
+  image: ghcr.io/scality/scuba:1.1.17-nodesvc-base
+
+scuba_metadata:
+  image: ghcr.io/scality/metadata:8.22.0-standalone
+
+kafka:
+  image: bitnami/kafka:3.9.0
+
+zookeeper:
+  image: bitnami/zookeeper:3.9.4
+
+redis:
+  image: redis:8
+
+utapi:
+  image: ghcr.io/scality/utapi:7.70.9
+
+migration_tools:
+  image: ghcr.io/scality/metadata-migration:1.4.0-svc-base
