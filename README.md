@@ -243,14 +243,49 @@ and aborts any ongoing multipart uploads to prepare the bucket for deletion.
 node cleanupBuckets.js testbucket1,testbucket2
 ```
 
-# List objects that failed replication
+# List objects by replication status
 
-This script prints the list of objects that failed replication to stdout,
-following a comma-separated list of buckets. Run the command as
+Two scripts are available for listing objects by replication status:
+
+## List objects with FAILED replication status
+
+To list only objects that have failed replication:
 
 ```
-node listFailedObjects testbucket1,testbucket2
+node listFailedObjects.js testbucket1,testbucket2
 ```
+
+## List objects by configurable replication status
+
+To list objects with a specific or multiple replication statuses:
+
+```
+node listObjectsByReplicationStatus.js testbucket1,testbucket2
+```
+
+## Required environment variables
+
+The following environment variable is **required** for `listObjectsByReplicationStatus.js`:
+
+### REPLICATION_STATUS
+
+Comma-separated list of replication statuses to list. The recognized statuses are:
+
+* **NEW**: No replication status is attached to the object.
+* **PENDING**: The object replication status is PENDING.
+* **COMPLETED**: The object replication status is COMPLETED.
+* **FAILED**: The object replication status is FAILED.
+* **REPLICA**: The object replication status is REPLICA.
+
+Examples:
+
+`REPLICATION_STATUS=PENDING`
+
+List objects that have a replication status of PENDING.
+
+`REPLICATION_STATUS=PENDING,FAILED`
+
+List objects that either have a replication status of PENDING or FAILED.
 
 # Verify existence of sproxyd keys
 
