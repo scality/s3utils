@@ -52,6 +52,11 @@ const baseMetricsObject = {
 };
 
 class S3UtilsMongoClient extends MongoClientInterface {
+    constructor(...args) {
+        super(...args);
+        this._usersBucketCreationDatesCache = null;
+    }
+
     /**
      * Get the list of buckets and their location dates
      * @param {object} log - Werelogs logger
@@ -59,6 +64,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
      * and their creation dates as values
      */
     async _getUsersBucketCreationDates(log) {
+        if (this._usersBucketCreationDatesCache) {
+            return this._usersBucketCreationDatesCache;
+        }
         let cursorUsersBucketCreationDates;
         try {
             cursorUsersBucketCreationDates = await this.getCollection(USERSBUCKET).find({}, {
@@ -67,8 +75,13 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 },
             });
             const usersBucketCreationDatesArray = await cursorUsersBucketCreationDates.toArray();
-            return usersBucketCreationDatesArray
-                .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
+            const result = {};
+            for (const obj of usersBucketCreationDatesArray) {
+                result[obj._id] = obj.value.creationDate;
+            }
+
+            this._usersBucketCreationDatesCache = result;
+            return result;
         } catch (err) {
             log.error('Failed to read __usersbucket collection', {
                 method: 'getUsersBucketCreationDates',
