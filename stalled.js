@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { Logger } = require('werelogs');
-const ZenkoClient = require('zenkoclient');
+const CloudserverClient = require('./Clients/CloudserverClient');
 
 const {
     MongoClientInterfaceStalled,
@@ -59,20 +59,14 @@ function wrapperFactory(bucketName, cmpDate, cursor, log) {
 }
 
 function handlerFactory(log) {
-    const zenkoClient = new ZenkoClient({
-        apiVersion: '2018-07-08-json',
-        accessKeyId: ACCESS_KEY,
-        secretAccessKey: SECRET_KEY,
-        endpoint: ENDPOINT,
-        s3ForcePathStyle: true,
-        signatureVersion: 'v4',
-        maxRetries: 0,
-        sslEnabled: false,
-        httpOptions: { timeout: 0 },
-    });
+    const cloudserverClient = new CloudserverClient(
+        ENDPOINT,
+        ACCESS_KEY,
+        SECRET_KEY,
+    );
 
     return new StalledRequestHandler(
-        zenkoClient,
+        cloudserverClient,
         {
             dryRun: DRY_RUN,
             batchSize: BATCH_SIZE,

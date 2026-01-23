@@ -35,7 +35,7 @@ class StalledRequestHandler {
             }
 
             return this.client.retryFailedObjects({
-                Body: JSON.stringify(batch.map(entry => entry.toObject())),
+                Body: Buffer.from(JSON.stringify(batch.map(entry => entry.toObject()))),
             }, err => {
                 if (err) {
                     return done(err);

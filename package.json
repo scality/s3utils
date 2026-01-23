@@ -28,7 +28,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/node-http-handler": "^3.374.0",
-    "@scality/cloudserverclient": "git+https://github.com/scality/cloudserverclient#v1.0.0",
+    "@scality/cloudserverclient": "^1.0.3",
     "@senx/warp10": "^2.0.3",
     "@smithy/util-retry": "^4.0.7",
     "JSONStream": "^1.3.5",
@@ -46,8 +46,7 @@
     "uuid": "^11.0.3",
     "vaultclient": "scality/vaultclient#8.5.1",
     "werelogs": "scality/werelogs#8.2.1",
-    "xml2js": "^0.6.2",
-    "zenkoclient": "scality/zenkoclient#1.2.1"
+    "xml2js": "^0.6.2"
   },
   "resolutions": {
     "ioctl": "2.0.2",

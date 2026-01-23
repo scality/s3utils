@@ -2,6 +2,9 @@ const {
     CloudserverClient,
     GetMetadataCommand,
     PutMetadataCommand,
+    GetLocationsStatusCommand,
+    ListFailedCommand,
+    RetryFailedObjectsCommand,
 } = require('@scality/cloudserverclient');
 const { http: httpArsn } = require('httpagent');
 const https = require('https');
@@ -59,6 +62,27 @@ class Client {
 
     putMetadata(params, callback) {
         const command = new PutMetadataCommand(params);
+        this.client.send(command)
+            .then(data => callback(null, data))
+            .catch(err => callback(err));
+    }
+
+    getLocationsStatus(callback) {
+        const command = new GetLocationsStatusCommand({});
+        this.client.send(command)
+            .then(data => callback(null, data))
+            .catch(err => callback(err));
+    }
+
+    listFailed(params, callback) {
+        const command = new ListFailedCommand(params);
+        this.client.send(command)
+            .then(data => callback(null, data))
+            .catch(err => callback(err));
+    }
+
+    retryFailedObjects(params, callback) {
+        const command = new RetryFailedObjectsCommand(params);
         this.client.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
