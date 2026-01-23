@@ -37,6 +37,7 @@ function _getKeys(list) {
     return list.map(v => ({
         Key: v.Key,
         VersionId: v.VersionId,
+        IsLatest: v.IsLatest,
     }));
 }
 
@@ -65,7 +66,7 @@ function _listBucket(s3, log, replicationStatusToProcess, bucket, cb) {
                 }
                 const keys = _getKeys(data.Versions || []);
                 return async.mapLimit(keys, 10, (k, next) => {
-                    const { Key, VersionId } = k;
+                    const { Key, VersionId, IsLatest } = k;
                     s3.send(new HeadObjectCommand({
                         Bucket: bucketName,
                         Key,
@@ -74,14 +75,30 @@ function _listBucket(s3, log, replicationStatusToProcess, bucket, cb) {
                         if (replicationStatusToProcess.includes(res.ReplicationStatus)) {
                             log.info('object with matching replication status found', {
                                 Key,
+                                VersionId,
+                                IsLatest,
                                 ReplicationStatus: res.ReplicationStatus,
-                                ...res
+                                ...res,
+                                bucketName
                             });
                         }
                         return next();
-                    }).catch(next);
+                    }).catch(err => {
+                        log.error('error getting object metadata', {
+                            bucketName,
+                            Key,
+                            VersionId,
+                            IsLatest,
+                            error: err
+                        });
+                        return next();
+                    });
                 }, err => {
                     if (err) {
+                        log.error('error processing batch of objects', {
+                            error: err,
+                            bucketName
+                        });
                         return done(err);
                     }
                     VersionIdMarker = data.NextVersionIdMarker;
