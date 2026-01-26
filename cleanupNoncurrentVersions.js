@@ -9,7 +9,6 @@ const { doWhilst, eachSeries, filterLimit } = require('async');
 
 const { Logger } = require('werelogs');
 
-const BackbeatClient = require('./BackbeatClient');
 const CloudserverClient = require('./Clients/CloudserverClient');
 const parseOlderThan = require('./utils/parseOlderThan');
 
