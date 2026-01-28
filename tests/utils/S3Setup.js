@@ -1,5 +1,5 @@
 const { S3Client, CreateBucketCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
-const { IAMClient, CreateUserCommand, CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand } = require('@aws-sdk/client-iam');
+const { IAMClient, CreateUserCommand, CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand, ListRolesCommand, ListAttachedRolePoliciesCommand, ListUsersCommand, ListAttachedUserPoliciesCommand, DetachUserPolicyCommand } = require('@aws-sdk/client-iam');
 const { promisify } = require('util');
 const { Logger } = require('werelogs');
 const admincredentials = require('vaultclient/tests/utils/admincredentials.json');
@@ -107,6 +107,87 @@ async function deleteTestAccount(vaultClient, account) {
 
     await account.s3Client.send(new DeleteBucketCommand({ Bucket: account.bucketName }));
     log.info('Deleted bucket', { bucket: account.bucketName });
+
+    // List and delete all IAM users
+    try {
+        const listUsersResp = await account.iamClient.send(new ListUsersCommand({}));
+        if (listUsersResp.Users && Array.isArray(listUsersResp.Users)) {
+            for (const user of listUsersResp.Users) {
+                // Detach all attached managed policies and delete the policies
+                try {
+                    const attachedPolicyResp = await account.iamClient.send(new ListAttachedUserPoliciesCommand({
+                        UserName: user.UserName
+                    }));
+                    if (attachedPolicyResp.AttachedPolicies) {
+                        for (const pol of attachedPolicyResp.AttachedPolicies) {
+                            // Detach the managed policy from the user
+                            await account.iamClient.send(new DetachUserPolicyCommand({
+                                UserName: user.UserName,
+                                PolicyArn: pol.PolicyArn
+                            }));
+                            log.info('Detached managed policy from IAM user', { iamUser: user.UserName, PolicyArn: pol.PolicyArn });
+
+                            // Try to delete the managed policy (ignore errors if others still attached)
+                            try {
+                                await account.iamClient.send(new DeletePolicyCommand({
+                                    PolicyArn: pol.PolicyArn
+                                }));
+                                log.info('Deleted managed policy', { PolicyArn: pol.PolicyArn });
+                            } catch (delPolErr) {
+                                // Policy might be attached to another user or resource, or policy is AWS managed
+                                log.info('Could not delete managed policy', { PolicyArn: pol.PolicyArn, error: delPolErr && delPolErr.message });
+                            }
+                        }
+                    }
+                } catch (err) {
+                    log.error('Error detaching/deleting managed policies from user', { iamUser: user.UserName, error: err });
+                }
+
+                // Do not remove inline policies
+
+                await account.iamClient.send(new DeleteUserCommand({ UserName: user.UserName }));
+                log.info('Deleted IAM user', { iamUser: user.UserName });
+            }
+        }
+    } catch (err) {
+        log.error('Error listing or deleting IAM users', { error: err });
+    }
+
+    // List and delete all IAM roles owned by the test account
+    try {
+        const rolesResp = await account.iamClient.send(new ListRolesCommand({}));
+
+        if (rolesResp.Roles && Array.isArray(rolesResp.Roles)) {
+            for (const role of rolesResp.Roles) {
+                log.info('Deleting IAM role', { RoleName: role.RoleName });
+                try {
+                    // Before deleting, need to detach all policies from the role
+                    const attachedPolicies = await account.iamClient.send(
+                        new ListAttachedRolePoliciesCommand({ RoleName: role.RoleName })
+                    );
+                    if (attachedPolicies.AttachedPolicies) {
+                        for (const policy of attachedPolicies.AttachedPolicies) {
+                            await account.iamClient.send(
+                                new DetachRolePolicyCommand({
+                                    RoleName: role.RoleName,
+                                    PolicyArn: policy.PolicyArn
+                                })
+                            );
+                            log.info('Detached policy from role', { RoleName: role.RoleName, PolicyArn: policy.PolicyArn });
+                        }
+                    }
+                    await account.iamClient.send(
+                        new DeleteRoleCommand({ RoleName: role.RoleName })
+                    );
+                    log.info('Deleted role', { RoleName: role.RoleName });
+                } catch (roleErr) {
+                    log.error('Error deleting IAM role', { RoleName: role.RoleName, error: roleErr });
+                }
+            }
+        }
+    } catch (err) {
+        log.error('Error listing IAM roles', { error: err });
+    }
 
     // Delete account with vaultclient
     await promisify(vaultClient.deleteAccount.bind(vaultClient))(account.accountName);
