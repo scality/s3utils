@@ -44,7 +44,11 @@ class CountManager {
                 this.log.info('processing a bucket', {
                     method: 'CountManager::_setupQueue',
                     workInQueue: this.q.length(),
-                    bucketInfo,
+                    bucketInfo: {
+                        name: bucketInfo.getName(),
+                        uid: bucketInfo.getUid(),
+                        creationDate: bucketInfo.getCreationDate(),
+                    }
                 });
                 if (err) {
                     return done(err);

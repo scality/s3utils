@@ -1026,60 +1026,6 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
     }));
 });
 
-describe('S3UtilsMongoClient::_getUsersBucketCreationDates', () => {
-    let client;
-    let repl;
-    beforeAll(async () => {
-        repl = await MongoMemoryReplSet.create(mongoMemoryServerParams);
-        client = new S3UtilsMongoClient({
-            ...createMongoParamsFromMongoMemoryRepl(repl),
-            logger,
-        });
-        const setupPromise = util.promisify(client.setup).bind(client);
-        await setupPromise();
-    });
-
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-    ], done));
-
-    it('should return empty array when no users bucket', async () => {
-        const testResults = await client._getUsersBucketCreationDates(logger);
-        assert.deepStrictEqual(testResults, {});
-    });
-
-    it('should list existing buckets and return their creation dates', async () => {
-        const bucketName = 'bucket1';
-        await new Promise((resolve, reject) => {
-            client.putObject(
-                USERSBUCKET,
-                `${testAccountCanonicalId}${constants.splitter}${bucketName}`,
-                testUserBucketInfo.value,
-                {
-                    versioning: false,
-                    versionId: null,
-                },
-                logger,
-                err => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                },
-            );
-        });
-        const testResults = await client._getUsersBucketCreationDates(logger);
-        const expectedRes = [
-            `${testAccountCanonicalId}${constants.splitter}${bucketName}`,
-        ];
-        assert.deepStrictEqual(Object.keys(testResults), expectedRes);
-    });
-});
-
 function createBucket(client, bucketName, isVersioned, callback) {
     const bucketMD = BucketInfo.fromObj({
         ...testBucketMD,

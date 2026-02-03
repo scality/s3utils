@@ -2,6 +2,7 @@ const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient
 const { Long } = require('mongodb');
 const { errors, constants } = require('arsenal');
 const async = require('async');
+const { promisify } = require('util');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');
 const getLocationConfig = require('./locationConfig');
 const monitoring = require('./monitoring');
@@ -52,35 +53,6 @@ const baseMetricsObject = {
 };
 
 class S3UtilsMongoClient extends MongoClientInterface {
-    /**
-     * Get the list of buckets and their location dates
-     * @param {object} log - Werelogs logger
-     * @returns {object} - Object with bucket names as keys
-     * and their creation dates as values
-     */
-    async _getUsersBucketCreationDates(log) {
-        let cursorUsersBucketCreationDates;
-        try {
-            cursorUsersBucketCreationDates = await this.getCollection(USERSBUCKET).find({}, {
-                projection: {
-                    'value.creationDate': 1,
-                },
-            });
-            const usersBucketCreationDatesArray = await cursorUsersBucketCreationDates.toArray();
-            return usersBucketCreationDatesArray
-                .reduce((map, obj) => ({ ...map, [obj._id]: obj.value.creationDate }), {});
-        } catch (err) {
-            log.error('Failed to read __usersbucket collection', {
-                method: 'getUsersBucketCreationDates',
-                errDetails: { ...err },
-                errorString: err.toString(),
-            });
-            return null;
-        } finally {
-            await cursorUsersBucketCreationDates.close();
-        }
-    }
-
     async updateInflightDeltas(allMetrics, log) {
         let cursor;
         try {
@@ -100,13 +72,11 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             const inflights = await cursor.toArray();
             // convert inflights to a map with _id: usedCapacity._inflight
-            const inflightsMap = inflights.reduce((map, obj) => {
-                const inflightLong = obj.usedCapacity?._inflight || 0n;
-                return {
-                    ...map,
-                    [obj._id]: inflightLong,
-                };
-            }, {});
+            const inflightsMap = {};
+            for (const inflight of inflights) {
+                const inflightValue = inflight.usedCapacity?._inflight || 0n;
+                inflightsMap[inflight._id] = inflightValue;
+            }
 
             const accountInflights = {};
             allMetrics.forEach(entry => {
@@ -201,22 +171,21 @@ class S3UtilsMongoClient extends MongoClientInterface {
 
             const locationConfig = getLocationConfig(log);
 
-            const usersBucketCreationDatesMap = await this._getUsersBucketCreationDates(log);
+            let bucketCreationDate;
+            const getUsersBucketCreationDateAsync = promisify(this.getUsersBucketCreationDate).bind(this);
+            try {
+                bucketCreationDate = await getUsersBucketCreationDateAsync(bucketInfo.getOwner(), bucketName, log);
+            } catch (err) {
+                return callback(errors.InternalError);
+            }
 
             const bucketStatus = bucketInfo.getVersioningConfiguration();
             const isVer = (bucketStatus && (bucketStatus.Status === 'Enabled'
                 || bucketStatus.Status === 'Suspended'));
 
-            if (!usersBucketCreationDatesMap) {
-                return callback(errors.InternalError);
-            }
-
-            const bucketDate = usersBucketCreationDatesMap[`${bucketInfo.getOwner()}${constants.splitter}${bucketName}`];
-            if (bucketDate) {
-                bucketKey = `bucket_${bucketName}_${new Date(bucketDate).getTime()}`;
-                if (bucketKey) {
-                    inflightsPreScan = await this.readStorageConsumptionInflights(bucketKey, log);
-                }
+            if (bucketCreationDate) {
+                bucketKey = `bucket_${bucketName}_${new Date(bucketCreationDate).getTime()}`;
+                inflightsPreScan = await this.readStorageConsumptionInflights(bucketKey, log);
             }
 
             let startCursorDate = new Date();
@@ -243,7 +212,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     bucketName,
                     bucketInfo,
                     entry,
-                    usersBucketCreationDatesMap[`${entry.value['owner-id']}${constants.splitter}${bucketName}`],
+                    bucketCreationDate,
                     isTransient,
                     locationConfig,
                     {
@@ -1022,6 +991,19 @@ class S3UtilsMongoClient extends MongoClientInterface {
         }
     }
 
+    /**
+     * Read the bucket creation date from the `__usersbucket` collection.
+     *
+     * If the bucket entry is missing or does not contain a creation date,
+     * the function doesn't throw an error, and instead 
+     * invoke the callback with no data `(null, undefined)`.
+     *
+     * @param {string} ownerId - Bucket owner canonical ID
+     * @param {string} bucketName - Bucket name
+     * @param {Object} log - Logger
+     * @param {Function} cb - Node-style callback: `(err, creationDate)`
+     * @returns {void}
+     */
     async getUsersBucketCreationDate(ownerId, bucketName, log, cb) {
         try {
             const usersBucketCol = this.getCollection(USERSBUCKET);
@@ -1033,15 +1015,17 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 },
             });
             if (!res || !res.value || !res.value.creationDate) {
-                log.error('bucket entry not found in __usersbucket', {
+                log.warn('bucket entry not found in __usersbucket', {
+                    method: 'getUsersBucketCreationDate',
                     bucketName,
                     ownerId,
                 });
-                return cb(new Error('Bucket entry not found'));
+                return cb(null, undefined);
             }
             return cb(null, res.value.creationDate);
         } catch (err) {
             log.error('failed to read bucket entry from __usersbucket', {
+                method: 'getUsersBucketCreationDate',
                 bucketName,
                 ownerId,
                 errDetails: { ...err },
