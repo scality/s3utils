@@ -1,3 +1,63 @@
+# TL;DR Complete Workflow Example
+
+Here's a complete example running the two scripts and audit the IAM policies used by CRR:
+
+From your local machine: copy scripts to the supervisor
+
+```bash
+scp replicationAudit/list-buckets-with-replication.sh root@<supervisor-ip>:/root/
+scp replicationAudit/check-replication-permissions.js root@<supervisor-ip>:/root/
+```
+
+Connect to the supervisor
+```bash
+ssh root@<supervisor-ip>
+```
+
+Then, from the supervisor, go to the federation directory
+(by default `/srv/scality/s3/s3-offline/federation`):
+
+```bash
+cd /srv/scality/s3/s3-offline/federation
+ENV_DIR=s3config
+
+# Step 1: Copy scripts to S3 connector node
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/list-buckets-with-replication.sh dest=/root/'
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/check-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
+
+# Step 2: Run list-buckets-with-replication.sh
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'BUCKETD_HOST=$(ss -nlptH "sport = :9000" | awk "{print \$4}"| cut -d: -f1) bash /root/list-buckets-with-replication.sh'
+
+# Step 3: Find the vault-metadata repd leader IP (port 5300)
+ansible -i env/$ENV_DIR/inventory md1-cluster1 -m shell \
+    -a 'curl -s http://localhost:5300/_/raft/leader'
+# Note the "ip" value from the output, e.g., {"ip":"10.160.116.162","port":4300}
+
+# Step 4: Set the LEADER_IP variable and run the permission check script
+# Note: replace ctrctl with docker on RHEL/CentOS 7
+LEADER_IP=<leader-ip-from-step-3>
+
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a "mv /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
+        ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
+        /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
+
+# Step 5: Retrieve results
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json' \
+    | grep -v CHANGED | tee /root/replicationAudit_missing.json
+
+# Step 6: Clean up
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'rm -f {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/check-replication-permissions.js \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/buckets-with-replication.json \
+       /root/list-buckets-with-replication.sh'
+```
+
 # Scripts Documentation
 
 ## list-buckets-with-replication.sh
@@ -177,14 +237,14 @@ This ensures portability while using the exact same protocol and key formats as 
 4. Copy the script to an S3 connector node:
 
    ```bash
-   ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
-       -a 'src=/root/check-replication-permissions.js dest=/root/'
+   ansible -i env/$ENV_DIR/inventory 'runners_s3[0]' -m copy \
+       -a 'src=/root/check-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
    ```
 
 5. Find the vault-metadata repd leader IP:
 
    ```bash
-   ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+   ansible -i env/$ENV_DIR/inventory md1-cluster1 -m shell \
        -a 'curl -s http://localhost:5300/_/raft/leader'
    ```
 
@@ -192,31 +252,22 @@ This ensures portability while using the exact same protocol and key formats as 
 
    **Note:** Vault metadata uses port 5300 for admin.
 
-6. Find the vault container ID:
+6. Copy files to `/var/tmp` (mounted in vault container) and run the script:
 
    ```bash
-   ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-       -a 'crictl ps | awk "/scality-vault/ {print \$1}"'
-   ```
-
-7. Copy files to `/var/tmp` (mounted in vault container) and run the script:
-
-   ```bash
-   VAULT_CONTAINER=<vault-container-id>
    LEADER_IP=<leader-ip-from-step-5>
 
    ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-       -a "cp /root/check-replication-permissions.js /var/tmp/ && \
-           cp /root/buckets-with-replication.json /var/tmp/ && \
-           crictl exec $VAULT_CONTAINER node /var/tmp/check-replication-permissions.js \
-           /var/tmp/buckets-with-replication.json $LEADER_IP /var/tmp/missing.json"
+       -a "cp /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
+           ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
+           /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
    ```
 
 8. Retrieve the output:
 
    ```bash
    ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-       -a 'cat /var/tmp/missing.json'
+       -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json'
    ```
 
 ### Command Line Arguments
@@ -379,61 +430,6 @@ Processing 6 buckets...
 Total checked: 6
 Missing permission: 3
 Output saved to: /tmp/missing.json
-```
-
-### Complete Workflow Example
-
-Here's a complete example running both scripts end-to-end:
-
-```bash
-# From your local machine: copy scripts to the supervisor
-scp replicationAudit/list-buckets-with-replication.sh root@<supervisor-ip>:/root/
-scp replicationAudit/check-replication-permissions.js root@<supervisor-ip>:/root/
-
-# Connect to the supervisor
-ssh root@<supervisor-ip>
-```
-
-Then, from the supervisor, go to the federation directory
-(by default `/srv/scality/s3/s3-offline/federation`):
-
-```bash
-cd /srv/scality/s3/s3-offline/federation
-ENV_DIR=s3config
-
-# Step 1: Copy scripts to S3 connector node
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
-    -a 'src=/root/list-buckets-with-replication.sh dest=/root/'
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
-    -a 'src=/root/check-replication-permissions.js dest=/root/'
-
-# Step 2: Run list-buckets-with-replication.sh
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a 'bash /root/list-buckets-with-replication.sh'
-
-# Step 3: Find the vault-metadata repd leader IP (port 5300)
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a 'curl -s http://localhost:5300/_/raft/leader'
-# Note the "ip" value from the output, e.g., {"ip":"10.160.116.162","port":4300}
-
-# Step 4: Find the vault container ID
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a 'crictl ps | awk "/scality-vault/ {print \$1}"'
-# Note the container ID from the output
-
-# Step 5: Set variables and run the permission check script
-VAULT_CONTAINER=<vault-container-id-from-step-4>
-LEADER_IP=<leader-ip-from-step-3>
-
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a "cp /root/check-replication-permissions.js /var/tmp/ && \
-        cp /root/buckets-with-replication.json /var/tmp/ && \
-        crictl exec $VAULT_CONTAINER node /var/tmp/check-replication-permissions.js \
-        /var/tmp/buckets-with-replication.json $LEADER_IP /var/tmp/missing.json"
-
-# Step 6: Retrieve results
-ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a 'cat /var/tmp/missing.json'
 ```
 
 ### Troubleshooting
