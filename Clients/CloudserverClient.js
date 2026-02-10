@@ -55,35 +55,35 @@ class Client {
 
     getMetadata(params, callback) {
         const command = new GetMetadataCommand(params);
-        this.client.send(command)
+        this.client.backbeatRoutes.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     putMetadata(params, callback) {
         const command = new PutMetadataCommand(params);
-        this.client.send(command)
+        this.client.backbeatRoutes.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     getLocationsStatus(callback) {
         const command = new GetLocationsStatusCommand({});
-        this.client.send(command)
+        this.client.proxyBackbeatApis.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     listFailed(params, callback) {
         const command = new ListFailedCommand(params);
-        this.client.send(command)
+        this.client.proxyBackbeatApis.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     retryFailedObjects(params, callback) {
         const command = new RetryFailedObjectsCommand(params);
-        this.client.send(command)
+        this.client.proxyBackbeatApis.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
