@@ -55,14 +55,14 @@ class Client {
 
     getMetadata(params, callback) {
         const command = new GetMetadataCommand(params);
-        this.client.send(command)
+        this.client.backbeatRoutes.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     putMetadata(params, callback) {
         const command = new PutMetadataCommand(params);
-        this.client.send(command)
+        this.client.backbeatRoutes.send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
