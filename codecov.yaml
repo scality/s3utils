@@ -1,10 +1,18 @@
 ---
 
 codecov:
-  require_ci_to_pass: yes
+  require_ci_to_pass: true
   notify:
-    wait_for_ci: yes
+    wait_for_ci: true
+    after_n_builds: 1
 
 parsers:
   javascript:
     enable_partials: yes
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
