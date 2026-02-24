@@ -1,4 +1,4 @@
-const { S3Client, CreateBucketCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, CreateBucketCommand, ListBucketsCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { IAMClient, CreateUserCommand, CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand, ListRolesCommand, ListAttachedRolePoliciesCommand, ListUsersCommand, ListAttachedUserPoliciesCommand, DetachUserPolicyCommand } = require('@aws-sdk/client-iam');
 const { promisify } = require('util');
 const { Logger } = require('werelogs');
@@ -73,40 +73,37 @@ async function createTestAccount(vaultClient) {
 
 
 async function deleteTestAccount(vaultClient, account) {
-    // Delete bucket
-    log.info('Deleting bucket', { bucket: account.bucketName });
-    // empty bucket - need to delete all versions and delete markers for versioned buckets
-    const listedObjects = await account.s3Client.send(new ListObjectVersionsCommand({ Bucket: account.bucketName }));
+    // Delete all buckets in the account
+    const bucketsResp = await account.s3Client.send(new ListBucketsCommand({}));
+    for (const bucket of (bucketsResp.Buckets || [])) {
+        log.info('Deleting bucket', { bucket: bucket.Name });
+        // empty bucket - need to delete all versions and delete markers for versioned buckets
+        const listedObjects = await account.s3Client.send(new ListObjectVersionsCommand({ Bucket: bucket.Name }));
 
-    const objectsToDelete = [];
+        const objectsToDelete = [];
 
-    // Add all object versions
-    if (listedObjects.Versions && listedObjects.Versions.length > 0) {
-        listedObjects.Versions.forEach(({ Key, VersionId }) => {
-            log.info('Scheduling object version for deletion', { key: Key, versionId: VersionId });
-            objectsToDelete.push({ Key, VersionId });
-        });
+        if (listedObjects.Versions && listedObjects.Versions.length > 0) {
+            listedObjects.Versions.forEach(({ Key, VersionId }) => {
+                objectsToDelete.push({ Key, VersionId });
+            });
+        }
+
+        if (listedObjects.DeleteMarkers && listedObjects.DeleteMarkers.length > 0) {
+            listedObjects.DeleteMarkers.forEach(({ Key, VersionId }) => {
+                objectsToDelete.push({ Key, VersionId });
+            });
+        }
+
+        if (objectsToDelete.length > 0) {
+            await account.s3Client.send(new DeleteObjectsCommand({
+                Bucket: bucket.Name,
+                Delete: { Objects: objectsToDelete },
+            }));
+        }
+
+        await account.s3Client.send(new DeleteBucketCommand({ Bucket: bucket.Name }));
+        log.info('Deleted bucket', { bucket: bucket.Name });
     }
-
-    // Add all delete markers
-    if (listedObjects.DeleteMarkers && listedObjects.DeleteMarkers.length > 0) {
-        listedObjects.DeleteMarkers.forEach(({ Key, VersionId }) => {
-            log.info('Scheduling delete marker for deletion', { key: Key, versionId: VersionId });
-            objectsToDelete.push({ Key, VersionId });
-        });
-    }
-
-    // Delete all versions and markers
-    if (objectsToDelete.length > 0) {
-        const deleteParams = {
-            Bucket: account.bucketName,
-            Delete: { Objects: objectsToDelete }
-        };
-        await account.s3Client.send(new DeleteObjectsCommand(deleteParams));
-    }
-
-    await account.s3Client.send(new DeleteBucketCommand({ Bucket: account.bucketName }));
-    log.info('Deleted bucket', { bucket: account.bucketName });
 
     // List and delete all IAM users
     try {
@@ -174,6 +171,15 @@ async function deleteTestAccount(vaultClient, account) {
                                 })
                             );
                             log.info('Detached policy from role', { RoleName: role.RoleName, PolicyArn: policy.PolicyArn });
+                            try {
+                                await account.iamClient.send(
+                                    new DeletePolicyCommand({ PolicyArn: policy.PolicyArn })
+                                );
+                                log.info('Deleted policy', { PolicyArn: policy.PolicyArn });
+                            } catch (delPolErr) {
+                                // Policy may still be attached to another role
+                                log.info('Could not delete policy', { PolicyArn: policy.PolicyArn, error: delPolErr && delPolErr.message });
+                            }
                         }
                     }
                     await account.iamClient.send(
