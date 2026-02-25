@@ -74,10 +74,10 @@ gh pr diff <number> --repo <owner/repo>
 For each specific issue, post a comment on the exact file and line:
 
 ```bash
-gh api -X POST -H "Accept: application/vnd.github+json" "repos/<owner/repo>/pulls/<number>/comments" -f body="Your comment<br><br>— Claude Code" -f path="path/to/file" -F line=<line_number> -f side="RIGHT" -f commit_id="<headRefOid>"
+gh api -X POST -H "Accept: application/vnd.github+json" "repos/<owner/repo>/pulls/<number>/comments" -f body=$'Your comment\n\n— Claude Code' -f path="path/to/file" -F line=<line_number> -f side="RIGHT" -f commit_id="<headRefOid>"
 ```
 
-**Never use newlines in bash commands** — use `<br>` for line breaks in comment bodies. The command must stay on a single line.
+**The command must stay on a single bash line.** Use `$'...'` quoting for the `-f body=` value, with `\n` for line breaks. Never use `<br>` — it renders as literal text inside code blocks and suggestion blocks.
 
 Each inline comment must:
 - Be short and direct — say what's wrong, why it's wrong, and how to fix it in 1-3 sentences
@@ -89,7 +89,11 @@ Each inline comment must:
   ```
   ````
   Only suggest when you can show the exact replacement. For architectural or design issues, just describe the problem.
-- Never put `<br>` inside code blocks or suggestion blocks — `<br>` renders as literal text in code. Use `<br>` only in regular comment text.
+  Example with a suggestion block:
+  ```bash
+  gh api ... -f body=$'Missing the shared-guidelines update command.\n\n```suggestion\n/plugin update shared-guidelines@scality-agent-hub\n/plugin update scality-skills@scality-agent-hub\n```\n\n— Claude Code' ...
+  ```
+- Escape single quotes inside `$'...'` as `\'` (e.g., `don\'t`)
 - End with: `— Claude Code`
 
 Use the line number from the **new version** of the file (the line number you'd see after the PR is merged), which corresponds to the `line` parameter in the GitHub API.
@@ -97,10 +101,10 @@ Use the line number from the **new version** of the file (the line number you'd 
 #### Part B: Summary comment
 
 ```bash
-gh pr comment <number> --repo <owner/repo> --body "LGTM<br><br>Review by Claude Code"
+gh pr comment <number> --repo <owner/repo> --body $'LGTM\n\nReview by Claude Code'
 ```
 
-**Never use newlines in bash commands** — use `<br>` for line breaks in comment bodies. The command must stay on a single line.
+**The command must stay on a single bash line.** Use `$'...'` quoting with `\n` for line breaks.
 
 Do not describe or summarize the PR. For each issue, state the problem on one line, then list one or more suggestions below it:
 
