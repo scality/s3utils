@@ -23,21 +23,6 @@ Parse `` to extract the repo and PR number:
 - **CI mode** (arguments contain `REPO:` and `PR_NUMBER:`): post inline comments and summary to GitHub.
 - **Local mode** (all other cases): output the review as text directly. Do NOT post anything to GitHub.
 
-## Repo context
-
-This is **s3utils**, a collection of Node.js (22+) utility scripts for managing Scality S3-compatible storage at scale. It provides operational tools for Cross-Region Replication (CRR), metadata verification, Raft consensus debugging, data integrity checks, and object repair.
-
-Key characteristics:
-- CommonJS module system (`require`/`module.exports`)
-- Root-level executable scripts (e.g., `crrExistingObjects.js`, `cleanupNoncurrentVersions.js`)
-- Modular subdirectories: `CRR/`, `CompareRaftMembers/`, `VerifyBucketSproxydKeys/`, `ObjectRepair/`, `Clients/`, `utils/`
-- Heavy use of Node.js streams for memory-efficient processing of large datasets
-- Environment variable-driven configuration (`ACCESS_KEY`, `SECRET_KEY`, `ENDPOINT`, `WORKERS`, etc.)
-- Scality internal git-based dependencies: `arsenal`, `bucketclient`, `vaultclient`, `werelogs`, `httpagent`
-- AWS SDK v3 (`@aws-sdk/client-s3`) with custom retry strategies
-- ESLint 9+ with `@scality/scality` base config
-- Jest 29 for testing (unit + functional with MongoDB)
-
 ## Steps
 
 1. **Fetch PR details:**
