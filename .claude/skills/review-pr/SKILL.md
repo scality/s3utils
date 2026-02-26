@@ -12,7 +12,7 @@ You are an expert code reviewer. Review this PR:
 
 ## Determine PR target
 
-Parse `` to extract the repo and PR number:
+Parse the argument to extract the repo and PR number:
 
 - If arguments contain `REPO:` and `PR_NUMBER:` (CI mode), use those values directly.
 - If the argument is a GitHub URL (starts with `https://github.com/`), extract `owner/repo` and the PR number from it.
