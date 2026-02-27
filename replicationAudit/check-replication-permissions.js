@@ -421,7 +421,7 @@ async function main() {
 
     // Process each bucket
     for (let i = 0; i < buckets.length; i++) {
-        const { bucket, sourceRole } = buckets[i];
+        const { bucket, sourceRole, ownerDisplayName } = buckets[i];
 
         if (!sourceRole) {
             logProgress(i + 1, buckets.length, bucket, 'SKIP (no role)');
@@ -440,12 +440,12 @@ async function main() {
             } else {
                 const reason = result.error || 's3:ReplicateObject';
                 logProgress(i + 1, buckets.length, bucket, `MISSING: ${reason}`);
-                results.push(result);
+                results.push({ ...result, ownerDisplayName });
                 stats.missing++;
             }
         } catch (e) {
             logProgress(i + 1, buckets.length, bucket, `ERROR: ${e.message}`);
-            results.push({ bucket, sourceRole, error: e.message, policies: [] });
+            results.push({ bucket, sourceRole, ownerDisplayName, error: e.message, policies: [] });
             stats.errors++;
         }
     }
