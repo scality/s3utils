@@ -484,9 +484,10 @@ Output saved to: /tmp/missing.json
 Reads the output of `check-replication-permissions.js` and creates IAM policies
 with `s3:ReplicateObject` for roles that are missing it.
 
-The script applies **minimal changes**: one policy per role (covering all affected
-buckets), with an explicit Statement ID (`AllowReplicateObjectAuditFix`) so the
-policies are easily identifiable later.
+The script applies **minimal changes**: one policy per bucket, with an explicit
+Statement ID (`AllowReplicateObjectAuditFix`) so the policies are easily
+identifiable later. Using one policy per bucket makes re-runs truly idempotent:
+if the policy already exists, its document is guaranteed to be identical.
 
 ### Prerequisites
 
@@ -517,19 +518,19 @@ node fix-missing-replication-permissions.js <input-file> <vault-host> <admin-con
 
 ### How It Works
 
-1. **Reads** the missing permissions file and groups buckets by account and role
+1. **Reads** the missing permissions file and enriches each entry with parsed role fields
 2. **Maps** account IDs to names using `ownerDisplayName` from the input (no API call)
-3. For each account:
+3. For each bucket entry (grouped by account for credential reuse):
    - **Generates** a temporary access key via vault admin API (15-minute auto-expiry)
-   - **Creates** one IAM policy per role with `s3:ReplicateObject` for all affected buckets
+   - **Creates** one IAM policy per bucket with `s3:ReplicateObject`
    - **Attaches** the policy to the role
    - **Deletes** the temporary access key (falls back to auto-expiry on failure)
 4. **Writes** results to the output file
 
 ### Policy Created
 
-For each role, the script creates a single policy named
-`s3-replication-audit-fix-<roleName>`:
+For each bucket, the script creates a policy named
+`s3-replication-audit-fix-<bucketName>`:
 
 ```json
 {
@@ -538,10 +539,7 @@ For each role, the script creates a single policy named
     "Sid": "AllowReplicateObjectAuditFix",
     "Effect": "Allow",
     "Action": "s3:ReplicateObject",
-    "Resource": [
-      "arn:aws:s3:::bucket-old-1/*",
-      "arn:aws:s3:::bucket-old-2/*"
-    ]
+    "Resource": "arn:aws:s3:::bucket-old-1/*"
   }]
 }
 ```
@@ -556,10 +554,10 @@ For each role, the script creates a single policy named
     "inputFile": "missing.json",
     "dryRun": false,
     "counts": {
-      "totalRolesProcessed": 1,
+      "totalBucketsProcessed": 3,
       "totalBucketsFixed": 3,
-      "policiesCreated": 1,
-      "policiesAttached": 1,
+      "policiesCreated": 3,
+      "policiesAttached": 3,
       "keysCreated": 1,
       "keysDeleted": 1,
       "errors": 0
@@ -571,9 +569,19 @@ For each role, the script creates a single policy named
       "accountName": "testaccount",
       "roleName": "crr-role-outdated",
       "roleArn": "arn:aws:iam::267390090509:role/crr-role-outdated",
-      "policyName": "s3-replication-audit-fix-crr-role-outdated",
-      "policyArn": "arn:aws:iam::267390090509:policy/s3-replication-audit-fix-crr-role-outdated",
-      "buckets": ["bucket-old-1", "bucket-old-2", "bucket-old-3"],
+      "policyName": "s3-replication-audit-fix-bucket-old-1",
+      "policyArn": "arn:aws:iam::267390090509:policy/s3-replication-audit-fix-bucket-old-1",
+      "bucket": "bucket-old-1",
+      "status": "success"
+    },
+    {
+      "accountId": "267390090509",
+      "accountName": "testaccount",
+      "roleName": "crr-role-outdated",
+      "roleArn": "arn:aws:iam::267390090509:role/crr-role-outdated",
+      "policyName": "s3-replication-audit-fix-bucket-old-2",
+      "policyArn": "arn:aws:iam::267390090509:policy/s3-replication-audit-fix-bucket-old-2",
+      "bucket": "bucket-old-2",
       "status": "success"
     }
   ],
@@ -589,18 +597,24 @@ Input:  missing.json
 Output: replication-fix-results.json
 Vault/IAM: 13.50.166.21:8600
 
-Processing 1 role(s)
+Processing 3 bucket(s)
 
-[1/1] Role "crr-role-outdated" — account "testaccount" (3 bucket(s))
-  Created policy "s3-replication-audit-fix-crr-role-outdated"
+[1/3] Bucket "bucket-old-1" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-1"
+  Attached policy to role "crr-role-outdated"
+[2/3] Bucket "bucket-old-2" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-2"
+  Attached policy to role "crr-role-outdated"
+[3/3] Bucket "bucket-old-3" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-3"
   Attached policy to role "crr-role-outdated"
 Deleted temp key for account "testaccount" (267390090509)
 
 === Summary ===
-Roles processed:       1
+Buckets processed:     3
 Buckets fixed:         3
-Policies created:      1
-Policies attached:     1
+Policies created:      3
+Policies attached:     3
 Keys created:          1
 Keys deleted:          1
 Errors:                0
@@ -614,7 +628,8 @@ Done.
 
 The script is safe to run multiple times:
 
-- If the policy already exists, it is reused (not duplicated)
+- Each bucket has its own policy, so if it already exists the document is
+  guaranteed to be identical — `EntityAlreadyExists` is a true no-op
 - Attaching an already-attached policy is a no-op in IAM
 - Temporary access keys auto-expire after 15 minutes even if deletion fails
 

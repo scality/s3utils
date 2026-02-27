@@ -35,7 +35,6 @@ const log = new Logger('fixMissingReplicationPermissions:test');
 const SCRIPT_PATH = path.resolve(__dirname, '../../../replicationAudit/fix-missing-replication-permissions.js');
 const ROLE_NAME = 'crr-role-test';
 const POLICY_PREFIX = 's3-replication-audit-fix';
-const AUDIT_FIX_POLICY_NAME = `${POLICY_PREFIX}-${ROLE_NAME}`;
 
 /**
  * Set up CRR on the source account with a role that deliberately
@@ -235,7 +234,7 @@ describe('fix-missing-replication-permissions', () => {
             new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
         );
         const auditFixPolicy = (attached.AttachedPolicies || [])
-            .find(p => p.PolicyName === AUDIT_FIX_POLICY_NAME);
+            .find(p => p.PolicyName === `${POLICY_PREFIX}-${accountSource.bucketName}`);
         expect(auditFixPolicy).toBeUndefined();
     }, 30000);
 
@@ -252,16 +251,18 @@ describe('fix-missing-replication-permissions', () => {
         expect(result.metadata.counts.policiesCreated).toBe(1);
         expect(result.metadata.counts.policiesAttached).toBe(1);
 
+        const bucketPolicyName = `${POLICY_PREFIX}-${accountSource.bucketName}`;
+
         // Verify policy is attached to role
         const attached = await accountSource.iamClient.send(
             new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
         );
         const auditFixPolicy = (attached.AttachedPolicies || [])
-            .find(p => p.PolicyName === AUDIT_FIX_POLICY_NAME);
+            .find(p => p.PolicyName === bucketPolicyName);
         expect(auditFixPolicy).toBeDefined();
 
-        // Verify policy document contains s3:ReplicateObject
-        const policyArn = `arn:aws:iam::${accountSource.accountId}:policy/${AUDIT_FIX_POLICY_NAME}`;
+        // Verify policy document contains s3:ReplicateObject for this bucket
+        const policyArn = `arn:aws:iam::${accountSource.accountId}:policy/${bucketPolicyName}`;
         const policyResp = await accountSource.iamClient.send(
             new GetPolicyCommand({ PolicyArn: policyArn }),
         );
@@ -273,6 +274,9 @@ describe('fix-missing-replication-permissions', () => {
         const policyDoc = JSON.parse(decodeURIComponent(versionResp.PolicyVersion.Document));
         const actions = policyDoc.Statement.flatMap(s => [].concat(s.Action));
         expect(actions).toContain('s3:ReplicateObject');
+
+        const resources = policyDoc.Statement.flatMap(s => [].concat(s.Resource));
+        expect(resources).toContain(`arn:aws:s3:::${accountSource.bucketName}/*`);
     }, 30000);
 
     it('idempotent: re-run does not fail or duplicate', async () => {
@@ -361,7 +365,7 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
         fs.rmSync(tmpDir, { recursive: true, force: true });
     }, 60000);
 
-    it('one role, multiple buckets: policy covers all bucket ARNs', async () => {
+    it('one role, multiple buckets: one policy per bucket', async () => {
         const accountSource = await createTestAccount(vaultClient);
         const accountDest = await createTestAccount(vaultClient);
         accounts.push(accountSource, accountDest);
@@ -426,28 +430,32 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
         expect(exitCode).toBe(0);
 
         const result = JSON.parse(stdout);
-        expect(result.fixes).toHaveLength(1);
-        expect(result.fixes[0].buckets).toEqual(
+        // One fix entry per bucket
+        expect(result.fixes).toHaveLength(2);
+        expect(result.fixes.map(f => f.bucket)).toEqual(
             expect.arrayContaining([accountSource.bucketName, secondBucket]),
         );
-        expect(result.metadata.counts.policiesCreated).toBe(1);
+        // One policy per bucket
+        expect(result.metadata.counts.policiesCreated).toBe(2);
         expect(result.metadata.counts.totalBucketsFixed).toBe(2);
 
-        // Verify the policy document covers both buckets
-        const policyArn = `arn:aws:iam::${accountSource.accountId}:policy/${AUDIT_FIX_POLICY_NAME}`;
-        const policyResp = await accountSource.iamClient.send(
-            new GetPolicyCommand({ PolicyArn: policyArn }),
-        );
-        const versionResp = await accountSource.iamClient.send(
-            new GetPolicyVersionCommand({
-                PolicyArn: policyArn,
-                VersionId: policyResp.Policy.DefaultVersionId,
-            }),
-        );
-        const policyDoc = JSON.parse(decodeURIComponent(versionResp.PolicyVersion.Document));
-        const resources = policyDoc.Statement.flatMap(s => [].concat(s.Resource));
-        expect(resources).toContain(`arn:aws:s3:::${accountSource.bucketName}/*`);
-        expect(resources).toContain(`arn:aws:s3:::${secondBucket}/*`);
+        // Verify each bucket has its own policy with the correct ARN
+        for (const bucketName of [accountSource.bucketName, secondBucket]) {
+            const policyName = `${POLICY_PREFIX}-${bucketName}`;
+            const policyArn = `arn:aws:iam::${accountSource.accountId}:policy/${policyName}`;
+            const policyResp = await accountSource.iamClient.send(
+                new GetPolicyCommand({ PolicyArn: policyArn }),
+            );
+            const versionResp = await accountSource.iamClient.send(
+                new GetPolicyVersionCommand({
+                    PolicyArn: policyArn,
+                    VersionId: policyResp.Policy.DefaultVersionId,
+                }),
+            );
+            const policyDoc = JSON.parse(decodeURIComponent(versionResp.PolicyVersion.Document));
+            const resources = policyDoc.Statement.flatMap(s => [].concat(s.Resource));
+            expect(resources).toEqual([`arn:aws:s3:::${bucketName}/*`]);
+        }
     }, 60000);
 
     it('two roles in the same account: two policies, one temp key', async () => {
@@ -523,18 +531,18 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
         expect(result.metadata.counts.keysCreated).toBe(1);
         expect(result.metadata.counts.keysDeleted).toBe(1);
 
-        // Verify both policies exist
+        // Verify both policies exist (named by bucket, not role)
         const attached1 = await accountSource.iamClient.send(
             new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
         );
         expect((attached1.AttachedPolicies || [])
-            .find(p => p.PolicyName === AUDIT_FIX_POLICY_NAME)).toBeDefined();
+            .find(p => p.PolicyName === `${POLICY_PREFIX}-${accountSource.bucketName}`)).toBeDefined();
 
         const attached2 = await accountSource.iamClient.send(
             new ListAttachedRolePoliciesCommand({ RoleName: secondRoleName }),
         );
         expect((attached2.AttachedPolicies || [])
-            .find(p => p.PolicyName === `${POLICY_PREFIX}-${secondRoleName}`)).toBeDefined();
+            .find(p => p.PolicyName === `${POLICY_PREFIX}-${secondBucket}`)).toBeDefined();
     }, 60000);
 
     it('two roles across different accounts: separate policies and keys', async () => {
@@ -605,18 +613,18 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
         expect(result.metadata.counts.keysCreated).toBe(2);
         expect(result.metadata.counts.keysDeleted).toBe(2);
 
-        // Verify each account has its own policy attached
+        // Verify each account has its own policy attached (named by bucket)
         const attached1 = await accountSource1.iamClient.send(
             new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
         );
         expect((attached1.AttachedPolicies || [])
-            .find(p => p.PolicyName === AUDIT_FIX_POLICY_NAME)).toBeDefined();
+            .find(p => p.PolicyName === `${POLICY_PREFIX}-${accountSource1.bucketName}`)).toBeDefined();
 
         const attached2 = await accountSource2.iamClient.send(
             new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
         );
         expect((attached2.AttachedPolicies || [])
-            .find(p => p.PolicyName === AUDIT_FIX_POLICY_NAME)).toBeDefined();
+            .find(p => p.PolicyName === `${POLICY_PREFIX}-${accountSource2.bucketName}`)).toBeDefined();
     }, 60000);
 
     it('empty results array exits with code 0', async () => {

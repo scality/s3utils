@@ -6,6 +6,15 @@
  * Reads the output of check-replication-permissions.js and creates IAM policies
  * with s3:ReplicateObject for roles that are missing it, then attaches them.
  *
+ * TBD: This script does not re-check whether the permission is still missing
+ * before applying the fix. This means:
+ *   - If someone manually added s3:ReplicateObject between check and fix,
+ *     a redundant (but harmless) policy is created.
+ *   - If the fix policy is later modified externally, re-running won't
+ *     detect or correct it (EntityAlreadyExists skips the policy).
+ * We keep it simple today: the intended workflow is check → fix → re-check.
+ * Re-run check-replication-permissions.js after fixing to verify the result.
+ *
  * Usage: node fix-missing-replication-permissions.js <input-file> <vault-host> <admin-config> [output-file] [--iam-port <port>] [--https] [--dry-run]
  *
  * Requires: vaultclient, @aws-sdk/client-iam (both in s3utils dependencies)
@@ -83,45 +92,15 @@ function parseRoleArn(arn) {
     return { accountId: match[1], roleName: match[2] };
 }
 
-/**
- * Group missing entries by role, collecting all affected buckets per role.
- *
- * Input (results from check-replication-permissions.js):
- *   [
- *     { bucket: "bucket-old-1", ownerDisplayName: "testaccount", sourceRole: "arn:aws:iam::123:role/crr-role" },
- *     { bucket: "bucket-old-2", ownerDisplayName: "testaccount", sourceRole: "arn:aws:iam::123:role/crr-role" },
- *   ]
- *
- * Output:
- *   [
- *     { accountId: "123", accountName: "testaccount", roleName: "crr-role",
- *       roleArn: "arn:aws:iam::123:role/crr-role", buckets: ["bucket-old-1", "bucket-old-2"] }
- *   ]
- */
-function groupByRole(results) {
-    const roles = Object.groupBy(results, entry => entry.sourceRole);
-
-    return Object.entries(roles).map(([roleArn, entries]) => {
-        const { accountId, roleName } = parseRoleArn(roleArn);
-        return {
-            accountId,
-            accountName: entries[0].ownerDisplayName,
-            roleName,
-            roleArn,
-            buckets: entries.map(e => e.bucket),
-        };
-    });
-}
-
-/** Build the IAM policy document */
-function buildPolicyDocument(buckets) {
+/** Build the IAM policy document for a single bucket */
+function buildPolicyDocument(bucket) {
     return {
         Version: '2012-10-17',
         Statement: [{
             Sid: STATEMENT_ID,
             Effect: 'Allow',
             Action: 's3:ReplicateObject',
-            Resource: buckets.map(b => `arn:aws:s3:::${b}/*`),
+            Resource: `arn:aws:s3:::${bucket}/*`,
         }],
     };
 }
@@ -190,13 +169,11 @@ async function main() {
         process.exit(1);
     }
 
-    // Group by role, sorted by account so roles in the same account are
-    // processed consecutively — reduces the chance of cached credentials
-    // expiring while other accounts are being processed.
-    const roles = groupByRole(entries)
-        .sort((a, b) => (a.accountId < b.accountId ? -1 : 1));
+    // Sort by sourceRole so entries in the same account are processed
+    // consecutively, maximising credential cache hits.
+    entries.sort((a, b) => (a.sourceRole < b.sourceRole ? -1 : 1));
 
-    log(`Processing ${roles.length} role(s)`);
+    log(`Processing ${entries.length} bucket(s)`);
     log('');
 
     // Read admin credentials
@@ -223,7 +200,7 @@ async function main() {
             inputFile: config.inputFile,
             dryRun: config.dryRun,
             counts: {
-                totalRolesProcessed: roles.length,
+                totalBucketsProcessed: entries.length,
                 totalBucketsFixed: 0,
                 policiesCreated: 0,
                 policiesAttached: 0,
@@ -236,25 +213,27 @@ async function main() {
         errors: [],
     };
 
-    // Cache IAM client per account to reuse connections across roles
+    // Cache IAM client per account to reuse connections across buckets
     // and for cleanup (key deletion).
     // Map<accountId, { accountName, accessKeyId, iamClient }>
     const accountCache = new Map();
 
-    for (let i = 0; i < roles.length; i++) {
-        const { accountId, accountName, roleName, roleArn, buckets } = roles[i];
-        const policyName = `${POLICY_PREFIX}-${roleName}`;
-        const policyDocument = buildPolicyDocument(buckets);
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const { accountId, roleName } = parseRoleArn(entry.sourceRole);
+        const { bucket, ownerDisplayName: accountName } = entry;
+        const policyName = `${POLICY_PREFIX}-${bucket}`;
+        const policyDocument = buildPolicyDocument(bucket);
 
-        log(`[${i + 1}/${roles.length}] Role "${roleName}" — account "${accountName}" (${buckets.length} bucket(s))`);
+        log(`[${i + 1}/${entries.length}] Bucket "${bucket}" — role "${roleName}" — account "${accountName}"`);
 
         const fix = {
             accountId,
             accountName,
             roleName,
-            roleArn,
+            roleArn: entry.sourceRole,
             policyName,
-            buckets,
+            bucket,
             status: 'pending',
         };
 
@@ -262,7 +241,6 @@ async function main() {
             fix.status = 'dry-run';
             log(`  [DRY-RUN] Would create policy "${policyName}"`);
             log(`  [DRY-RUN] Would attach to role "${roleName}"`);
-            log(`  Buckets: ${buckets.join(', ')}`);
             outcome.fixes.push(fix);
             continue;
         }
@@ -284,9 +262,10 @@ async function main() {
 
             const { iamClient } = accountCache.get(accountId);
 
-            // Idempotent/safe to re-run: CreatePolicy reuses an existing policy
-            // with the same name, and AttachRolePolicy is a no-op if
-            // the policy is already attached to the role.
+            // Idempotent/safe to re-run: each bucket has its own policy,
+            // so EntityAlreadyExists means the exact same policy document
+            // already exists — a true no-op. AttachRolePolicy is also
+            // a no-op if the policy is already attached to the role.
             let policyArn;
             try {
                 const resp = await iamClient.send(new CreatePolicyCommand({
@@ -300,7 +279,7 @@ async function main() {
                 if (err.name === 'EntityAlreadyExistsException'
                     || err.Code === 'EntityAlreadyExists') {
                     policyArn = `arn:aws:iam::${accountId}:policy/${policyName}`;
-                    log(`  Policy "${policyName}" already exists, reusing`);
+                    log(`  Policy "${policyName}" already exists, skipping`);
                 } else {
                     throw err;
                 }
@@ -316,7 +295,7 @@ async function main() {
             log(`  Attached policy to role "${roleName}"`);
 
             fix.status = 'success';
-            outcome.metadata.counts.totalBucketsFixed += buckets.length;
+            outcome.metadata.counts.totalBucketsFixed++;
         } catch (err) {
             fix.status = 'error';
             fix.error = err.message;
@@ -325,6 +304,7 @@ async function main() {
                 accountId,
                 accountName,
                 roleName,
+                bucket,
                 policyName,
                 message: err.message,
             });
@@ -356,7 +336,7 @@ async function main() {
 
     // Print summary
     log('\n=== Summary ===');
-    log(`Roles processed:       ${outcome.metadata.counts.totalRolesProcessed}`);
+    log(`Buckets processed:     ${outcome.metadata.counts.totalBucketsProcessed}`);
     log(`Buckets fixed:         ${outcome.metadata.counts.totalBucketsFixed}`);
     log(`Policies created:      ${outcome.metadata.counts.policiesCreated}`);
     log(`Policies attached:     ${outcome.metadata.counts.policiesAttached}`);
