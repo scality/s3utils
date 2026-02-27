@@ -370,6 +370,8 @@ async function main() {
 
     // JSON result to stdout
     console.log(JSON.stringify(outcome, null, 2));
+
+    process.exit(0);
 }
 
 main().catch(e => {
