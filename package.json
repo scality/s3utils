@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/scality/s3utils#readme",
   "dependencies": {
+    "@aws-sdk/client-iam": "^3.962.0",
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/node-http-handler": "^3.374.0",
     "@scality/cloudserverclient": "^1.0.4",
@@ -54,7 +55,6 @@
     "string-width": "4.2.3"
   },
   "devDependencies": {
-    "@aws-sdk/client-iam": "^3.962.0",
     "@scality/eslint-config-scality": "scality/Guidelines#8.3.0",
     "@sinonjs/fake-timers": "^14.0.0",
     "eslint": "^9.14.0",
