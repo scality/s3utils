@@ -7,7 +7,9 @@
  * with s3:ReplicateObject for roles that are missing it, then attaches them.
  *
  * TBD: This script does not re-check whether the permission is still missing
- * before applying the fix. This means:
+ * before applying the fix. It only checks that a policy named
+ * s3-replication-audit-fix-<bucketName> exists (EntityAlreadyExists) to make
+ * the script idempotent — re-running it won't create extra policies. But:
  *   - If someone manually added s3:ReplicateObject between check and fix,
  *     a redundant (but harmless) policy is created.
  *   - If the fix policy is later modified externally, re-running won't
@@ -105,7 +107,6 @@ function buildPolicyDocument(bucket) {
     };
 }
 
-/** Promisify vaultclient.generateAccountAccessKey (callback is 2nd arg) */
 function generateAccountAccessKeyAsync(client, accountName, options) {
     return new Promise((resolve, reject) => {
         client.generateAccountAccessKey(accountName, (err, res) => {

@@ -15,6 +15,7 @@ const {
     CreateRoleCommand,
     AttachRolePolicyCommand,
     ListAttachedRolePoliciesCommand,
+    ListAccessKeysCommand,
     GetPolicyCommand,
     GetPolicyVersionCommand,
 } = require('@aws-sdk/client-iam');
@@ -141,14 +142,17 @@ async function configureCrrWithMissingPermission(accountSource, accountDest) {
 /**
  * Build the missing.json input file matching check script output format.
  */
-function buildInputFile(accountSource, accountDest) {
+function buildInputFile(accountSource) {
     return {
         results: [{
             bucket: accountSource.bucketName,
             ownerDisplayName: accountSource.accountName,
             sourceRole: `arn:aws:iam::${accountSource.accountId}:role/${ROLE_NAME}`,
-            destinationRole: `arn:aws:iam::${accountDest.accountId}:role/${ROLE_NAME}`,
-            missingActions: ['s3:ReplicateObject'],
+            policies: [{
+                name: 'crr-policy-incomplete',
+                path: '/',
+                allowsReplicateObject: false,
+            }],
         }],
     };
 }
@@ -206,7 +210,7 @@ describe('fix-missing-replication-permissions', () => {
         }));
 
         inputFilePath = path.join(tmpDir, 'missing.json');
-        fs.writeFileSync(inputFilePath, JSON.stringify(buildInputFile(accountSource, accountDest)));
+        fs.writeFileSync(inputFilePath, JSON.stringify(buildInputFile(accountSource)));
 
         outputFilePath = path.join(tmpDir, 'output.json');
     }, 60000);
@@ -300,9 +304,21 @@ describe('fix-missing-replication-permissions', () => {
         const secondResult = JSON.parse(second.stdout);
         expect(secondResult.fixes[0].status).toBe('success');
         expect(secondResult.metadata.counts.policiesCreated).toBe(0);
+
+        // Verify no extra policies were attached to the role
+        const attached = await accountSource.iamClient.send(
+            new ListAttachedRolePoliciesCommand({ RoleName: ROLE_NAME }),
+        );
+        const auditFixPolicies = (attached.AttachedPolicies || [])
+            .filter(p => p.PolicyName.startsWith(POLICY_PREFIX));
+        expect(auditFixPolicies).toHaveLength(1);
     }, 30000);
 
-    it('temp key cleanup: keysDeleted matches keysCreated', async () => {
+    it('temp key cleanup: no leftover access keys', async () => {
+        // Snapshot keys before the script runs
+        const keysBefore = await accountSource.iamClient.send(new ListAccessKeysCommand({}));
+        const keyIdsBefore = (keysBefore.AccessKeyMetadata || []).map(k => k.AccessKeyId);
+
         const { stdout, exitCode } = await runFixScript([
             inputFilePath, iamHost, adminConfigPath, outputFilePath,
             '--iam-port', String(iamPort),
@@ -312,6 +328,11 @@ describe('fix-missing-replication-permissions', () => {
 
         const result = JSON.parse(stdout);
         expect(result.metadata.counts.keysDeleted).toBe(result.metadata.counts.keysCreated);
+
+        // Verify no new keys remain after the script
+        const keysAfter = await accountSource.iamClient.send(new ListAccessKeysCommand({}));
+        const keyIdsAfter = (keysAfter.AccessKeyMetadata || []).map(k => k.AccessKeyId);
+        expect(keyIdsAfter).toEqual(keyIdsBefore);
     }, 30000);
 
     it('rejects input without ownerDisplayName', async () => {
@@ -321,7 +342,7 @@ describe('fix-missing-replication-permissions', () => {
                 bucket: accountSource.bucketName,
                 // ownerDisplayName deliberately omitted
                 sourceRole: `arn:aws:iam::${accountSource.accountId}:role/${ROLE_NAME}`,
-                missingActions: ['s3:ReplicateObject'],
+                policies: [],
             }],
         }));
 
@@ -411,13 +432,13 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
                     bucket: accountSource.bucketName,
                     ownerDisplayName: accountSource.accountName,
                     sourceRole,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
                 {
                     bucket: secondBucket,
                     ownerDisplayName: accountSource.accountName,
                     sourceRole,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
             ],
         }));
@@ -505,13 +526,13 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
                     bucket: accountSource.bucketName,
                     ownerDisplayName: accountSource.accountName,
                     sourceRole: `arn:aws:iam::${accountSource.accountId}:role/${ROLE_NAME}`,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
                 {
                     bucket: secondBucket,
                     ownerDisplayName: accountSource.accountName,
                     sourceRole: `arn:aws:iam::${accountSource.accountId}:role/${secondRoleName}`,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
             ],
         }));
@@ -587,13 +608,13 @@ describe('fix-missing-replication-permissions (multi-bucket and multi-role)', ()
                     bucket: accountSource1.bucketName,
                     ownerDisplayName: accountSource1.accountName,
                     sourceRole: `arn:aws:iam::${accountSource1.accountId}:role/${ROLE_NAME}`,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
                 {
                     bucket: accountSource2.bucketName,
                     ownerDisplayName: accountSource2.accountName,
                     sourceRole: `arn:aws:iam::${accountSource2.accountId}:role/${ROLE_NAME}`,
-                    missingActions: ['s3:ReplicateObject'],
+                    policies: [],
                 },
             ],
         }));
