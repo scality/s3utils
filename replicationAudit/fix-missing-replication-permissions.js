@@ -126,6 +126,8 @@ function createIAMClient(config, accessKeyId, secretKey) {
         credentials: { accessKeyId, secretAccessKey: secretKey },
         requestHandler: new NodeHttpHandler({
             httpAgent: new http.Agent({ keepAlive: true }),
+            // TBD: rejectUnauthorized: false disables certificate validation.
+            // Consider accepting a CA cert path via CLI option instead.
             httpsAgent: new https.Agent({
                 keepAlive: true,
                 rejectUnauthorized: false,
