@@ -78,6 +78,7 @@ async function deleteTestAccount(vaultClient, account) {
     for (const bucket of (bucketsResp.Buckets || [])) {
         log.info('Deleting bucket', { bucket: bucket.Name });
         // empty bucket - need to delete all versions and delete markers for versioned buckets
+        // Note: no pagination — silently misses objects beyond 1000. Fine for test cleanup.
         const listedObjects = await account.s3Client.send(new ListObjectVersionsCommand({ Bucket: bucket.Name }));
 
         const objectsToDelete = [];

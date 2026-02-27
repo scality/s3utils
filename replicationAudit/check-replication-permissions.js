@@ -440,8 +440,7 @@ async function main() {
             } else {
                 const reason = result.error || 's3:ReplicateObject';
                 logProgress(i + 1, buckets.length, bucket, `MISSING: ${reason}`);
-                result.ownerDisplayName = ownerDisplayName;
-                results.push(result);
+                results.push({ ...result, ownerDisplayName });
                 stats.missing++;
             }
         } catch (e) {
