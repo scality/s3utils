@@ -6,7 +6,9 @@ on:
 
 jobs:
   review:
-    uses: scality/agent-hub/.github/workflows/claude-code-review.yml@v1
+    uses: scality/workflows/.github/workflows/claude-code-review.yml@v2
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
+      CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
