@@ -46,7 +46,7 @@ ansible -i env/$ENV_DIR/inventory md1-cluster1 -m shell \
 LEADER_IP=<leader-ip-from-step-3>
 
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a "mv /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
+    -a "cp /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
         ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
         /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
 
@@ -82,7 +82,8 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/buckets-with-replication.json \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/replication-fix-results.json \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/admin1.json \
-       /root/list-buckets-with-replication.sh'
+       /root/list-buckets-with-replication.sh \
+       /root/buckets-with-replication.json'
 ```
 
 # Scripts Documentation
