@@ -20,7 +20,7 @@ const USERSBUCKET = '__usersbucket';
 const expectedCountItems = {
     objects: 90,
     versions: 60,
-    buckets: 9,
+    buckets: 10,
     dataManaged: {
         total: { curr: 15000, prev: 12000 },
         byLocation: {
@@ -99,6 +99,10 @@ const expectedDataMetrics = {
     [`bucket_test-bucket-8_${testBucketCreationDate}`]: {
         objectCount: { current: 10n, deleteMarker: 0n, nonCurrent: 10n },
         usedCapacity: { current: 1000n, nonCurrent: 1000n },
+    },
+    [`bucket_test-bucket-empty_${testBucketCreationDate}`]: {
+        objectCount: { current: 0n, deleteMarker: 0n, nonCurrent: 0n },
+        usedCapacity: { current: 0n, nonCurrent: 0n },
     },
     'location_secondary-location-1': {
         objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n }, usedCapacity: { current: 3000n, nonCurrent: 3000n },
@@ -199,6 +203,25 @@ function populateMongo(client, callback) {
     ], cb), callback);
 }
 
+const emptyBucket = BucketInfo.fromObj({ ...testBucketMD, _name: 'test-bucket-empty' });
+
+function populateEmptyBucket(client, callback) {
+    return async.series([
+        next => client.createBucket(emptyBucket.getName(), emptyBucket, logger, next),
+        next => client.putObject(
+            USERSBUCKET,
+            `${emptyBucket.getOwner()}${constants.splitter}${emptyBucket.getName()}`,
+            testUserBucketInfo.value,
+            {
+                versioning: false,
+                versionId: null,
+            },
+            logger,
+            next,
+        ),
+    ], callback);
+}
+
 jest.setTimeout(120000);
 describe('CountItems', () => {
     const oldEnv = process.env;
@@ -222,6 +245,7 @@ describe('CountItems', () => {
         async.series([
             next => client.setup(next),
             next => populateMongo(client, next),
+            next => populateEmptyBucket(client, next),
         ], done);
         setTimeoutSpy = jest.spyOn(global, 'setTimeout');
         setTimeoutSpy.mockImplementation((callback, delay) => callback());
