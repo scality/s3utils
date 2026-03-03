@@ -19,7 +19,12 @@
  *
  * Usage: node fix-missing-replication-permissions.js <input-file> <vault-host> <admin-config> [output-file] [--iam-port <port>] [--https] [--dry-run]
  *
- * Requires: vaultclient, @aws-sdk/client-iam (both in s3utils dependencies)
+ * Requires: vaultclient, aws-sdk (both available in vault container)
+ *
+ * Note: This script uses aws-sdk v2 (not @aws-sdk/client-iam v3) because it
+ * is meant to be copied into the vault container of older S3C versions
+ * (before S3C 9.5.2 / Vault 7.84.0) where aws-sdk v2 is available but
+ * @aws-sdk/client-iam v3 is not.
  */
 
 const fs = require('fs');
@@ -27,13 +32,7 @@ const http = require('http');
 const https = require('https');
 const { parseArgs } = require('util');
 const { Client: VaultClient } = require('vaultclient');
-const {
-    IAMClient,
-    CreatePolicyCommand,
-    AttachRolePolicyCommand,
-    DeleteAccessKeyCommand,
-} = require('@aws-sdk/client-iam');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const AWS = require('aws-sdk');
 
 // ===========================================================================
 // Constants
@@ -121,19 +120,17 @@ function generateAccountAccessKeyAsync(client, accountName, options) {
 /** Create an IAM client for a given account */
 function createIAMClient(config, accessKeyId, secretKey) {
     const protocol = config.useHttps ? 'https' : 'http';
-    return new IAMClient({
-        region: 'us-east-1',
+    return new AWS.IAM({
         endpoint: `${protocol}://${config.vaultHost}:${config.iamPort}`,
-        credentials: { accessKeyId, secretAccessKey: secretKey },
-        requestHandler: new NodeHttpHandler({
-            httpAgent: new http.Agent({ keepAlive: true }),
-            // TBD: rejectUnauthorized: false disables certificate validation.
-            // Consider accepting a CA cert path via CLI option instead.
-            httpsAgent: new https.Agent({
-                keepAlive: true,
-                rejectUnauthorized: false,
-            }),
-        }),
+        region: 'us-east-1',
+        accessKeyId,
+        secretAccessKey: secretKey,
+        sslEnabled: config.useHttps,
+        httpOptions: {
+            agent: config.useHttps
+                ? new https.Agent({ keepAlive: true, rejectUnauthorized: false })
+                : new http.Agent({ keepAlive: true }),
+        },
     });
 }
 
@@ -271,16 +268,15 @@ async function main() {
             // a no-op if the policy is already attached to the role.
             let policyArn;
             try {
-                const resp = await iamClient.send(new CreatePolicyCommand({
+                const resp = await iamClient.createPolicy({
                     PolicyName: policyName,
                     PolicyDocument: JSON.stringify(policyDocument),
-                }));
+                }).promise();
                 policyArn = resp.Policy.Arn;
                 outcome.metadata.counts.policiesCreated++;
                 log(`  Created policy "${policyName}"`);
             } catch (err) {
-                if (err.name === 'EntityAlreadyExistsException'
-                    || err.Code === 'EntityAlreadyExists') {
+                if (err.code === 'EntityAlreadyExists') {
                     policyArn = `arn:aws:iam::${accountId}:policy/${policyName}`;
                     log(`  Policy "${policyName}" already exists, skipping`);
                 } else {
@@ -290,10 +286,10 @@ async function main() {
 
             fix.policyArn = policyArn;
 
-            await iamClient.send(new AttachRolePolicyCommand({
+            await iamClient.attachRolePolicy({
                 RoleName: roleName,
                 PolicyArn: policyArn,
-            }));
+            }).promise();
             outcome.metadata.counts.policiesAttached++;
             log(`  Attached policy to role "${roleName}"`);
 
@@ -320,9 +316,9 @@ async function main() {
     // Cleanup: delete all temporary keys via IAM DeleteAccessKey
     for (const [accountId, { accountName, accessKeyId, iamClient }] of accountCache) {
         try {
-            await iamClient.send(new DeleteAccessKeyCommand({
+            await iamClient.deleteAccessKey({
                 AccessKeyId: accessKeyId,
-            }));
+            }).promise();
             outcome.metadata.counts.keysDeleted++;
             log(`Deleted temp key for account "${accountName}" (${accountId})`);
         } catch (err) {

@@ -1,12 +1,15 @@
 # TL;DR Complete Workflow Example
 
-Here's a complete example running the two scripts and audit the IAM policies used by CRR:
+Here's a complete example running the two scripts and audit the IAM policies used by CRR.
+
+Use the fix-missing-replication-permissions.js script (step 7) to correct any missing permissions found by the check script. If the fix script fails with "missing ownerDisplayName", re-run check-replication-permissions.js — this field was added in s3utils 1.17.5.
 
 From your local machine: copy scripts to the supervisor
 
 ```bash
 scp replicationAudit/list-buckets-with-replication.sh root@<supervisor-ip>:/root/
 scp replicationAudit/check-replication-permissions.js root@<supervisor-ip>:/root/
+scp replicationAudit/fix-missing-replication-permissions.js root@<supervisor-ip>:/root/
 ```
 
 Connect to the supervisor
@@ -26,6 +29,8 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
     -a 'src=/root/list-buckets-with-replication.sh dest=/root/'
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
     -a 'src=/root/check-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/fix-missing-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
 
 # Step 2: Run list-buckets-with-replication.sh
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
@@ -50,19 +55,34 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
     -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json' \
     | grep -v CHANGED | tee /root/replicationAudit_missing.json
 
-# Step 6: Clean up remote files
+# Step 6: Fix missing permissions
+# Copy admin credentials and missing.json to vault container and run inside it
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a "src=/srv/scality/s3/s3-offline/federation/env/$ENV_DIR/vault/admin-clientprofile/admin1.json dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs"
+
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/replicationAudit_missing.json dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json'
+
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'ctrctl exec scality-vault{{ container_name_suffix | default("")}} env NODE_PATH=/home/scality/vault/node_modules node /logs/fix-missing-replication-permissions.js \
+        /logs/missing.json localhost /logs/admin1.json /logs/replication-fix-results.json'
+
+# Retrieve fix results
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/replication-fix-results.json' \
+    | grep -v CHANGED | tee /root/replicationAudit_fix_results.json
+
+# Step 7: Re-run check to verify fixes (repeat steps 3-5)
+
+# Step 8: Clean up remote files
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
     -a 'rm -f {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/check-replication-permissions.js \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/fix-missing-replication-permissions.js \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/buckets-with-replication.json \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/replication-fix-results.json \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/admin1.json \
        /root/list-buckets-with-replication.sh'
-
-# Step 7 (optional): Fix missing permissions
-# Run from your local machine (requires vaultclient and @aws-sdk/client-iam)
-node replicationAudit/fix-missing-replication-permissions.js \
-    /root/replicationAudit_missing.json <supervisor-ip> admin1.json
-
-# Step 8: Re-run check to verify fixes (repeat steps 3-5)
 ```
 
 # Scripts Documentation
@@ -497,8 +517,7 @@ if the policy already exists, its document is guaranteed to be identical.
   ```
   /srv/scality/s3/s3-offline/federation/env/<ENV_DIR>/vault/admin-clientprofile/admin1.json
   ```
-- Network access to Vault admin/IAM API (port 8600) from the machine running the script
-- `vaultclient` and `@aws-sdk/client-iam` installed (both in s3utils dependencies)
+- The script runs inside the vault container (`scality-vault`), which has `vaultclient` and `aws-sdk` pre-installed
 
 ### Usage
 
@@ -509,7 +528,7 @@ node fix-missing-replication-permissions.js <input-file> <vault-host> <admin-con
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `input-file` | (required) | Path to missing.json from check script |
-| `vault-host` | (required) | Vault admin host (e.g., 13.50.166.21) |
+| `vault-host` | (required) | Vault admin host (use `localhost` when running inside the vault container) |
 | `admin-config` | (required) | Path to admin credentials JSON |
 | `output-file` | replication-fix-results.json | Output file path |
 | `--iam-port <port>` | 8600 | Vault admin and IAM API port |
