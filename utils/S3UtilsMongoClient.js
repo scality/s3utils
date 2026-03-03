@@ -164,8 +164,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
             };
             let stalledCount = 0;
             let bucketKey;
+            let bucketResource;
             let inflightsPreScan = 0n;
             let accountBucket;
+            let scanHadErrors = false;
             const cmpDate = new Date();
             cmpDate.setHours(cmpDate.getHours() - 1);
 
@@ -184,7 +186,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 || bucketStatus.Status === 'Suspended'));
 
             if (bucketCreationDate) {
-                bucketKey = `bucket_${bucketName}_${new Date(bucketCreationDate).getTime()}`;
+                bucketResource = `${bucketName}_${new Date(bucketCreationDate).getTime()}`;
+                bucketKey = `bucket_${bucketResource}`;
                 inflightsPreScan = await this.readStorageConsumptionInflights(bucketKey, log);
             }
 
@@ -229,6 +232,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         error,
                     });
                     monitoring.objectsCount.inc({ status: 'error' });
+                    scanHadErrors = true;
                     return;
                 }
 
@@ -400,6 +404,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 },
             );
 
+            if (this._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, scanHadErrors, log)) {
+                accountBucket = bucketInfo.getOwner();
+            }
+
             const retResult = this._handleResults(collRes, isVer);
             retResult.stalled = stalledCount;
 
@@ -430,6 +438,50 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 cursor.close();
             }
         }
+    }
+
+    /**
+     * Seed zero-value metrics for empty buckets.
+     * @param{object} collRes - per-resource metrics accumulator, mutated in place
+     * @param{string} [bucketResource] - `${bucketName}_${creationDate}` key, absent when no __usersbucket date
+     * @param{object} bucketInfo - bucket attributes
+     * @param{object} locationConfig - locationConfig.json
+     * @param{boolean} scanHadErrors - whether any entry failed processing during the scan
+     * @param{object} log - werelogs logger
+     * @returns{boolean} true when zero metrics were seeded, false otherwise
+     */
+    _seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, scanHadErrors, log) {
+        if (Object.keys(collRes.bucket).length > 0) {
+            return false;
+        }
+        if (scanHadErrors) {
+            // An empty collRes with processing errors means we could not account
+            // for the bucket's objects, not that it is empty: seeding zero would
+            // under-report a non-empty bucket, so leave it to the next scan.
+            log.warn('cannot seed empty-bucket metrics: the scan had processing errors, emptiness is unverified', {
+                method: 'getObjectMDStats',
+                bucketName: bucketInfo.getName(),
+            });
+            return false;
+        }
+        if (!bucketResource) {
+            log.warn('cannot seed empty-bucket metrics: bucket has no __usersbucket creation date entry', {
+                method: 'getObjectMDStats',
+                bucketName: bucketInfo.getName(),
+                owner: bucketInfo.getOwner(),
+            });
+            return false;
+        }
+        // eslint-disable-next-line no-param-reassign
+        collRes.bucket[bucketResource] = { ...baseMetricsObject, locations: {} };
+        // eslint-disable-next-line no-param-reassign
+        collRes.account[bucketInfo.getOwner()] = { ...baseMetricsObject, locations: {} };
+        const bucketLocation = bucketInfo.getLocationConstraint();
+        if (bucketLocation && locationConfig && locationConfig[bucketLocation]) {
+            // eslint-disable-next-line no-param-reassign
+            collRes.location[locationConfig[bucketLocation].objectId] = { ...baseMetricsObject };
+        }
+        return true;
     }
 
     /**
