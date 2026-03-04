@@ -109,43 +109,33 @@ function httpRequest(method, url, cb) {
 
 let sproxydAlias;
 
-function getSproxydAlias(cb) {
+async function getSproxydAlias() {
     const url = `http://${SPROXYD_HOSTPORT}/.conf`;
-    httpRequest('GET', url, (err, res) => {
-        if (err) {
-            return cb(err);
-        }
-        if (res.statusCode !== 200) {
-            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
-        }
-        const resp = JSON.parse(res.body);
-        sproxydAlias = resp['ring_driver:0'].alias;
-        return cb();
-    });
+    const res = await httpRequestAsync('GET', url);
+    if (res.statusCode !== 200) {
+        throw new Error(`GET ${url} returned status ${res.statusCode}`);
+    }
+    const resp = JSON.parse(res.body);
+    sproxydAlias = resp['ring_driver:0'].alias;
 }
 
-function raftSessionsToBuckets(cb) {
+async function raftSessionsToBuckets() {
     if (!RAFT_SESSIONS) {
-        return cb();
+        return;
     }
     const rsList = RAFT_SESSIONS.split(',');
-    return async.each(rsList, (rs, done) => {
+    await Promise.all(rsList.map(async rs => {
         const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
-        httpRequest('GET', url, (err, res) => {
-            if (err) {
-                return cb(err);
-            }
-            if (res.statusCode !== 200) {
-                return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
-            }
-            const resp = JSON.parse(res.body);
-            remainingBuckets = remainingBuckets.concat(resp.filter(
-                bucket => !bucket.startsWith('mpuShadowBucket')
-                    && bucket !== 'users..bucket'
-            ));
-            return done();
-        });
-    }, cb);
+        const res = await httpRequestAsync('GET', url);
+        if (res.statusCode !== 200) {
+            throw new Error(`GET ${url} returned status ${res.statusCode}`);
+        }
+        const resp = JSON.parse(res.body);
+        remainingBuckets = remainingBuckets.concat(resp.filter(
+            bucket => !bucket.startsWith('mpuShadowBucket')
+                && bucket !== 'users..bucket'
+        ));
+    }));
 }
 
 /**
@@ -560,22 +550,22 @@ function processBucket(bucket, cb) {
     });
 }
 
-function main() {
-    async.series([
-        done => getSproxydAlias(done),
-        done => raftSessionsToBuckets(done),
-        done => async.eachSeries(remainingBuckets, processBucket, done),
-    ], err => {
-        if (err) {
-            log.error('an error occurred during cleanup', {
-                error: { message: err.message },
-            });
-            process.exit(1);
-        } else {
-            log.info('completed MPU orphan cleanup');
-            process.exit(0);
-        }
-    });
+async function main() {
+    try {
+        await getSproxydAlias();
+        await raftSessionsToBuckets();
+        await new Promise((resolve, reject) =>
+            async.eachSeries(remainingBuckets, processBucket,
+                err => (err ? reject(err) : resolve()))
+        );
+        log.info('completed MPU orphan cleanup');
+        process.exit(0);
+    } catch (err) {
+        log.error('an error occurred during cleanup', {
+            error: { message: err.message },
+        });
+        process.exit(1);
+    }
 }
 
 main();
