@@ -459,75 +459,67 @@ async function buildOrphanMap(bucket, shadowBucket) {
     return orphanMap;
 }
 
-function processBucket(bucket, cb) {
+async function processBucket(bucket) {
     const shadowBucket = `mpuShadowBucket${bucket}`;
 
     log.info('scanning MPU shadow bucket', { bucket, shadowBucket });
 
-    buildOrphanMap(bucket, shadowBucket).then(orphanMap => {
-        const orphanCount = Object.keys(orphanMap).length;
-        log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
-        Object.entries(orphanMap).forEach(([uploadId, info]) => {
-            log.info('orphaned MPU found', {
-                bucket, uploadId,
-                partCount: info.partKeys.length,
-                sproxydKeyCount: info.sproxydKeys.size,
-            });
+    const orphanMap = await buildOrphanMap(bucket, shadowBucket);
+    const orphanCount = Object.keys(orphanMap).length;
+    log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
+    Object.entries(orphanMap).forEach(([uploadId, info]) => {
+        log.info('orphaned MPU found', {
+            bucket, uploadId,
+            partCount: info.partKeys.length,
+            sproxydKeyCount: info.sproxydKeys.size,
         });
-        if (orphanCount === 0) {
-            return cb();
+    });
+    if (orphanCount === 0) {
+        return;
+    }
+
+    // --- Phase 2: scan original bucket versions to find any completed MPU
+    //     objects that share sproxyd keys with orphaned parts, then delete
+    //     orphaned data (not part of the completed MPU). ---
+
+    for await (const { value: resolvedMd } of makeVersionsListingIterator(bucket)) {
+        if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
+            continue;
         }
-
-        // --- Phase 2: scan original bucket versions to find any completed MPU
-        //     objects that share sproxyd keys with orphaned parts, then delete
-        //     orphaned data (not part of the completed MPU). ---
-
-        return (async () => {
-            for await (const { value: resolvedMd } of makeVersionsListingIterator(bucket)) {
-                if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
-                    continue;
-                }
-                const uploadId = resolvedMd.uploadId;
-                const locationKeys = new Set(
-                    (resolvedMd.location || []).map(loc => loc.key)
-                );
-                const orphanEntry = orphanMap[uploadId];
-                // Only delete sproxyd keys not referenced by the completed object
-                const keysToDelete = [...orphanEntry.sproxydKeys]
-                    .filter(k => !locationKeys.has(k));
-                await new Promise(resolve => // eslint-disable-line no-await-in-loop
-                    cleanupOrphanEntry(
-                        bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
-                    )
-                );
-                delete orphanMap[uploadId];
-            }
-            // Delete remaining orphans not referenced by any completed object
-            for (const uploadId of Object.keys(orphanMap)) {
-                const orphanEntry = orphanMap[uploadId];
-                const keysToDelete = [...orphanEntry.sproxydKeys];
-                await new Promise(resolve => // eslint-disable-line no-await-in-loop
-                    cleanupOrphanEntry(
-                        bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
-                    )
-                );
-                delete orphanMap[uploadId];
-            }
-        })().then(() => {
-            log.info('phase 2 complete', { bucket });
-            return cb();
-        }).catch(cb);
-    }).catch(cb);
+        const uploadId = resolvedMd.uploadId;
+        const locationKeys = new Set(
+            (resolvedMd.location || []).map(loc => loc.key)
+        );
+        const orphanEntry = orphanMap[uploadId];
+        // Only delete sproxyd keys not referenced by the completed object
+        const keysToDelete = [...orphanEntry.sproxydKeys]
+            .filter(k => !locationKeys.has(k));
+        await new Promise(resolve => // eslint-disable-line no-await-in-loop
+            cleanupOrphanEntry(
+                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
+            )
+        );
+        delete orphanMap[uploadId];
+    }
+    // Delete remaining orphans not referenced by any completed object
+    for (const uploadId of Object.keys(orphanMap)) {
+        const orphanEntry = orphanMap[uploadId];
+        const keysToDelete = [...orphanEntry.sproxydKeys];
+        await new Promise(resolve => // eslint-disable-line no-await-in-loop
+            cleanupOrphanEntry(
+                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
+            )
+        );
+        delete orphanMap[uploadId];
+    }
+    log.info('phase 2 complete', { bucket });
 }
 
 async function main() {
     try {
         await getSproxydAlias();
         await raftSessionsToBuckets();
-        await new Promise((resolve, reject) =>
-            async.eachSeries(remainingBuckets, processBucket,
-                err => (err ? reject(err) : resolve()))
-        );
+        await async.eachSeries(remainingBuckets, processBucket);
         log.info('completed MPU orphan cleanup');
         process.exit(0);
     } catch (err) {
