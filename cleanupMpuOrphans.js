@@ -3,7 +3,7 @@ const http = require('http');
 const { http: httpArsn } = require('httpagent');
 const async = require('async');
 
-const { Logger } = require('werelogs');
+const werelogs = require('werelogs');
 
 const DEFAULT_LISTING_LIMIT = 1000;
 
@@ -13,6 +13,8 @@ const {
 } = process.env;
 
 const VERBOSE = process.env.VERBOSE === '1';
+
+werelogs.configure({ level: VERBOSE ? 'debug' : 'info', dump: 'error' });
 
 const LISTING_LIMIT = (
     process.env.LISTING_LIMIT
@@ -63,7 +65,7 @@ if (!SPROXYD_HOSTPORT) {
     process.exit(1);
 }
 
-const log = new Logger('s3utils:cleanupMpuOrphans');
+const log = new werelogs.Logger('s3utils:cleanupMpuOrphans');
 
 const httpAgent = new httpArsn.Agent({
     keepAlive: true,
@@ -155,7 +157,7 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
                         error: err ? { message: err.message } : { statusCode: res.statusCode },
                     });
                 } else {
-                    log.info('deleted orphaned sproxyd key', { bucket, uploadId, sproxydKey });
+                    log.debug('deleted orphaned sproxyd key', { bucket, uploadId, sproxydKey });
                 }
                 keyDone();
             });
@@ -171,7 +173,7 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
                         error: err ? { message: err.message } : { statusCode: res.statusCode },
                     });
                 } else {
-                    log.info('deleted orphaned part metadata', { bucket, uploadId, partKey });
+                    log.debug('deleted orphaned part metadata', { bucket, uploadId, partKey });
                 }
                 partDone();
             });
