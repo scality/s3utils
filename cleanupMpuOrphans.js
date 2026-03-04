@@ -99,6 +99,23 @@ function httpRequest(method, url, cb) {
     req.end();
 }
 
+let sproxydAlias;
+
+function getSproxydAlias(cb) {
+    const url = `http://${SPROXYD_HOSTPORT}/.conf`;
+    httpRequest('GET', url, (err, res) => {
+        if (err) {
+            return cb(err);
+        }
+        if (res.statusCode !== 200) {
+            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+        }
+        const resp = JSON.parse(res.body);
+        sproxydAlias = resp['ring_driver:0'].alias;
+        return cb();
+    });
+}
+
 function raftSessionsToBuckets(cb) {
     if (!RAFT_SESSIONS) {
         return cb();
@@ -121,6 +138,45 @@ function raftSessionsToBuckets(cb) {
             return done();
         });
     }, cb);
+}
+
+/**
+ * Delete orphaned sproxyd keys (keysToDelete) and all part metadata entries
+ * for the given orphaned upload ID. Failures are logged but do not abort.
+ */
+function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, cb) {
+    async.series([
+        done => async.eachSeries(keysToDelete, (sproxydKey, keyDone) => {
+            const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
+            httpRequest('DELETE', sproxydUrl, (err, res) => {
+                if (err || (res.statusCode !== 200 && res.statusCode !== 204)) {
+                    log.error('failed to delete orphaned sproxyd key', {
+                        bucket, uploadId, sproxydKey,
+                        error: err ? { message: err.message } : { statusCode: res.statusCode },
+                    });
+                } else {
+                    log.info('deleted orphaned sproxyd key', { bucket, uploadId, sproxydKey });
+                }
+                keyDone();
+            });
+        }, done),
+        done => async.eachSeries(orphanEntry.partKeys, (partKey, partDone) => {
+            const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
+                + encodeURIComponent(partKey);
+            httpRequest('DELETE', partUrl, (err, res) => {
+                if (err || (res.statusCode !== 200 && res.statusCode !== 204
+                        && res.statusCode !== 404)) {
+                    log.error('failed to delete orphaned part metadata', {
+                        bucket, uploadId, partKey,
+                        error: err ? { message: err.message } : { statusCode: res.statusCode },
+                    });
+                } else {
+                    log.info('deleted orphaned part metadata', { bucket, uploadId, partKey });
+                }
+                partDone();
+            });
+        }, done),
+    ], cb);
 }
 
 const OVERVIEW_KEY_PREFIX = 'overview..|..';
@@ -295,21 +351,142 @@ function processBucket(bucket, cb) {
         }
         const orphanCount = Object.keys(orphanMap).length;
         log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
-        if (VERBOSE) {
-            Object.entries(orphanMap).forEach(([uploadId, info]) => {
-                log.info('orphaned MPU found', {
-                    bucket, uploadId,
-                    partCount: info.partKeys.length,
-                    sproxydKeyCount: info.sproxydKeys.size,
+        Object.entries(orphanMap).forEach(([uploadId, info]) => {
+            log.info('orphaned MPU found', {
+                bucket, uploadId,
+                partCount: info.partKeys.length,
+                sproxydKeyCount: info.sproxydKeys.size,
+            });
+        });
+        if (orphanCount === 0) {
+            return cb();
+        }
+
+        // --- Phase 2: scan original bucket versions to find any completed MPU
+        //     objects that share sproxyd keys with orphaned parts, then delete
+        //     orphaned data. ---
+
+        let keyMarker = '';
+        let versionIdMarker = '';
+
+        function listVersionsIter(iterCb) {
+            const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}`
+                + `?listingType=DelimiterVersions&maxKeys=${LISTING_LIMIT}`
+                + `&keyMarker=${encodeURIComponent(keyMarker)}`
+                + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
+            httpRequest('GET', url, (err, res) => {
+                if (err) {
+                    return iterCb(err);
+                }
+                if (res.statusCode !== 200) {
+                    return iterCb(new Error(`GET ${url} returned status ${res.statusCode}`));
+                }
+                const { Versions, IsTruncated,
+                    NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
+                async.eachSeries(Versions || [], (entry, entryDone) => {
+                    let md;
+                    try {
+                        md = JSON.parse(entry.value);
+                    } catch (e) {
+                        log.warn('failed to parse object metadata', {
+                            bucket, key: entry.key,
+                            error: { message: e.message },
+                        });
+                        return entryDone();
+                    }
+                    if (!md.uploadId || !orphanMap[md.uploadId]) {
+                        return entryDone();
+                    }
+                    const uploadId = md.uploadId;
+                    // Fetch full metadata to ensure the location array is complete
+                    // (the listing result may have it pruned for large MPUs)
+                    const fullUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/`
+                        + `${encodeURIComponent(entry.key)}`
+                        + `?versionId=${encodeURIComponent(entry.versionId)}`;
+                    httpRequest('GET', fullUrl, (getErr, getRes) => {
+                        if (getErr || getRes.statusCode !== 200) {
+                            log.error('failed to fetch full object metadata', {
+                                bucket, key: entry.key, versionId: entry.versionId, uploadId,
+                                error: getErr
+                                    ? { message: getErr.message }
+                                    : { statusCode: getRes.statusCode },
+                            });
+                            return entryDone();
+                        }
+                        let fullMd;
+                        try {
+                            fullMd = JSON.parse(getRes.body);
+                        } catch (e) {
+                            log.error('failed to parse full object metadata', {
+                                bucket, key: entry.key, versionId: entry.versionId, uploadId,
+                                error: { message: e.message },
+                            });
+                            return entryDone();
+                        }
+                        const locationKeys = new Set(
+                            (fullMd.location || []).map(loc => loc.key)
+                        );
+                        const orphanEntry = orphanMap[uploadId];
+                        // Only delete sproxyd keys not referenced by the completed object
+                        const keysToDelete = [...orphanEntry.sproxydKeys]
+                            .filter(k => !locationKeys.has(k));
+                        return cleanupOrphanEntry(
+                            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
+                            () => {
+                                delete orphanMap[uploadId];
+                                entryDone();
+                            }
+                        );
+                    });
+                }, iterErr => {
+                    if (iterErr) {
+                        return iterCb(iterErr);
+                    }
+                    if (IsTruncated) {
+                        keyMarker = NextKeyMarker || '';
+                        versionIdMarker = NextVersionIdMarker || '';
+                    }
+                    return iterCb(null, IsTruncated);
                 });
             });
         }
-        return cb(null, orphanMap);
+
+        return async.series([
+            // Scan all object versions, cleaning up as matches are found
+            done => async.doWhilst(
+                iterDone => async.retry(
+                    { times: 100, interval: 5000 },
+                    listVersionsIter,
+                    iterDone
+                ),
+                async isTruncated => isTruncated,
+                done
+            ),
+            // Delete remaining orphans not referenced by any completed object
+            done => async.eachSeries(Object.keys(orphanMap), (uploadId, entryCb) => {
+                const orphanEntry = orphanMap[uploadId];
+                const keysToDelete = [...orphanEntry.sproxydKeys];
+                cleanupOrphanEntry(
+                    bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
+                    () => {
+                        delete orphanMap[uploadId];
+                        entryCb();
+                    }
+                );
+            }, done),
+        ], err2 => {
+            if (err2) {
+                return cb(err2);
+            }
+            log.info('phase 2 complete', { bucket });
+            return cb();
+        });
     });
 }
 
 function main() {
     async.series([
+        done => getSproxydAlias(done),
         done => raftSessionsToBuckets(done),
         done => async.eachSeries(remainingBuckets, processBucket, done),
     ], err => {
