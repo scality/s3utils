@@ -189,8 +189,7 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
 /**
  * Fetch the complete metadata of an object version from bucketd.
  *
- * Mirrors the logic of fetch_source_entry_md() in the Python migration script
- * to correctly handle non-versioned objects and null versions:
+ * Correctly handles non-versioned objects and null versions:
  *
  * - Non-versioned (versionId === 'null'): fetch without a versionId query
  *   param; reject the result if it now has a versionId field (the object was
@@ -503,8 +502,35 @@ function processBucket(bucket, cb) {
                         return entryDone();
                     }
                     const uploadId = md.uploadId;
-                    // Fetch full metadata to ensure the location array is complete
-                    // (the listing result may have it pruned for large MPUs)
+
+                    function processWithLocation(resolvedMd) {
+                        const locationKeys = new Set(
+                            (resolvedMd.location || []).map(loc => loc.key)
+                        );
+                        const orphanEntry = orphanMap[uploadId];
+                        // Only delete sproxyd keys not referenced by the completed object
+                        const keysToDelete = [...orphanEntry.sproxydKeys]
+                            .filter(k => !locationKeys.has(k));
+                        return cleanupOrphanEntry(
+                            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
+                            () => {
+                                delete orphanMap[uploadId];
+                                entryDone();
+                            }
+                        );
+                    }
+
+                    // Only fetch full metadata when the listing result has a pruned
+                    // location array (same condition as need_md_fetch in the Python
+                    // migration script's prepare_source_entries())
+                    const needMdFetch = (
+                        'content-length' in md
+                        && md['content-length'] !== 0
+                        && !md.location
+                    );
+                    if (!needMdFetch) {
+                        return processWithLocation(md);
+                    }
                     return fetchFullObjectMetadata(
                         bucket, entry.key, entry.versionId, md,
                         (fetchErr, fullMd) => {
@@ -517,20 +543,7 @@ function processBucket(bucket, cb) {
                                 });
                                 return entryDone();
                             }
-                            const locationKeys = new Set(
-                                (fullMd.location || []).map(loc => loc.key)
-                            );
-                            const orphanEntry = orphanMap[uploadId];
-                            // Only delete sproxyd keys not referenced by the completed object
-                            const keysToDelete = [...orphanEntry.sproxydKeys]
-                                .filter(k => !locationKeys.has(k));
-                            return cleanupOrphanEntry(
-                                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
-                                () => {
-                                    delete orphanMap[uploadId];
-                                    entryDone();
-                                }
-                            );
+                            return processWithLocation(fullMd);
                         }
                     );
                 }, iterErr => {
