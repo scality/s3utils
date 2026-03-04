@@ -1,12 +1,15 @@
 # TL;DR Complete Workflow Example
 
-Here's a complete example running the two scripts and audit the IAM policies used by CRR:
+Here's a complete example running the two scripts and audit the IAM policies used by CRR.
+
+Use the fix-missing-replication-permissions.js script (step 7) to correct any missing permissions found by the check script. If the fix script fails with "missing ownerDisplayName", re-run check-replication-permissions.js — this field was added in s3utils 1.17.5.
 
 From your local machine: copy scripts to the supervisor
 
 ```bash
 scp replicationAudit/list-buckets-with-replication.sh root@<supervisor-ip>:/root/
 scp replicationAudit/check-replication-permissions.js root@<supervisor-ip>:/root/
+scp replicationAudit/fix-missing-replication-permissions.js root@<supervisor-ip>:/root/
 ```
 
 Connect to the supervisor
@@ -26,6 +29,8 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
     -a 'src=/root/list-buckets-with-replication.sh dest=/root/'
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
     -a 'src=/root/check-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/fix-missing-replication-permissions.js dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs'
 
 # Step 2: Run list-buckets-with-replication.sh
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
@@ -41,7 +46,7 @@ ansible -i env/$ENV_DIR/inventory md1-cluster1 -m shell \
 LEADER_IP=<leader-ip-from-step-3>
 
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
-    -a "mv /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
+    -a "cp /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
         ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
         /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
 
@@ -50,12 +55,35 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
     -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json' \
     | grep -v CHANGED | tee /root/replicationAudit_missing.json
 
-# Step 6: Clean up
+# Step 6: Fix missing permissions
+# Copy admin credentials and missing.json to vault container and run inside it
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a "src=/srv/scality/s3/s3-offline/federation/env/$ENV_DIR/vault/admin-clientprofile/admin1.json dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs"
+
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m copy \
+    -a 'src=/root/replicationAudit_missing.json dest={{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json'
+
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'ctrctl exec scality-vault{{ container_name_suffix | default("")}} env NODE_PATH=/home/scality/vault/node_modules node /logs/fix-missing-replication-permissions.js \
+        /logs/missing.json localhost /logs/admin1.json /logs/replication-fix-results.json'
+
+# Retrieve fix results
+ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
+    -a 'cat {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/replication-fix-results.json' \
+    | grep -v CHANGED | tee /root/replicationAudit_fix_results.json
+
+# Step 7: Re-run check to verify fixes (repeat steps 3-5)
+
+# Step 8: Clean up remote files
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
     -a 'rm -f {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/missing.json \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/check-replication-permissions.js \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/fix-missing-replication-permissions.js \
        {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/buckets-with-replication.json \
-       /root/list-buckets-with-replication.sh'
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/replication-fix-results.json \
+       {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs/admin1.json \
+       /root/list-buckets-with-replication.sh \
+       /root/buckets-with-replication.json'
 ```
 
 # Scripts Documentation
@@ -285,6 +313,13 @@ node check-replication-permissions.js [input-file] [leader-ip] [output-file] [--
 
 ### Output Format
 
+> **Breaking change (since 1.17.5):** The output now includes `ownerDisplayName`
+> in each result entry. This field is required by
+> `fix-missing-replication-permissions.js` to identify accounts without an
+> extra API call. If you ran `check-replication-permissions.js` on version
+> 1.17.4 or earlier, **re-run it** to produce an output that
+> `fix-missing-replication-permissions.js` can consume.
+
 The script produces a JSON file with metadata and results. The `results` array
 contains **only buckets missing the `s3:ReplicateObject` permission**.
 
@@ -310,6 +345,7 @@ contains **only buckets missing the `s3:ReplicateObject` permission**.
   "results": [
     {
       "bucket": "bucket-old-1",
+      "ownerDisplayName": "testaccount",
       "sourceRole": "arn:aws:iam::267390090509:role/crr-role-outdated",
       "policies": [
         {
@@ -461,3 +497,180 @@ Output saved to: /tmp/missing.json
 **Script timeout**
 
 - For many buckets, run directly on the S3 connector node via interactive SSH
+
+---
+
+## fix-missing-replication-permissions.js
+
+Reads the output of `check-replication-permissions.js` and creates IAM policies
+with `s3:ReplicateObject` for roles that are missing it.
+
+The script applies **minimal changes**: one policy per bucket, with an explicit
+Statement ID (`AllowReplicateObjectAuditFix`) so the policies are easily
+identifiable later. Using one policy per bucket makes re-runs truly idempotent:
+if the policy already exists, its document is guaranteed to be identical.
+
+### Prerequisites
+
+- Output from `check-replication-permissions.js` (missing.json)
+- Vault admin credentials (`admin1.json` with `accessKey` and `secretKeyValue`).
+  Found on the supervisor at:
+  ```
+  /srv/scality/s3/s3-offline/federation/env/<ENV_DIR>/vault/admin-clientprofile/admin1.json
+  ```
+- The script runs inside the vault container (`scality-vault`), which has `vaultclient` and `aws-sdk` pre-installed
+
+### Usage
+
+```bash
+node fix-missing-replication-permissions.js <input-file> <vault-host> <admin-config> [output-file] [options]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `input-file` | (required) | Path to missing.json from check script |
+| `vault-host` | (required) | Vault admin host (use `localhost` when running inside the vault container) |
+| `admin-config` | (required) | Path to admin credentials JSON |
+| `output-file` | replication-fix-results.json | Output file path |
+| `--iam-port <port>` | 8600 | Vault admin and IAM API port |
+| `--https` | (not set) | Use HTTPS to connect to Vault |
+| `--dry-run` | (not set) | Show what would be done without making changes |
+
+### How It Works
+
+1. **Reads** the missing permissions file and enriches each entry with parsed role fields
+2. **Maps** account IDs to names using `ownerDisplayName` from the input (no API call)
+3. For each bucket entry (grouped by account for credential reuse):
+   - **Generates** a temporary access key via vault admin API (15-minute auto-expiry)
+   - **Creates** one IAM policy per bucket with `s3:ReplicateObject`
+   - **Attaches** the policy to the role
+   - **Deletes** the temporary access key (falls back to auto-expiry on failure)
+4. **Writes** results to the output file
+
+### Policy Created
+
+For each bucket, the script creates a policy named
+`s3-replication-audit-fix-<bucketName>`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AllowReplicateObjectAuditFix",
+    "Effect": "Allow",
+    "Action": "s3:ReplicateObject",
+    "Resource": "arn:aws:s3:::bucket-old-1/*"
+  }]
+}
+```
+
+### Output Format
+
+```json
+{
+  "metadata": {
+    "timestamp": "2026-02-23T20:35:00.000Z",
+    "durationMs": 65,
+    "inputFile": "missing.json",
+    "dryRun": false,
+    "counts": {
+      "totalBucketsProcessed": 3,
+      "totalBucketsFixed": 3,
+      "policiesCreated": 3,
+      "policiesAttached": 3,
+      "keysCreated": 1,
+      "keysDeleted": 1,
+      "errors": 0
+    }
+  },
+  "fixes": [
+    {
+      "accountId": "267390090509",
+      "accountName": "testaccount",
+      "roleName": "crr-role-outdated",
+      "roleArn": "arn:aws:iam::267390090509:role/crr-role-outdated",
+      "policyName": "s3-replication-audit-fix-bucket-old-1",
+      "policyArn": "arn:aws:iam::267390090509:policy/s3-replication-audit-fix-bucket-old-1",
+      "bucket": "bucket-old-1",
+      "status": "success"
+    },
+    {
+      "accountId": "267390090509",
+      "accountName": "testaccount",
+      "roleName": "crr-role-outdated",
+      "roleArn": "arn:aws:iam::267390090509:role/crr-role-outdated",
+      "policyName": "s3-replication-audit-fix-bucket-old-2",
+      "policyArn": "arn:aws:iam::267390090509:policy/s3-replication-audit-fix-bucket-old-2",
+      "bucket": "bucket-old-2",
+      "status": "success"
+    }
+  ],
+  "errors": []
+}
+```
+
+### Example Run
+
+```
+=== Fix Missing Replication Permissions ===
+Input:  missing.json
+Output: replication-fix-results.json
+Vault/IAM: 13.50.166.21:8600
+
+Processing 3 bucket(s)
+
+[1/3] Bucket "bucket-old-1" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-1"
+  Attached policy to role "crr-role-outdated"
+[2/3] Bucket "bucket-old-2" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-2"
+  Attached policy to role "crr-role-outdated"
+[3/3] Bucket "bucket-old-3" — role "crr-role-outdated" — account "testaccount"
+  Created policy "s3-replication-audit-fix-bucket-old-3"
+  Attached policy to role "crr-role-outdated"
+Deleted temp key for account "testaccount" (267390090509)
+
+=== Summary ===
+Buckets processed:     3
+Buckets fixed:         3
+Policies created:      3
+Policies attached:     3
+Keys created:          1
+Keys deleted:          1
+Errors:                0
+Duration:              0.7s
+Output saved to: replication-fix-results.json
+
+Done.
+```
+
+### Idempotency
+
+The script is safe to run multiple times:
+
+- Each bucket has its own policy, so if it already exists the document is
+  guaranteed to be identical — `EntityAlreadyExists` is a true no-op
+- Attaching an already-attached policy is a no-op in IAM
+- Temporary access keys auto-expire after 15 minutes even if deletion fails
+
+### Troubleshooting
+
+**"No ownerDisplayName found for account"**
+
+- The input file is missing `ownerDisplayName`. Re-run `check-replication-permissions.js`
+  to generate a fresh output that includes this field.
+
+**"Failed to generate temp key"**
+
+- Verify admin credentials in the config file
+- Ensure vault admin API is reachable on the specified host and port
+
+**IAM operation errors**
+
+- Check that the IAM port is correct (default 8600, may differ per deployment)
+- Verify the role still exists in vault
+
+**"Failed to delete temp key"**
+
+- Non-critical: the key auto-expires after 15 minutes
+- The error is logged but does not prevent other operations

@@ -1,6 +1,6 @@
 {
   "name": "s3utils",
-  "version": "1.17.4",
+  "version": "1.17.5",
   "engines": {
     "node": ">= 22"
   },
@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-iam": "^3.962.0",
+    "aws-sdk": "^2.1692.0",
     "@scality/eslint-config-scality": "scality/Guidelines#8.3.0",
     "@sinonjs/fake-timers": "^14.0.0",
     "eslint": "^9.14.0",

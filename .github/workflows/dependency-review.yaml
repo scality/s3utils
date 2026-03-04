@@ -14,3 +14,10 @@ jobs:
 
       - name: 'Dependency Review'
         uses: actions/dependency-review-action@v4
+        with:
+          # aws-sdk v2 is intentionally used as a devDependency because the
+          # fix-missing-replication-permissions script runs inside the vault
+          # container of older S3C versions (pre-9.5.2) where only v2 is
+          # available. This low-severity advisory is informational (no patch
+          # exists, v2 is end-of-life).
+          allow-ghsas: GHSA-j965-2qgj-vjmq
