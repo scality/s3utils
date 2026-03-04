@@ -206,17 +206,32 @@ function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
     const baseUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/`
         + encodeURIComponent(key);
 
+    function parseResponse(url, res) {
+        if (res.statusCode === 404) {
+            return { err: null, md: null };
+        }
+        if (res.statusCode !== 200) {
+            return { err: new Error(`GET ${url} returned status ${res.statusCode}`) };
+        }
+        try {
+            return { err: null, md: JSON.parse(res.body) };
+        } catch (e) {
+            return { err: new Error(`failed to parse metadata from ${url}: ${e.message}`) };
+        }
+    }
+
     if (versionId === 'null') {
         // Non-versioned object: fetch without versionId param
         httpRequest('GET', baseUrl, (err, res) => {
-            if (err || res.statusCode !== 200) {
-                return cb(null, null);
+            if (err) {
+                return cb(err);
             }
-            let fullMd;
-            try {
-                fullMd = JSON.parse(res.body);
-            } catch (e) {
-                return cb(null, null);
+            const { err: parseErr, md: fullMd } = parseResponse(baseUrl, res);
+            if (parseErr) {
+                return cb(parseErr);
+            }
+            if (fullMd === null) {
+                return cb(null, null); // 404: object is gone
             }
             if ('versionId' in fullMd) {
                 // Object has since been overwritten by a versioned one; skip
@@ -228,17 +243,19 @@ function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
     }
 
     // Versioned object: try the primary URL first
-    httpRequest('GET', `${baseUrl}?versionId=${encodeURIComponent(versionId)}`, (err, res) => {
-        if (err === null && res.statusCode === 200) {
-            let fullMd;
-            try {
-                fullMd = JSON.parse(res.body);
-            } catch (e) {
-                return cb(null, null);
-            }
-            return cb(null, fullMd);
+    const primaryUrl = `${baseUrl}?versionId=${encodeURIComponent(versionId)}`;
+    httpRequest('GET', primaryUrl, (err, res) => {
+        if (err) {
+            return cb(err);
         }
-        // Primary fetch failed; if the listing entry is a null version,
+        if (res.statusCode === 200) {
+            const { err: parseErr, md: fullMd } = parseResponse(primaryUrl, res);
+            return cb(parseErr, parseErr ? undefined : fullMd);
+        }
+        if (res.statusCode !== 404) {
+            return cb(new Error(`GET ${primaryUrl} returned status ${res.statusCode}`));
+        }
+        // Primary returned 404; if the listing entry is a null version,
         // try alternative URLs (same fallback logic as the Python script)
         if (!('isNull' in listingParsedMd)) {
             return cb(null, null);
@@ -250,21 +267,19 @@ function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
                 return altDone();
             }
             httpRequest('GET', altUrl, (altErr, altRes) => {
-                if (altErr || altRes.statusCode !== 200) {
-                    return altDone();
+                if (altErr) {
+                    return altDone(altErr);
                 }
-                let altMd;
-                try {
-                    altMd = JSON.parse(altRes.body);
-                } catch (e) {
-                    return altDone();
+                const { err: parseErr, md: altMd } = parseResponse(altUrl, altRes);
+                if (parseErr) {
+                    return altDone(parseErr);
                 }
-                if (altMd.versionId === versionId) {
+                if (altMd !== null && altMd.versionId === versionId) {
                     foundMd = altMd;
                 }
                 return altDone();
             });
-        }, () => cb(null, foundMd));
+        }, altErr => cb(altErr || null, altErr ? undefined : foundMd));
     });
 }
 
@@ -493,11 +508,7 @@ function processBucket(bucket, cb) {
                         bucket, entry.key, entry.versionId, md,
                         (fetchErr, fullMd) => {
                             if (fetchErr) {
-                                log.error('error fetching full object metadata', {
-                                    bucket, key: entry.key, versionId: entry.versionId, uploadId,
-                                    error: { message: fetchErr.message },
-                                });
-                                return entryDone();
+                                return entryDone(fetchErr);
                             }
                             if (fullMd === null) {
                                 log.warn('full object metadata not found or skipped', {
