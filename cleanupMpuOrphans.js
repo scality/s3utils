@@ -156,7 +156,7 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
         done => async.eachSeries(keysToDelete, (sproxydKey, keyDone) => {
             const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
             httpRequest('DELETE', sproxydUrl, (err, res) => {
-                if (err || (res.statusCode !== 200 && res.statusCode !== 204)) {
+                if (err || res.statusCode !== 200) {
                     log.error('failed to delete orphaned sproxyd key', {
                         bucket, uploadId, sproxydKey,
                         error: err ? { message: err.message } : { statusCode: res.statusCode },
@@ -171,8 +171,7 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
             const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
                 + encodeURIComponent(partKey);
             httpRequest('DELETE', partUrl, (err, res) => {
-                if (err || (res.statusCode !== 200 && res.statusCode !== 204
-                        && res.statusCode !== 404)) {
+                if (err || (res.statusCode !== 200 && res.statusCode !== 404)) {
                     log.error('failed to delete orphaned part metadata', {
                         bucket, uploadId, partKey,
                         error: err ? { message: err.message } : { statusCode: res.statusCode },
@@ -308,10 +307,8 @@ function processBucket(bucket, cb) {
 
     function listOverviewKeysIter(iterCb) {
         let url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
-            + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_LIMIT}`;
-        if (overviewMarker) {
-            url += `&marker=${encodeURIComponent(overviewMarker)}`;
-        }
+            + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_LIMIT}`
+            + `&marker=${encodeURIComponent(overviewMarker)}`;
         httpRequest('GET', url, (err, res) => {
             if (err) {
                 return iterCb(err);
@@ -342,10 +339,8 @@ function processBucket(bucket, cb) {
 
     function listAllPartsIter(iterCb) {
         let url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
-            + `?maxKeys=${LISTING_LIMIT}`;
-        if (partsMarker) {
-            url += `&marker=${encodeURIComponent(partsMarker)}`;
-        }
+            + `?maxKeys=${LISTING_LIMIT}`
+            + `&marker=${encodeURIComponent(partsMarker)}`;
         httpRequest('GET', url, (err, res) => {
             if (err) {
                 return iterCb(err);
@@ -468,7 +463,7 @@ function processBucket(bucket, cb) {
 
         // --- Phase 2: scan original bucket versions to find any completed MPU
         //     objects that share sproxyd keys with orphaned parts, then delete
-        //     orphaned data. ---
+        //     orphaned data (not part of the completed MPU). ---
 
         let keyMarker = '';
         let versionIdMarker = '';
