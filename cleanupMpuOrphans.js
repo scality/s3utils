@@ -531,8 +531,11 @@ function processBucket(bucket, cb) {
                     if (!needMdFetch) {
                         return processWithLocation(md);
                     }
-                    return fetchFullObjectMetadata(
-                        bucket, entry.key, entry.versionId, md,
+                    return async.retry(
+                        { times: 100, interval: 5000 },
+                        retryDone => fetchFullObjectMetadata(
+                            bucket, entry.key, entry.versionId, md, retryDone
+                        ),
                         (fetchErr, fullMd) => {
                             if (fetchErr) {
                                 return entryDone(fetchErr);
