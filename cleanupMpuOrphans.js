@@ -149,25 +149,6 @@ function raftSessionsToBuckets(cb) {
 }
 
 /**
- * Retry an async operation up to `times` times, waiting `intervalMs` between
- * attempts. Throws the last error if all attempts fail.
- */
-async function retry(times, intervalMs, fn) {
-    let lastErr;
-    for (let attempt = 0; attempt < times; attempt++) {
-        try {
-            return await fn(); // eslint-disable-line no-await-in-loop
-        } catch (err) {
-            lastErr = err;
-            if (attempt < times - 1) {
-                await new Promise(resolve => setTimeout(resolve, intervalMs)); // eslint-disable-line no-await-in-loop
-            }
-        }
-    }
-    throw lastErr;
-}
-
-/**
  * Delete orphaned sproxyd keys (keysToDelete) and all part metadata entries
  * for the given orphaned upload ID. Failures are logged but do not abort.
  */
@@ -327,8 +308,8 @@ async function* makeVersionsListingIterator(bucket) {
             + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
 
         // eslint-disable-next-line no-await-in-loop
-        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = await retry(
-            100, 5000,
+        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = await async.retry(
+            { times: 100, interval: 5000 },
             async () => {
                 const res = await httpRequestAsync('GET', url);
                 if (res.statusCode !== 200) {
@@ -362,8 +343,8 @@ async function* makeVersionsListingIterator(bucket) {
                 continue;
             }
             // eslint-disable-next-line no-await-in-loop
-            const fullMd = await retry(
-                100, 5000,
+            const fullMd = await async.retry(
+                { times: 100, interval: 5000 },
                 () => fetchFullObjectMetadataAsync(bucket, key, versionId, parsedMd)
             );
             if (fullMd === null) {
