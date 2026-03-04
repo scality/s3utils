@@ -13,8 +13,10 @@ const {
 } = process.env;
 
 const VERBOSE = process.env.VERBOSE === '1';
+const TRACE = process.env.TRACE === '1';
 
-werelogs.configure({ level: VERBOSE ? 'debug' : 'info', dump: 'error' });
+// eslint-disable-next-line no-nested-ternary
+werelogs.configure({ level: TRACE ? 'trace' : VERBOSE ? 'debug' : 'info', dump: 'error' });
 
 const LISTING_LIMIT = (
     process.env.LISTING_LIMIT
@@ -39,6 +41,7 @@ Mandatory environment variables:
 
 Optional environment variables:
     VERBOSE: set to 1 for more verbose output
+    TRACE: set to 1 to trace every request to bucketd and sproxyd
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
 `;
 
@@ -98,6 +101,7 @@ function httpRequest(method, url, cb) {
     req.once('error', err => cb(new Error(
         `error sending HTTP request to ${url}: ${err.message}`
     )));
+    log.trace('sending HTTP request', { method, url });
     req.end();
 }
 
