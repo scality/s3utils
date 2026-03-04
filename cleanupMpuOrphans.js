@@ -90,6 +90,7 @@ function httpRequest(method, url, cb) {
         res.once('end', () => {
             // eslint-disable-next-line no-param-reassign
             res.body = chunks.join('');
+            log.trace('received HTTP response', { method, url, statusCode: res.statusCode });
             return cb(null, res);
         });
         res.once('error', err => cb(new Error(
