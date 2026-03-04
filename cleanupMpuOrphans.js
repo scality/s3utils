@@ -332,169 +332,139 @@ async function* makeVersionsListingIterator(bucket) {
 const OVERVIEW_KEY_PREFIX = 'overview..|..';
 
 /**
- * Phase 1: build a map of orphaned MPU upload IDs for a given bucket.
+ * Phase 1: builds a map of orphaned MPU upload IDs for a given bucket.
  *
  * An orphaned MPU has one or more part keys in the MPU shadow bucket but no
  * corresponding overview key.
  *
- * Returns (via cb) a map of the form:
+ * Returns a map of the form:
  *   { [uploadId]: { partKeys: string[], sproxydKeys: Set<string> } }
  */
-function processBucket(bucket, cb) {
-    const shadowBucket = `mpuShadowBucket${bucket}`;
+async function buildOrphanMap(bucket, shadowBucket) {
     const uploadIdsWithOverview = new Set();
-    // uploadId => { partKeys: string[], sproxydKeys: Set<string> }
     const orphanMap = {};
 
-    log.info('scanning MPU shadow bucket', { bucket, shadowBucket });
-
-    // --- Step 1: collect upload IDs that have an overview key ---
-
-    let overviewMarker = '';
-
-    function listOverviewKeysIter(iterCb) {
-        let url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
-            + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_LIMIT}`
-            + `&marker=${encodeURIComponent(overviewMarker)}`;
-        httpRequest('GET', url, (err, res) => {
-            if (err) {
-                return iterCb(err);
-            }
-            if (res.statusCode === 404) {
-                // shadow bucket does not exist: no MPUs for this bucket
-                return iterCb(null, false);
-            }
-            if (res.statusCode !== 200) {
-                return iterCb(new Error(`GET ${url} returned status ${res.statusCode}`));
-            }
-            const { Contents, IsTruncated } = JSON.parse(res.body);
+    async function listOverviewKeys() {
+        let marker = '';
+        let isTruncated = true;
+        while (isTruncated) {
+            const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
+                + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_LIMIT}`
+                + `&marker=${encodeURIComponent(marker)}`;
+            // eslint-disable-next-line no-await-in-loop
+            const { Contents, IsTruncated } = await async.retry(
+                { times: 100, interval: 5000 },
+                async () => {
+                    const res = await httpRequestAsync('GET', url);
+                    if (res.statusCode === 404) {
+                        return { Contents: [], IsTruncated: false };
+                    }
+                    if (res.statusCode !== 200) {
+                        throw new Error(`GET ${url} returned status ${res.statusCode}`);
+                    }
+                    return JSON.parse(res.body);
+                }
+            );
             (Contents || []).forEach(item => {
                 // overview key format: overview..|..<objectKey>..|..<uploadId>
                 const parts = item.key.split('..|..');
                 uploadIdsWithOverview.add(parts[parts.length - 1]);
             });
             if (IsTruncated && Contents.length > 0) {
-                overviewMarker = Contents[Contents.length - 1].key;
+                marker = Contents[Contents.length - 1].key;
             }
-            return iterCb(null, IsTruncated);
-        });
+            isTruncated = IsTruncated;
+        }
     }
 
-    // --- Step 2: list all keys, collect orphaned part keys ---
+    // Step 1: collect upload IDs that have an overview key
+    await listOverviewKeys();
 
+    // Step 2: list all parts, populate orphan map
     let partsMarker = '';
-
-    function listAllPartsIter(iterCb) {
-        let url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
+    let isTruncated = true;
+    while (isTruncated) {
+        const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
             + `?maxKeys=${LISTING_LIMIT}`
             + `&marker=${encodeURIComponent(partsMarker)}`;
-        httpRequest('GET', url, (err, res) => {
-            if (err) {
-                return iterCb(err);
+        // eslint-disable-next-line no-await-in-loop
+        const { Contents, IsTruncated } = await async.retry(
+            { times: 100, interval: 5000 },
+            async () => {
+                const res = await httpRequestAsync('GET', url);
+                if (res.statusCode === 404) {
+                    return { Contents: [], IsTruncated: false };
+                }
+                if (res.statusCode !== 200) {
+                    throw new Error(`GET ${url} returned status ${res.statusCode}`);
+                }
+                return JSON.parse(res.body);
             }
-            if (res.statusCode === 404) {
-                return iterCb(null, false);
+        );
+        (Contents || []).forEach(item => {
+            if (item.key.startsWith(OVERVIEW_KEY_PREFIX)) {
+                return; // skip overview keys
             }
-            if (res.statusCode !== 200) {
-                return iterCb(new Error(`GET ${url} returned status ${res.statusCode}`));
+            // part key format: <uploadId>..|..<5-digit-index>
+            const sepPos = item.key.indexOf('..|..');
+            if (sepPos === -1) {
+                log.warn('unexpected key format in MPU shadow bucket', {
+                    shadowBucket, key: item.key,
+                });
+                return;
             }
-            const { Contents, IsTruncated } = JSON.parse(res.body);
-            (Contents || []).forEach(item => {
-                if (item.key.startsWith(OVERVIEW_KEY_PREFIX)) {
-                    return; // skip overview keys
-                }
-                // part key format: <uploadId>..|..<5-digit-index>
-                const sepPos = item.key.indexOf('..|..');
-                if (sepPos === -1) {
-                    log.warn('unexpected key format in MPU shadow bucket', {
-                        shadowBucket, key: item.key,
-                    });
-                    return;
-                }
-                const uploadId = item.key.slice(0, sepPos);
-                if (uploadIdsWithOverview.has(uploadId)) {
-                    return; // has a live overview key: not orphaned
-                }
-                if (!orphanMap[uploadId]) {
-                    orphanMap[uploadId] = { partKeys: [], sproxydKeys: new Set() };
-                }
-                orphanMap[uploadId].partKeys.push(item.key);
+            const uploadId = item.key.slice(0, sepPos);
+            if (uploadIdsWithOverview.has(uploadId)) {
+                return; // has a live overview key: not orphaned
+            }
+            if (!orphanMap[uploadId]) {
+                orphanMap[uploadId] = { partKeys: [], sproxydKeys: new Set() };
+            }
+            orphanMap[uploadId].partKeys.push(item.key);
 
-                let md;
-                try {
-                    md = JSON.parse(item.value);
-                } catch (e) {
-                    log.warn('failed to parse part key metadata', {
-                        shadowBucket, key: item.key,
-                        error: { message: e.message },
-                    });
-                    return;
-                }
-                const { partLocations } = md;
-                if (!partLocations || partLocations.length === 0) {
-                    log.warn('part key has no partLocations', {
-                        shadowBucket, uploadId, key: item.key,
-                    });
-                    return;
-                }
-                partLocations.forEach(loc => orphanMap[uploadId].sproxydKeys.add(loc.key));
-            });
-            if (IsTruncated && Contents.length > 0) {
-                partsMarker = Contents[Contents.length - 1].key;
+            let md;
+            try {
+                md = JSON.parse(item.value);
+            } catch (e) {
+                log.warn('failed to parse part key metadata', {
+                    shadowBucket, key: item.key,
+                    error: { message: e.message },
+                });
+                return;
             }
-            return iterCb(null, IsTruncated);
+            const { partLocations } = md;
+            if (!partLocations || partLocations.length === 0) {
+                log.warn('part key has no partLocations', {
+                    shadowBucket, uploadId, key: item.key,
+                });
+                return;
+            }
+            partLocations.forEach(loc => orphanMap[uploadId].sproxydKeys.add(loc.key));
         });
+        if (IsTruncated && Contents.length > 0) {
+            partsMarker = Contents[Contents.length - 1].key;
+        }
+        isTruncated = IsTruncated;
     }
 
-    async.series([
-        // Step 1: collect upload IDs that have an overview key
-        done => async.doWhilst(
-            iterDone => async.retry(
-                { times: 100, interval: 5000 },
-                listOverviewKeysIter,
-                iterDone
-            ),
-            async isTruncated => isTruncated,
-            done
-        ),
-        // Step 2: list all parts, populate orphan map
-        done => async.doWhilst(
-            iterDone => async.retry(
-                { times: 100, interval: 5000 },
-                listAllPartsIter,
-                iterDone
-            ),
-            async isTruncated => isTruncated,
-            done
-        ),
-        // Step 3: re-check overview keys a second time to eliminate upload IDs
-        // that gained an overview key between step 1 and step 2 (race condition)
-        done => {
-            overviewMarker = '';
-            async.doWhilst(
-                iterDone => async.retry(
-                    { times: 100, interval: 5000 },
-                    listOverviewKeysIter,
-                    iterDone
-                ),
-                async isTruncated => isTruncated,
-                err => {
-                    if (err) {
-                        return done(err);
-                    }
-                    Object.keys(orphanMap).forEach(uploadId => {
-                        if (uploadIdsWithOverview.has(uploadId)) {
-                            delete orphanMap[uploadId];
-                        }
-                    });
-                    return done();
-                }
-            );
-        },
-    ], err => {
-        if (err) {
-            return cb(err);
+    // Step 3: re-check overview keys to eliminate upload IDs that gained an
+    // overview key between step 1 and step 2 (race condition)
+    await listOverviewKeys();
+    Object.keys(orphanMap).forEach(uploadId => {
+        if (uploadIdsWithOverview.has(uploadId)) {
+            delete orphanMap[uploadId];
         }
+    });
+
+    return orphanMap;
+}
+
+function processBucket(bucket, cb) {
+    const shadowBucket = `mpuShadowBucket${bucket}`;
+
+    log.info('scanning MPU shadow bucket', { bucket, shadowBucket });
+
+    buildOrphanMap(bucket, shadowBucket).then(orphanMap => {
         const orphanCount = Object.keys(orphanMap).length;
         log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
         Object.entries(orphanMap).forEach(([uploadId, info]) => {
@@ -547,7 +517,7 @@ function processBucket(bucket, cb) {
             log.info('phase 2 complete', { bucket });
             return cb();
         }).catch(cb);
-    });
+    }).catch(cb);
 }
 
 async function main() {
