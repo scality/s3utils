@@ -200,91 +200,66 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
  *   ?versionId=null as fallbacks, accepting the result only when its versionId
  *   matches the expected one.
  *
- * Calls cb(null, fullMd) on success, cb(null, null) when not found/skipped.
+ * Returns the full metadata object, or null when not found/skipped.
  */
-function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
+async function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd) {
     const baseUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/`
         + encodeURIComponent(key);
 
     function parseResponse(url, res) {
         if (res.statusCode === 404) {
-            return { err: null, md: null };
+            return null;
         }
         if (res.statusCode !== 200) {
-            return { err: new Error(`GET ${url} returned status ${res.statusCode}`) };
+            throw new Error(`GET ${url} returned status ${res.statusCode}`);
         }
         try {
-            return { err: null, md: JSON.parse(res.body) };
+            return JSON.parse(res.body);
         } catch (e) {
-            return { err: new Error(`failed to parse metadata from ${url}: ${e.message}`) };
+            throw new Error(`failed to parse metadata from ${url}: ${e.message}`);
         }
     }
 
     if (versionId === 'null') {
         // Non-versioned object: fetch without versionId param
-        httpRequest('GET', baseUrl, (err, res) => {
-            if (err) {
-                return cb(err);
-            }
-            const { err: parseErr, md: fullMd } = parseResponse(baseUrl, res);
-            if (parseErr) {
-                return cb(parseErr);
-            }
-            if (fullMd === null) {
-                return cb(null, null); // 404: object is gone
-            }
-            if ('versionId' in fullMd) {
-                // Object has since been overwritten by a versioned one; skip
-                return cb(null, null);
-            }
-            return cb(null, fullMd);
-        });
-        return;
+        const res = await httpRequestAsync('GET', baseUrl);
+        const fullMd = parseResponse(baseUrl, res);
+        if (fullMd === null) {
+            return null; // 404: object is gone
+        }
+        if ('versionId' in fullMd) {
+            // Object has since been overwritten by a versioned one; skip
+            return null;
+        }
+        return fullMd;
     }
 
     // Versioned object: try the primary URL first
     const primaryUrl = `${baseUrl}?versionId=${encodeURIComponent(versionId)}`;
-    httpRequest('GET', primaryUrl, (err, res) => {
-        if (err) {
-            return cb(err);
+    const res = await httpRequestAsync('GET', primaryUrl);
+    if (res.statusCode === 200) {
+        return parseResponse(primaryUrl, res);
+    }
+    if (res.statusCode !== 404) {
+        throw new Error(`GET ${primaryUrl} returned status ${res.statusCode}`);
+    }
+    // Primary returned 404; if the listing entry is a null version,
+    // try alternative URLs (same fallback logic as the Python script)
+    if (!('isNull' in listingParsedMd)) {
+        return null;
+    }
+    for (const altUrl of [baseUrl, `${baseUrl}?versionId=null`]) {
+        // eslint-disable-next-line no-await-in-loop
+        const altRes = await httpRequestAsync('GET', altUrl);
+        const altMd = parseResponse(altUrl, altRes);
+        if (altMd !== null && altMd.versionId === versionId) {
+            return altMd;
         }
-        if (res.statusCode === 200) {
-            const { err: parseErr, md: fullMd } = parseResponse(primaryUrl, res);
-            return cb(parseErr, parseErr ? undefined : fullMd);
-        }
-        if (res.statusCode !== 404) {
-            return cb(new Error(`GET ${primaryUrl} returned status ${res.statusCode}`));
-        }
-        // Primary returned 404; if the listing entry is a null version,
-        // try alternative URLs (same fallback logic as the Python script)
-        if (!('isNull' in listingParsedMd)) {
-            return cb(null, null);
-        }
-        const altUrls = [baseUrl, `${baseUrl}?versionId=null`];
-        let foundMd = null;
-        async.eachSeries(altUrls, (altUrl, altDone) => {
-            if (foundMd !== null) {
-                return altDone();
-            }
-            httpRequest('GET', altUrl, (altErr, altRes) => {
-                if (altErr) {
-                    return altDone(altErr);
-                }
-                const { err: parseErr, md: altMd } = parseResponse(altUrl, altRes);
-                if (parseErr) {
-                    return altDone(parseErr);
-                }
-                if (altMd !== null && altMd.versionId === versionId) {
-                    foundMd = altMd;
-                }
-                return altDone();
-            });
-        }, altErr => cb(altErr || null, altErr ? undefined : foundMd));
-    });
+    }
+    return null;
 }
 
 const httpRequestAsync = promisify(httpRequest);
-const fetchFullObjectMetadataAsync = promisify(fetchFullObjectMetadata);
 
 /**
  * Async generator that iterates over all versions in a bucket using
@@ -345,7 +320,7 @@ async function* makeVersionsListingIterator(bucket) {
             // eslint-disable-next-line no-await-in-loop
             const fullMd = await async.retry(
                 { times: 100, interval: 5000 },
-                () => fetchFullObjectMetadataAsync(bucket, key, versionId, parsedMd)
+                () => fetchFullObjectMetadata(bucket, key, versionId, parsedMd)
             );
             if (fullMd === null) {
                 log.warn('full object metadata not found or skipped', {
