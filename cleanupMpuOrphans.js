@@ -245,7 +245,7 @@ function processBucket(bucket, cb) {
     }
 
     async.series([
-        // Step 1
+        // Step 1: collect upload IDs that have an overview key
         done => async.doWhilst(
             iterDone => async.retry(
                 { times: 100, interval: 5000 },
@@ -255,7 +255,7 @@ function processBucket(bucket, cb) {
             async isTruncated => isTruncated,
             done
         ),
-        // Step 2
+        // Step 2: list all parts, populate orphan map
         done => async.doWhilst(
             iterDone => async.retry(
                 { times: 100, interval: 5000 },
@@ -265,6 +265,30 @@ function processBucket(bucket, cb) {
             async isTruncated => isTruncated,
             done
         ),
+        // Step 3: re-check overview keys a second time to eliminate upload IDs
+        // that gained an overview key between step 1 and step 2 (race condition)
+        done => {
+            overviewMarker = '';
+            async.doWhilst(
+                iterDone => async.retry(
+                    { times: 100, interval: 5000 },
+                    listOverviewKeysIter,
+                    iterDone
+                ),
+                async isTruncated => isTruncated,
+                err => {
+                    if (err) {
+                        return done(err);
+                    }
+                    Object.keys(orphanMap).forEach(uploadId => {
+                        if (uploadIdsWithOverview.has(uploadId)) {
+                            delete orphanMap[uploadId];
+                        }
+                    });
+                    return done();
+                }
+            );
+        },
     ], err => {
         if (err) {
             return cb(err);
