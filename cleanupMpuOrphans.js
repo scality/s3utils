@@ -185,6 +185,89 @@ function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToD
     ], cb);
 }
 
+/**
+ * Fetch the complete metadata of an object version from bucketd.
+ *
+ * Mirrors the logic of fetch_source_entry_md() in the Python migration script
+ * to correctly handle non-versioned objects and null versions:
+ *
+ * - Non-versioned (versionId === 'null'): fetch without a versionId query
+ *   param; reject the result if it now has a versionId field (the object was
+ *   overwritten by a versioned one since the listing was taken).
+ *
+ * - Versioned: try the primary ?versionId=<id> URL first. If that fails and
+ *   the listing entry carries isNull, try the master-key URL and
+ *   ?versionId=null as fallbacks, accepting the result only when its versionId
+ *   matches the expected one.
+ *
+ * Calls cb(null, fullMd) on success, cb(null, null) when not found/skipped.
+ */
+function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
+    const baseUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/`
+        + encodeURIComponent(key);
+
+    if (versionId === 'null') {
+        // Non-versioned object: fetch without versionId param
+        httpRequest('GET', baseUrl, (err, res) => {
+            if (err || res.statusCode !== 200) {
+                return cb(null, null);
+            }
+            let fullMd;
+            try {
+                fullMd = JSON.parse(res.body);
+            } catch (e) {
+                return cb(null, null);
+            }
+            if ('versionId' in fullMd) {
+                // Object has since been overwritten by a versioned one; skip
+                return cb(null, null);
+            }
+            return cb(null, fullMd);
+        });
+        return;
+    }
+
+    // Versioned object: try the primary URL first
+    httpRequest('GET', `${baseUrl}?versionId=${encodeURIComponent(versionId)}`, (err, res) => {
+        if (err === null && res.statusCode === 200) {
+            let fullMd;
+            try {
+                fullMd = JSON.parse(res.body);
+            } catch (e) {
+                return cb(null, null);
+            }
+            return cb(null, fullMd);
+        }
+        // Primary fetch failed; if the listing entry is a null version,
+        // try alternative URLs (same fallback logic as the Python script)
+        if (!('isNull' in listingParsedMd)) {
+            return cb(null, null);
+        }
+        const altUrls = [baseUrl, `${baseUrl}?versionId=null`];
+        let foundMd = null;
+        async.eachSeries(altUrls, (altUrl, altDone) => {
+            if (foundMd !== null) {
+                return altDone();
+            }
+            httpRequest('GET', altUrl, (altErr, altRes) => {
+                if (altErr || altRes.statusCode !== 200) {
+                    return altDone();
+                }
+                let altMd;
+                try {
+                    altMd = JSON.parse(altRes.body);
+                } catch (e) {
+                    return altDone();
+                }
+                if (altMd.versionId === versionId) {
+                    foundMd = altMd;
+                }
+                return altDone();
+            });
+        }, () => cb(null, foundMd));
+    });
+}
+
 const OVERVIEW_KEY_PREFIX = 'overview..|..';
 
 /**
@@ -406,44 +489,38 @@ function processBucket(bucket, cb) {
                     const uploadId = md.uploadId;
                     // Fetch full metadata to ensure the location array is complete
                     // (the listing result may have it pruned for large MPUs)
-                    const fullUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}/`
-                        + `${encodeURIComponent(entry.key)}`
-                        + `?versionId=${encodeURIComponent(entry.versionId)}`;
-                    httpRequest('GET', fullUrl, (getErr, getRes) => {
-                        if (getErr || getRes.statusCode !== 200) {
-                            log.error('failed to fetch full object metadata', {
-                                bucket, key: entry.key, versionId: entry.versionId, uploadId,
-                                error: getErr
-                                    ? { message: getErr.message }
-                                    : { statusCode: getRes.statusCode },
-                            });
-                            return entryDone();
-                        }
-                        let fullMd;
-                        try {
-                            fullMd = JSON.parse(getRes.body);
-                        } catch (e) {
-                            log.error('failed to parse full object metadata', {
-                                bucket, key: entry.key, versionId: entry.versionId, uploadId,
-                                error: { message: e.message },
-                            });
-                            return entryDone();
-                        }
-                        const locationKeys = new Set(
-                            (fullMd.location || []).map(loc => loc.key)
-                        );
-                        const orphanEntry = orphanMap[uploadId];
-                        // Only delete sproxyd keys not referenced by the completed object
-                        const keysToDelete = [...orphanEntry.sproxydKeys]
-                            .filter(k => !locationKeys.has(k));
-                        return cleanupOrphanEntry(
-                            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
-                            () => {
-                                delete orphanMap[uploadId];
-                                entryDone();
+                    return fetchFullObjectMetadata(
+                        bucket, entry.key, entry.versionId, md,
+                        (fetchErr, fullMd) => {
+                            if (fetchErr) {
+                                log.error('error fetching full object metadata', {
+                                    bucket, key: entry.key, versionId: entry.versionId, uploadId,
+                                    error: { message: fetchErr.message },
+                                });
+                                return entryDone();
                             }
-                        );
-                    });
+                            if (fullMd === null) {
+                                log.warn('full object metadata not found or skipped', {
+                                    bucket, key: entry.key, versionId: entry.versionId, uploadId,
+                                });
+                                return entryDone();
+                            }
+                            const locationKeys = new Set(
+                                (fullMd.location || []).map(loc => loc.key)
+                            );
+                            const orphanEntry = orphanMap[uploadId];
+                            // Only delete sproxyd keys not referenced by the completed object
+                            const keysToDelete = [...orphanEntry.sproxydKeys]
+                                .filter(k => !locationKeys.has(k));
+                            return cleanupOrphanEntry(
+                                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
+                                () => {
+                                    delete orphanMap[uploadId];
+                                    entryDone();
+                                }
+                            );
+                        }
+                    );
                 }, iterErr => {
                     if (iterErr) {
                         return iterCb(iterErr);
