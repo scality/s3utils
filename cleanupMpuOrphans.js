@@ -282,6 +282,96 @@ function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd, cb) {
     });
 }
 
+/**
+ * Creates a function that iterates over all pages of a DelimiterVersions
+ * listing for a bucket, calling onEntry for each entry across all pages.
+ * Automatically fetches full metadata (with retries) for entries whose
+ * location array is absent from the listing result (large MPUs).
+ *
+ * onEntry(key, versionId, resolvedMd, entryDone) is called for each entry
+ * with its fully resolved metadata (including location when available).
+ *
+ * The returned function iter(cb) runs until all pages are exhausted,
+ * retrying each page fetch up to 100 times on transient errors.
+ */
+function makeVersionsListingIterator(bucket, onEntry) {
+    return function iter(cb) {
+        let keyMarker = '';
+        let versionIdMarker = '';
+
+        function fetchPage(pageDone) {
+            async.retry({ times: 100, interval: 5000 }, retryDone => {
+                const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}`
+                    + `?listingType=DelimiterVersions&maxKeys=${LISTING_LIMIT}`
+                    + `&keyMarker=${encodeURIComponent(keyMarker)}`
+                    + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
+                httpRequest('GET', url, (err, res) => {
+                    if (err) {
+                        return retryDone(err);
+                    }
+                    if (res.statusCode !== 200) {
+                        return retryDone(new Error(`GET ${url} returned status ${res.statusCode}`));
+                    }
+                    const { Versions, IsTruncated,
+                        NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
+                    async.eachSeries(Versions || [], (entry, entryDone) => {
+                        const { key, versionId } = entry;
+                        let parsedMd;
+                        try {
+                            parsedMd = JSON.parse(entry.value);
+                        } catch (e) {
+                            log.warn('failed to parse object metadata', {
+                                bucket, key,
+                                error: { message: e.message },
+                            });
+                            return entryDone();
+                        }
+                        // Only fetch full metadata when the listing result has a pruned
+                        // location array: typically the field is absent for large MPUs
+                        const needMdFetch = (
+                            'content-length' in parsedMd
+                            && parsedMd['content-length'] !== 0
+                            && (parsedMd.location === undefined || parsedMd.location === null)
+                        );
+                        if (!needMdFetch) {
+                            return onEntry(key, versionId, parsedMd, entryDone);
+                        }
+                        return async.retry(
+                            { times: 100, interval: 5000 },
+                            retryDone2 => fetchFullObjectMetadata(
+                                bucket, key, versionId, parsedMd, retryDone2
+                            ),
+                            (fetchErr, fullMd) => {
+                                if (fetchErr) {
+                                    return entryDone(fetchErr);
+                                }
+                                if (fullMd === null) {
+                                    log.warn('full object metadata not found or skipped', {
+                                        bucket, key, versionId,
+                                    });
+                                    return entryDone();
+                                }
+                                return onEntry(key, versionId, fullMd, entryDone);
+                            }
+                        );
+                    }, iterErr => {
+                        if (iterErr) {
+                            return retryDone(iterErr);
+                        }
+                        if (IsTruncated) {
+                            keyMarker = NextKeyMarker || '';
+                            versionIdMarker = NextVersionIdMarker || '';
+                        }
+                        return retryDone(null, IsTruncated);
+                    });
+                });
+            }, pageDone);
+        }
+
+        async.doWhilst(fetchPage, async isTruncated => isTruncated, cb);
+    };
+}
+
 const OVERVIEW_KEY_PREFIX = 'overview..|..';
 
 /**
@@ -465,109 +555,33 @@ function processBucket(bucket, cb) {
         //     objects that share sproxyd keys with orphaned parts, then delete
         //     orphaned data (not part of the completed MPU). ---
 
-        let keyMarker = '';
-        let versionIdMarker = '';
-
-        function listVersionsIter(iterCb) {
-            const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${bucket}`
-                + `?listingType=DelimiterVersions&maxKeys=${LISTING_LIMIT}`
-                + `&keyMarker=${encodeURIComponent(keyMarker)}`
-                + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
-            httpRequest('GET', url, (err, res) => {
-                if (err) {
-                    return iterCb(err);
+        const listVersionsIter = makeVersionsListingIterator(
+            bucket,
+            (key, versionId, resolvedMd, entryDone) => {
+                if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
+                    return entryDone();
                 }
-                if (res.statusCode !== 200) {
-                    return iterCb(new Error(`GET ${url} returned status ${res.statusCode}`));
-                }
-                const { Versions, IsTruncated,
-                    NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
-                async.eachSeries(Versions || [], (entry, entryDone) => {
-                    let md;
-                    try {
-                        md = JSON.parse(entry.value);
-                    } catch (e) {
-                        log.warn('failed to parse object metadata', {
-                            bucket, key: entry.key,
-                            error: { message: e.message },
-                        });
-                        return entryDone();
+                const uploadId = resolvedMd.uploadId;
+                const locationKeys = new Set(
+                    (resolvedMd.location || []).map(loc => loc.key)
+                );
+                const orphanEntry = orphanMap[uploadId];
+                // Only delete sproxyd keys not referenced by the completed object
+                const keysToDelete = [...orphanEntry.sproxydKeys]
+                    .filter(k => !locationKeys.has(k));
+                return cleanupOrphanEntry(
+                    bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
+                    () => {
+                        delete orphanMap[uploadId];
+                        entryDone();
                     }
-                    if (!md.uploadId || !orphanMap[md.uploadId]) {
-                        return entryDone();
-                    }
-                    const uploadId = md.uploadId;
-
-                    function processWithLocation(resolvedMd) {
-                        const locationKeys = new Set(
-                            (resolvedMd.location || []).map(loc => loc.key)
-                        );
-                        const orphanEntry = orphanMap[uploadId];
-                        // Only delete sproxyd keys not referenced by the completed object
-                        const keysToDelete = [...orphanEntry.sproxydKeys]
-                            .filter(k => !locationKeys.has(k));
-                        return cleanupOrphanEntry(
-                            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete,
-                            () => {
-                                delete orphanMap[uploadId];
-                                entryDone();
-                            }
-                        );
-                    }
-
-                    // Only fetch full metadata when the listing result has a pruned
-                    // location array (same condition as need_md_fetch in the Python
-                    // migration script's prepare_source_entries())
-                    const needMdFetch = (
-                        'content-length' in md
-                        && md['content-length'] !== 0
-                        && !md.location
-                    );
-                    if (!needMdFetch) {
-                        return processWithLocation(md);
-                    }
-                    return async.retry(
-                        { times: 100, interval: 5000 },
-                        retryDone => fetchFullObjectMetadata(
-                            bucket, entry.key, entry.versionId, md, retryDone
-                        ),
-                        (fetchErr, fullMd) => {
-                            if (fetchErr) {
-                                return entryDone(fetchErr);
-                            }
-                            if (fullMd === null) {
-                                log.warn('full object metadata not found or skipped', {
-                                    bucket, key: entry.key, versionId: entry.versionId, uploadId,
-                                });
-                                return entryDone();
-                            }
-                            return processWithLocation(fullMd);
-                        }
-                    );
-                }, iterErr => {
-                    if (iterErr) {
-                        return iterCb(iterErr);
-                    }
-                    if (IsTruncated) {
-                        keyMarker = NextKeyMarker || '';
-                        versionIdMarker = NextVersionIdMarker || '';
-                    }
-                    return iterCb(null, IsTruncated);
-                });
-            });
-        }
+                );
+            }
+        );
 
         return async.series([
             // Scan all object versions, cleaning up as matches are found
-            done => async.doWhilst(
-                iterDone => async.retry(
-                    { times: 100, interval: 5000 },
-                    listVersionsIter,
-                    iterDone
-                ),
-                async isTruncated => isTruncated,
-                done
-            ),
+            listVersionsIter,
             // Delete remaining orphans not referenced by any completed object
             done => async.eachSeries(Object.keys(orphanMap), (uploadId, entryCb) => {
                 const orphanEntry = orphanMap[uploadId];
