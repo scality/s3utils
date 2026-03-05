@@ -306,7 +306,7 @@ async function processBucket(bucket) {
     //     objects that share sproxyd keys with orphaned parts, then delete
     //     orphaned data (not part of the completed MPU). ---
 
-    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_LIMIT })) {
+    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_LIMIT, retry: { times: 100, interval: 5000 } })) {
         if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
             continue;
         }

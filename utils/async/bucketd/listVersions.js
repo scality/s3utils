@@ -1,11 +1,11 @@
 'use strict';
 
-const async = require('async');
 const werelogs = require('werelogs');
 
 const httpRequest = require('../httpRequest');
 
 const log = new werelogs.Logger('s3utils:listVersions');
+
 
 /**
  * Fetch the complete metadata of an object version from bucketd.
@@ -23,7 +23,7 @@ const log = new werelogs.Logger('s3utils:listVersions');
  *
  * Returns the full metadata object, or null when not found/skipped.
  */
-async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, listingParsedMd) {
+async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, listingParsedMd, retryParams) {
     const baseUrl = `http://${bucketdHostport}/default/bucket/${bucket}/`
         + encodeURIComponent(key);
 
@@ -43,7 +43,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
 
     if (versionId === 'null') {
         // Non-versioned object: fetch without versionId param
-        const res = await httpRequest('GET', baseUrl);
+        const res = await httpRequest('GET', baseUrl, retryParams);
         const fullMd = parseResponse(baseUrl, res);
         if (fullMd === null) {
             return null; // 404: object is gone
@@ -57,7 +57,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
 
     // Versioned object: try the primary URL first
     const primaryUrl = `${baseUrl}?versionId=${encodeURIComponent(versionId)}`;
-    const res = await httpRequest('GET', primaryUrl);
+    const res = await httpRequest('GET', primaryUrl, retryParams);
     if (res.statusCode === 200) {
         return parseResponse(primaryUrl, res);
     }
@@ -71,7 +71,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
     }
     for (const altUrl of [baseUrl, `${baseUrl}?versionId=null`]) {
         // eslint-disable-next-line no-await-in-loop
-        const altRes = await httpRequest('GET', altUrl);
+        const altRes = await httpRequest('GET', altUrl, retryParams);
         const altMd = parseResponse(altUrl, altRes);
         if (altMd !== null && altMd.versionId === versionId) {
             return altMd;
@@ -87,8 +87,8 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  * result has a pruned location array (large MPUs), the full metadata is
  * fetched individually.
  *
- * Page fetches and individual metadata fetches are each retried up to
- * 100 times on transient errors.
+ * Page fetches and individual metadata fetches are retried on transient
+ * errors (network failures and 5xx responses) using RETRY_PARAMS.
  *
  * @param {string} bucketdHostport - host:port of the bucketd endpoint
  * @param {string} bucket - name of the bucket to list
@@ -103,6 +103,9 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  *   (exclusive); defaults to the beginning of the bucket
  * @param {string} [options.versionIdMarker] - resume listing from this
  *   version ID marker, used together with keyMarker
+ * @param {object} [options.retry] - if provided, passed as retryParams to
+ *   httpRequest to retry on network errors and 5xx responses
+ *   (e.g. { times: 100, interval: 5000 }); by default requests are not retried
  */
 async function* listVersions(bucketdHostport, bucket, {
     pageSize,
@@ -110,6 +113,7 @@ async function* listVersions(bucketdHostport, bucket, {
     prefix = '',
     keyMarker: startKeyMarker = '',
     versionIdMarker: startVersionIdMarker = '',
+    retry,
 } = {}) {
     let keyMarker = startKeyMarker;
     let versionIdMarker = startVersionIdMarker;
@@ -128,16 +132,11 @@ async function* listVersions(bucketdHostport, bucket, {
             + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
 
         // eslint-disable-next-line no-await-in-loop
-        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = await async.retry(
-            { times: 100, interval: 5000 },
-            async () => {
-                const res = await httpRequest('GET', url);
-                if (res.statusCode !== 200) {
-                    throw new Error(`GET ${url} returned status ${res.statusCode}`);
-                }
-                return JSON.parse(res.body);
-            }
-        );
+        const res = await httpRequest('GET', url, retry);
+        if (res.statusCode !== 200) {
+            throw new Error(`GET ${url} returned status ${res.statusCode}`);
+        }
+        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
 
         for (const entry of (Versions || [])) {
             const { key, versionId } = entry;
@@ -166,9 +165,8 @@ async function* listVersions(bucketdHostport, bucket, {
                 continue;
             }
             // eslint-disable-next-line no-await-in-loop
-            const fullMd = await async.retry(
-                { times: 100, interval: 5000 },
-                () => fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, parsedMd)
+            const fullMd = await fetchFullObjectMetadata(
+                bucketdHostport, bucket, key, versionId, parsedMd, retry
             );
             if (fullMd === null) {
                 log.warn('full object metadata not found or skipped', {
