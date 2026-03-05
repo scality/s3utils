@@ -1,6 +1,5 @@
 /* eslint-disable no-console */
 const http = require('http');
-const { promisify } = require('util');
 const { http: httpArsn } = require('httpagent');
 const async = require('async');
 
@@ -84,41 +83,42 @@ const httpAgent = new httpArsn.Agent({
 
 let remainingBuckets = (BUCKETS && BUCKETS.split(',')) || [];
 
-function httpRequest(method, url, cb) {
-    const urlObj = new URL(url);
-    const req = http.request({
-        hostname: urlObj.hostname,
-        port: urlObj.port,
-        path: `${urlObj.pathname}${urlObj.search}`,
-        method,
-        agent: httpAgent,
-    }, res => {
-        const chunks = [];
-        res.on('data', chunk => chunks.push(chunk));
-        res.once('end', () => {
-            // eslint-disable-next-line no-param-reassign
-            res.body = chunks.join('');
-            log.trace('received HTTP response', { method, url, statusCode: res.statusCode });
-            return cb(null, res);
+function httpRequest(method, url) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const req = http.request({
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: `${urlObj.pathname}${urlObj.search}`,
+            method,
+            agent: httpAgent,
+        }, res => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.once('end', () => {
+                // eslint-disable-next-line no-param-reassign
+                res.body = chunks.join('');
+                log.trace('received HTTP response', { method, url, statusCode: res.statusCode });
+                resolve(res);
+            });
+            res.once('error', err => reject(new Error(
+                'error reading response from HTTP request '
+                    + `to ${url}: ${err.message}`
+            )));
         });
-        res.once('error', err => cb(new Error(
-            'error reading response from HTTP request '
-                + `to ${url}: ${err.message}`
+        req.once('error', err => reject(new Error(
+            `error sending HTTP request to ${url}: ${err.message}`
         )));
-        return undefined;
+        log.trace('sending HTTP request', { method, url });
+        req.end();
     });
-    req.once('error', err => cb(new Error(
-        `error sending HTTP request to ${url}: ${err.message}`
-    )));
-    log.trace('sending HTTP request', { method, url });
-    req.end();
 }
 
 let sproxydAlias;
 
 async function getSproxydAlias() {
     const url = `http://${SPROXYD_HOSTPORT}/.conf`;
-    const res = await httpRequestAsync('GET', url);
+    const res = await httpRequest('GET', url);
     if (res.statusCode !== 200) {
         throw new Error(`GET ${url} returned status ${res.statusCode}`);
     }
@@ -133,7 +133,7 @@ async function raftSessionsToBuckets() {
     const rsList = RAFT_SESSIONS.split(',');
     await Promise.all(rsList.map(async rs => {
         const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
-        const res = await httpRequestAsync('GET', url);
+        const res = await httpRequest('GET', url);
         if (res.statusCode !== 200) {
             throw new Error(`GET ${url} returned status ${res.statusCode}`);
         }
@@ -153,7 +153,7 @@ async function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, k
     for (const sproxydKey of keysToDelete) {
         const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
         try {
-            const res = await httpRequestAsync('DELETE', sproxydUrl); // eslint-disable-line no-await-in-loop
+            const res = await httpRequest('DELETE', sproxydUrl); // eslint-disable-line no-await-in-loop
             if (res.statusCode !== 200) {
                 log.error('failed to delete orphaned sproxyd key', {
                     bucket, uploadId, sproxydKey, error: { statusCode: res.statusCode },
@@ -171,7 +171,7 @@ async function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, k
         const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
             + encodeURIComponent(partKey);
         try {
-            const res = await httpRequestAsync('DELETE', partUrl); // eslint-disable-line no-await-in-loop
+            const res = await httpRequest('DELETE', partUrl); // eslint-disable-line no-await-in-loop
             if (res.statusCode !== 200 && res.statusCode !== 404) {
                 log.error('failed to delete orphaned part metadata', {
                     bucket, uploadId, partKey, error: { statusCode: res.statusCode },
@@ -223,7 +223,7 @@ async function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd) 
 
     if (versionId === 'null') {
         // Non-versioned object: fetch without versionId param
-        const res = await httpRequestAsync('GET', baseUrl);
+        const res = await httpRequest('GET', baseUrl);
         const fullMd = parseResponse(baseUrl, res);
         if (fullMd === null) {
             return null; // 404: object is gone
@@ -237,7 +237,7 @@ async function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd) 
 
     // Versioned object: try the primary URL first
     const primaryUrl = `${baseUrl}?versionId=${encodeURIComponent(versionId)}`;
-    const res = await httpRequestAsync('GET', primaryUrl);
+    const res = await httpRequest('GET', primaryUrl);
     if (res.statusCode === 200) {
         return parseResponse(primaryUrl, res);
     }
@@ -245,13 +245,13 @@ async function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd) 
         throw new Error(`GET ${primaryUrl} returned status ${res.statusCode}`);
     }
     // Primary returned 404; if the listing entry is a null version,
-    // try alternative URLs (same fallback logic as the Python script)
+    // try alternative URLs
     if (!('isNull' in listingParsedMd)) {
         return null;
     }
     for (const altUrl of [baseUrl, `${baseUrl}?versionId=null`]) {
         // eslint-disable-next-line no-await-in-loop
-        const altRes = await httpRequestAsync('GET', altUrl);
+        const altRes = await httpRequest('GET', altUrl);
         const altMd = parseResponse(altUrl, altRes);
         if (altMd !== null && altMd.versionId === versionId) {
             return altMd;
@@ -259,8 +259,6 @@ async function fetchFullObjectMetadata(bucket, key, versionId, listingParsedMd) 
     }
     return null;
 }
-
-const httpRequestAsync = promisify(httpRequest);
 
 /**
  * Async generator that iterates over all versions in a bucket using
@@ -287,7 +285,7 @@ async function* makeVersionsListingIterator(bucket) {
         const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = await async.retry(
             { times: 100, interval: 5000 },
             async () => {
-                const res = await httpRequestAsync('GET', url);
+                const res = await httpRequest('GET', url);
                 if (res.statusCode !== 200) {
                     throw new Error(`GET ${url} returned status ${res.statusCode}`);
                 }
@@ -366,7 +364,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
             const { Contents, IsTruncated } = await async.retry(
                 { times: 100, interval: 5000 },
                 async () => {
-                    const res = await httpRequestAsync('GET', url);
+                    const res = await httpRequest('GET', url);
                     if (res.statusCode === 404) {
                         return { Contents: [], IsTruncated: false };
                     }
@@ -402,7 +400,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
         const { Contents, IsTruncated } = await async.retry(
             { times: 100, interval: 5000 },
             async () => {
-                const res = await httpRequestAsync('GET', url);
+                const res = await httpRequest('GET', url);
                 if (res.statusCode === 404) {
                     return { Contents: [], IsTruncated: false };
                 }
