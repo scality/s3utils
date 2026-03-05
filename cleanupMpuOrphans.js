@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
-const http = require('http');
-const { http: httpArsn } = require('httpagent');
 const async = require('async');
 
 const werelogs = require('werelogs');
+
+const httpRequest = require('./utils/async/httpRequest');
 
 const DEFAULT_LISTING_LIMIT = 1000;
 
@@ -77,42 +77,7 @@ if (!SPROXYD_HOSTPORT) {
 
 const log = new werelogs.Logger('s3utils:cleanupMpuOrphans');
 
-const httpAgent = new httpArsn.Agent({
-    keepAlive: true,
-});
-
 let remainingBuckets = (BUCKETS && BUCKETS.split(',')) || [];
-
-function httpRequest(method, url) {
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(url);
-        const req = http.request({
-            hostname: urlObj.hostname,
-            port: urlObj.port,
-            path: `${urlObj.pathname}${urlObj.search}`,
-            method,
-            agent: httpAgent,
-        }, res => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.once('end', () => {
-                // eslint-disable-next-line no-param-reassign
-                res.body = chunks.join('');
-                log.trace('received HTTP response', { method, url, statusCode: res.statusCode });
-                resolve(res);
-            });
-            res.once('error', err => reject(new Error(
-                'error reading response from HTTP request '
-                    + `to ${url}: ${err.message}`
-            )));
-        });
-        req.once('error', err => reject(new Error(
-            `error sending HTTP request to ${url}: ${err.message}`
-        )));
-        log.trace('sending HTTP request', { method, url });
-        req.end();
-    });
-}
 
 let sproxydAlias;
 
@@ -547,4 +512,4 @@ process.on('SIGHUP', stop);
 process.on('SIGTERM', stop);
 process.on('SIGQUIT', stop);
 
-module.exports = { httpRequest };
+module.exports = {};
