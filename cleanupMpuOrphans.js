@@ -16,8 +16,15 @@ const {
 const VERBOSE = process.env.VERBOSE === '1';
 const TRACE = process.env.TRACE === '1';
 
-// eslint-disable-next-line no-nested-ternary
-werelogs.configure({ level: TRACE ? 'trace' : VERBOSE ? 'debug' : 'info', dump: 'error' });
+let logLevel;
+if (TRACE) {
+    logLevel = 'trace';
+} else if (VERBOSE) {
+    logLevel = 'debug';
+} else {
+    logLevel = 'info';
+}
+werelogs.configure({ level: logLevel, dump: 'error' });
 
 const LISTING_LIMIT = (
     process.env.LISTING_LIMIT
