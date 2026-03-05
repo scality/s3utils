@@ -120,10 +120,7 @@ async function* listVersions(bucketdHostport, bucket, {
     let isTruncated = true;
     let remaining = maxItems ?? Infinity;
 
-    while (isTruncated) {
-        if (remaining <= 0) {
-            break;
-        }
+    while (isTruncated && remaining > 0) {
         const maxKeys = Math.min(pageSize, remaining);
         const url = `http://${bucketdHostport}/default/bucket/${bucket}`
             + `?listingType=DelimiterVersions&maxKeys=${maxKeys}`
@@ -136,7 +133,12 @@ async function* listVersions(bucketdHostport, bucket, {
         if (res.statusCode !== 200) {
             throw new Error(`GET ${url} returned status ${res.statusCode}`);
         }
-        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
+        const {
+            Versions,
+            IsTruncated,
+            NextKeyMarker,
+            NextVersionIdMarker,
+        } = JSON.parse(res.body);
 
         for (const entry of (Versions || [])) {
             const { key, versionId } = entry;
@@ -146,7 +148,7 @@ async function* listVersions(bucketdHostport, bucket, {
             } catch (e) {
                 log.warn('failed to parse object metadata', {
                     bucket, key,
-                    error: { message: e.message },
+                    error: e.message,
                 });
                 continue;
             }
@@ -157,27 +159,20 @@ async function* listVersions(bucketdHostport, bucket, {
                 && parsedMd['content-length'] !== 0
                 && (parsedMd.location === undefined || parsedMd.location === null)
             );
-            if (!needMdFetch) {
-                yield { key, versionId, value: parsedMd };
-                if (--remaining <= 0) {
-                    return;
+            if (needMdFetch) {
+                // eslint-disable-next-line no-await-in-loop
+                parsedMd = await fetchFullObjectMetadata(
+                    bucketdHostport, bucket, key, versionId, parsedMd, retry
+                );
+                if (parsedMd === null) {
+                    log.debug('full object metadata not found or skipped', {
+                        bucket, key, versionId,
+                    });
+                    continue;
                 }
-                continue;
             }
-            // eslint-disable-next-line no-await-in-loop
-            const fullMd = await fetchFullObjectMetadata(
-                bucketdHostport, bucket, key, versionId, parsedMd, retry
-            );
-            if (fullMd === null) {
-                log.warn('full object metadata not found or skipped', {
-                    bucket, key, versionId,
-                });
-                continue;
-            }
-            yield { key, versionId, value: fullMd };
-            if (--remaining <= 0) {
-                return;
-            }
+            yield { key, versionId, value: parsedMd };
+            --remaining;
         }
 
         isTruncated = IsTruncated;
