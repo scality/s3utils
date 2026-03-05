@@ -89,15 +89,41 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  *
  * Page fetches and individual metadata fetches are each retried up to
  * 100 times on transient errors.
+ *
+ * @param {string} bucketdHostport - host:port of the bucketd endpoint
+ * @param {string} bucket - name of the bucket to list
+ * @param {object} [options]
+ * @param {number} options.pageSize - number of entries requested per listing
+ *   page (passed as maxKeys to bucketd)
+ * @param {number} [options.maxItems] - maximum total number of entries to
+ *   yield; if omitted, all entries are yielded
+ * @param {string} [options.prefix] - only yield entries whose key starts with
+ *   this prefix; an empty string (the default) applies no prefix filter
+ * @param {string} [options.keyMarker] - resume listing from this key marker
+ *   (exclusive); defaults to the beginning of the bucket
+ * @param {string} [options.versionIdMarker] - resume listing from this
+ *   version ID marker, used together with keyMarker
  */
-async function* listVersions(bucketdHostport, bucket, listingLimit) {
-    let keyMarker = '';
-    let versionIdMarker = '';
+async function* listVersions(bucketdHostport, bucket, {
+    pageSize,
+    maxItems,
+    prefix = '',
+    keyMarker: startKeyMarker = '',
+    versionIdMarker: startVersionIdMarker = '',
+} = {}) {
+    let keyMarker = startKeyMarker;
+    let versionIdMarker = startVersionIdMarker;
     let isTruncated = true;
+    let remaining = maxItems ?? Infinity;
 
     while (isTruncated) {
+        if (remaining <= 0) {
+            break;
+        }
+        const maxKeys = Math.min(pageSize, remaining);
         const url = `http://${bucketdHostport}/default/bucket/${bucket}`
-            + `?listingType=DelimiterVersions&maxKeys=${listingLimit}`
+            + `?listingType=DelimiterVersions&maxKeys=${maxKeys}`
+            + (prefix ? `&prefix=${encodeURIComponent(prefix)}` : '')
             + `&keyMarker=${encodeURIComponent(keyMarker)}`
             + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
 
@@ -134,6 +160,9 @@ async function* listVersions(bucketdHostport, bucket, listingLimit) {
             );
             if (!needMdFetch) {
                 yield { key, versionId, value: parsedMd };
+                if (--remaining <= 0) {
+                    return;
+                }
                 continue;
             }
             // eslint-disable-next-line no-await-in-loop
@@ -148,6 +177,9 @@ async function* listVersions(bucketdHostport, bucket, listingLimit) {
                 continue;
             }
             yield { key, versionId, value: fullMd };
+            if (--remaining <= 0) {
+                return;
+            }
         }
 
         isTruncated = IsTruncated;
