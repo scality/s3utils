@@ -284,30 +284,17 @@ async function buildOrphanMap(bucket, shadowBucket) {
     return orphanMap;
 }
 
-async function processBucket(bucket) {
-    const shadowBucket = `mpuShadowBucket${bucket}`;
-
-    log.info('scanning MPU shadow bucket', { bucket, shadowBucket });
-
-    const orphanMap = await buildOrphanMap(bucket, shadowBucket);
-    const orphanCount = Object.keys(orphanMap).length;
-    log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
-    Object.entries(orphanMap).forEach(([uploadId, info]) => {
-        log.info('orphaned MPU found', {
-            bucket, uploadId,
-            partCount: info.partKeys.length,
-            sproxydKeyCount: info.sproxydKeys.size,
-        });
-    });
-    if (orphanCount === 0) {
-        return;
-    }
-
-    // --- Phase 2: scan original bucket versions to find any completed MPU
-    //     objects that share sproxyd keys with orphaned parts, then delete
-    //     orphaned data (not part of the completed MPU). ---
-
-    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_PAGE_SIZE, retry: RETRY_PARAMS })) {
+/**
+ * Phase 2: scan all object versions in the original bucket to find completed
+ * MPU objects that share sproxyd keys with orphaned parts, delete only the
+ * orphaned keys (those not referenced by the completed object), then delete
+ * all remaining orphans unconditionally.
+ */
+async function cleanupOrphans(bucket, shadowBucket, orphanMap) {
+    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, {
+        pageSize: LISTING_PAGE_SIZE,
+        retry: RETRY_PARAMS,
+    })) {
         if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
             continue;
         }
@@ -333,6 +320,27 @@ async function processBucket(bucket) {
         );
         delete orphanMap[uploadId];
     }
+}
+
+async function processBucket(bucket) {
+    const shadowBucket = `mpuShadowBucket${bucket}`;
+
+    log.info('scanning MPU shadow bucket', { bucket, shadowBucket });
+
+    const orphanMap = await buildOrphanMap(bucket, shadowBucket);
+    const orphanCount = Object.keys(orphanMap).length;
+    log.info('phase 1 complete', { bucket, orphanedUploadIds: orphanCount });
+    Object.entries(orphanMap).forEach(([uploadId, info]) => {
+        log.info('orphaned MPU found', {
+            bucket, uploadId,
+            partCount: info.partKeys.length,
+            sproxydKeyCount: info.sproxydKeys.size,
+        });
+    });
+    if (orphanCount === 0) {
+        return;
+    }
+    await cleanupOrphans(bucket, shadowBucket, orphanMap);
     log.info('phase 2 complete', { bucket });
 }
 
