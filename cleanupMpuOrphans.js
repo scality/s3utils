@@ -6,7 +6,7 @@ const werelogs = require('werelogs');
 const httpRequest = require('./utils/async/httpRequest');
 const listVersions = require('./utils/async/bucketd/listVersions');
 
-const DEFAULT_LISTING_LIMIT = 1000;
+const DEFAULT_LISTING_PAGE_SIZE = 1000;
 
 const {
     BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
@@ -26,10 +26,10 @@ if (TRACE) {
 }
 werelogs.configure({ level: logLevel, dump: 'error' });
 
-const LISTING_LIMIT = (
-    process.env.LISTING_LIMIT
-        && Number.parseInt(process.env.LISTING_LIMIT, 10))
-      || DEFAULT_LISTING_LIMIT;
+const LISTING_PAGE_SIZE = (
+    process.env.LISTING_PAGE_SIZE
+        && Number.parseInt(process.env.LISTING_PAGE_SIZE, 10))
+      || DEFAULT_LISTING_PAGE_SIZE;
 
 const USAGE = `
 cleanupMpuOrphans.js
@@ -50,7 +50,7 @@ Mandatory environment variables:
 Optional environment variables:
     VERBOSE: set to 1 for more verbose output
     TRACE: set to 1 to trace every request to bucketd and sproxyd
-    LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
+    LISTING_PAGE_SIZE: number of keys to list per listing request (default ${DEFAULT_LISTING_PAGE_SIZE})
 `;
 
 if (!BUCKETS && !RAFT_SESSIONS) {
@@ -173,7 +173,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
         let isTruncated = true;
         while (isTruncated) {
             const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
-                + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_LIMIT}`
+                + `?prefix=overview%2E%2E%7C%2E%2E&maxKeys=${LISTING_PAGE_SIZE}`
                 + `&marker=${encodeURIComponent(marker)}`;
             // eslint-disable-next-line no-await-in-loop
             const { Contents, IsTruncated } = await async.retry(
@@ -209,7 +209,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
     let isTruncated = true;
     while (isTruncated) {
         const url = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}`
-            + `?maxKeys=${LISTING_LIMIT}`
+            + `?maxKeys=${LISTING_PAGE_SIZE}`
             + `&marker=${encodeURIComponent(partsMarker)}`;
         // eslint-disable-next-line no-await-in-loop
         const { Contents, IsTruncated } = await async.retry(
@@ -306,7 +306,7 @@ async function processBucket(bucket) {
     //     objects that share sproxyd keys with orphaned parts, then delete
     //     orphaned data (not part of the completed MPU). ---
 
-    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_LIMIT, retry: { times: 100, interval: 5000 } })) {
+    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_PAGE_SIZE, retry: { times: 100, interval: 5000 } })) {
         if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
             continue;
         }
