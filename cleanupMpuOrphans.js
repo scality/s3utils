@@ -7,6 +7,7 @@ const httpRequest = require('./utils/async/httpRequest');
 const listVersions = require('./utils/async/bucketd/listVersions');
 
 const DEFAULT_LISTING_PAGE_SIZE = 1000;
+const RETRY_PARAMS = { times: 100, interval: 5000 };
 
 const {
     BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
@@ -84,7 +85,7 @@ let sproxydAlias;
 
 async function getSproxydAlias() {
     const url = `http://${SPROXYD_HOSTPORT}/.conf`;
-    const res = await httpRequest('GET', url);
+    const res = await httpRequest('GET', url, RETRY_PARAMS);
     if (res.statusCode !== 200) {
         throw new Error(`GET ${url} returned status ${res.statusCode}`);
     }
@@ -99,7 +100,7 @@ async function raftSessionsToBuckets() {
     const rsList = RAFT_SESSIONS.split(',');
     await Promise.all(rsList.map(async rs => {
         const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
-        const res = await httpRequest('GET', url);
+        const res = await httpRequest('GET', url, RETRY_PARAMS);
         if (res.statusCode !== 200) {
             throw new Error(`GET ${url} returned status ${res.statusCode}`);
         }
@@ -119,7 +120,7 @@ async function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, k
     for (const sproxydKey of keysToDelete) {
         const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
         try {
-            const res = await httpRequest('DELETE', sproxydUrl); // eslint-disable-line no-await-in-loop
+            const res = await httpRequest('DELETE', sproxydUrl, RETRY_PARAMS); // eslint-disable-line no-await-in-loop
             if (res.statusCode !== 200) {
                 log.error('failed to delete orphaned sproxyd key', {
                     bucket, uploadId, sproxydKey, error: { statusCode: res.statusCode },
@@ -137,7 +138,7 @@ async function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, k
         const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
             + encodeURIComponent(partKey);
         try {
-            const res = await httpRequest('DELETE', partUrl); // eslint-disable-line no-await-in-loop
+            const res = await httpRequest('DELETE', partUrl, RETRY_PARAMS); // eslint-disable-line no-await-in-loop
             if (res.statusCode !== 200 && res.statusCode !== 404) {
                 log.error('failed to delete orphaned part metadata', {
                     bucket, uploadId, partKey, error: { statusCode: res.statusCode },
@@ -179,7 +180,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
             const { Contents, IsTruncated } = await async.retry(
                 { times: 100, interval: 5000 },
                 async () => {
-                    const res = await httpRequest('GET', url);
+                    const res = await httpRequest('GET', url, RETRY_PARAMS);
                     if (res.statusCode === 404) {
                         return { Contents: [], IsTruncated: false };
                     }
@@ -215,7 +216,7 @@ async function buildOrphanMap(bucket, shadowBucket) {
         const { Contents, IsTruncated } = await async.retry(
             { times: 100, interval: 5000 },
             async () => {
-                const res = await httpRequest('GET', url);
+                const res = await httpRequest('GET', url, RETRY_PARAMS);
                 if (res.statusCode === 404) {
                     return { Contents: [], IsTruncated: false };
                 }
@@ -306,7 +307,7 @@ async function processBucket(bucket) {
     //     objects that share sproxyd keys with orphaned parts, then delete
     //     orphaned data (not part of the completed MPU). ---
 
-    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_PAGE_SIZE, retry: { times: 100, interval: 5000 } })) {
+    for await (const { value: resolvedMd } of listVersions(BUCKETD_HOSTPORT, bucket, { pageSize: LISTING_PAGE_SIZE, retry: RETRY_PARAMS })) {
         if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]) {
             continue;
         }
