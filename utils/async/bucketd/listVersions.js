@@ -93,8 +93,8 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  * @param {string} bucketdHostport - host:port of the bucketd endpoint
  * @param {string} bucket - name of the bucket to list
  * @param {object} [options]
- * @param {number} options.pageSize - number of entries requested per listing
- *   page (passed as maxKeys to bucketd)
+ * @param {number} [options.pageSize=1000] - number of entries requested per
+ *   listing page (passed as maxKeys to bucketd)
  * @param {number} [options.maxItems] - maximum total number of entries to
  *   yield; if omitted, all entries are yielded
  * @param {string} [options.prefix] - only yield entries whose key starts with
@@ -108,7 +108,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  *   (e.g. { times: 100, interval: 5000 }); by default requests are not retried
  */
 async function* listVersions(bucketdHostport, bucket, {
-    pageSize,
+    pageSize = 1000,
     maxItems,
     prefix = '',
     keyMarker: startKeyMarker = '',
