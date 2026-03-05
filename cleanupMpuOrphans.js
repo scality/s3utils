@@ -149,38 +149,42 @@ async function raftSessionsToBuckets() {
  * Delete orphaned sproxyd keys (keysToDelete) and all part metadata entries
  * for the given orphaned upload ID. Failures are logged but do not abort.
  */
-function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, cb) {
-    async.series([
-        done => async.eachSeries(keysToDelete, (sproxydKey, keyDone) => {
-            const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
-            httpRequest('DELETE', sproxydUrl, (err, res) => {
-                if (err || res.statusCode !== 200) {
-                    log.error('failed to delete orphaned sproxyd key', {
-                        bucket, uploadId, sproxydKey,
-                        error: err ? { message: err.message } : { statusCode: res.statusCode },
-                    });
-                } else {
-                    log.debug('deleted orphaned sproxyd key', { bucket, uploadId, sproxydKey });
-                }
-                keyDone();
+async function cleanupOrphanEntry(bucket, shadowBucket, uploadId, orphanEntry, keysToDelete) {
+    for (const sproxydKey of keysToDelete) {
+        const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${sproxydKey}`;
+        try {
+            const res = await httpRequestAsync('DELETE', sproxydUrl); // eslint-disable-line no-await-in-loop
+            if (res.statusCode !== 200) {
+                log.error('failed to delete orphaned sproxyd key', {
+                    bucket, uploadId, sproxydKey, error: { statusCode: res.statusCode },
+                });
+            } else {
+                log.debug('deleted orphaned sproxyd key', { bucket, uploadId, sproxydKey });
+            }
+        } catch (err) {
+            log.error('failed to delete orphaned sproxyd key', {
+                bucket, uploadId, sproxydKey, error: { message: err.message },
             });
-        }, done),
-        done => async.eachSeries(orphanEntry.partKeys, (partKey, partDone) => {
-            const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
-                + encodeURIComponent(partKey);
-            httpRequest('DELETE', partUrl, (err, res) => {
-                if (err || (res.statusCode !== 200 && res.statusCode !== 404)) {
-                    log.error('failed to delete orphaned part metadata', {
-                        bucket, uploadId, partKey,
-                        error: err ? { message: err.message } : { statusCode: res.statusCode },
-                    });
-                } else {
-                    log.debug('deleted orphaned part metadata', { bucket, uploadId, partKey });
-                }
-                partDone();
+        }
+    }
+    for (const partKey of orphanEntry.partKeys) {
+        const partUrl = `http://${BUCKETD_HOSTPORT}/default/bucket/${shadowBucket}/`
+            + encodeURIComponent(partKey);
+        try {
+            const res = await httpRequestAsync('DELETE', partUrl); // eslint-disable-line no-await-in-loop
+            if (res.statusCode !== 200 && res.statusCode !== 404) {
+                log.error('failed to delete orphaned part metadata', {
+                    bucket, uploadId, partKey, error: { statusCode: res.statusCode },
+                });
+            } else {
+                log.debug('deleted orphaned part metadata', { bucket, uploadId, partKey });
+            }
+        } catch (err) {
+            log.error('failed to delete orphaned part metadata', {
+                bucket, uploadId, partKey, error: { message: err.message },
             });
-        }, done),
-    ], cb);
+        }
+    }
 }
 
 /**
@@ -501,10 +505,8 @@ async function processBucket(bucket) {
         // Only delete sproxyd keys not referenced by the completed object
         const keysToDelete = [...orphanEntry.sproxydKeys]
             .filter(k => !locationKeys.has(k));
-        await new Promise(resolve => // eslint-disable-line no-await-in-loop
-            cleanupOrphanEntry(
-                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
-            )
+        await cleanupOrphanEntry( // eslint-disable-line no-await-in-loop
+            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete
         );
         delete orphanMap[uploadId];
     }
@@ -512,10 +514,8 @@ async function processBucket(bucket) {
     for (const uploadId of Object.keys(orphanMap)) {
         const orphanEntry = orphanMap[uploadId];
         const keysToDelete = [...orphanEntry.sproxydKeys];
-        await new Promise(resolve => // eslint-disable-line no-await-in-loop
-            cleanupOrphanEntry(
-                bucket, shadowBucket, uploadId, orphanEntry, keysToDelete, resolve
-            )
+        await cleanupOrphanEntry( // eslint-disable-line no-await-in-loop
+            bucket, shadowBucket, uploadId, orphanEntry, keysToDelete
         );
         delete orphanMap[uploadId];
     }
