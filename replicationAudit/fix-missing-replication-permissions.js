@@ -30,7 +30,6 @@
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const { parseArgs } = require('util');
 const { Client: VaultClient } = require('vaultclient');
 const AWS = require('aws-sdk');
 
@@ -49,17 +48,27 @@ function log(message) {
 }
 
 // ===========================================================================
-// Argument parsing (Node.js 22+ built-in util.parseArgs)
+// Argument parsing (manual process.argv for Node 16+ compatibility)
 // ===========================================================================
 function getConfig() {
-    const { values, positionals } = parseArgs({
-        allowPositionals: true,
-        options: {
-            'iam-port': { type: 'string', default: '8600' },
-            'https': { type: 'boolean', default: false },
-            'dry-run': { type: 'boolean', default: false },
-        },
-    });
+    const args = process.argv.slice(2);
+
+    const positionals = [];
+    let iamPort = 8600;
+    let useHttps = false;
+    let dryRun = false;
+
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--iam-port') {
+            iamPort = parseInt(args[++i], 10);
+        } else if (args[i] === '--https') {
+            useHttps = true;
+        } else if (args[i] === '--dry-run') {
+            dryRun = true;
+        } else {
+            positionals.push(args[i]);
+        }
+    }
 
     if (positionals.length < 3) {
         log('Usage: node fix-missing-replication-permissions.js'
@@ -72,11 +81,11 @@ function getConfig() {
     return {
         inputFile,
         vaultHost,
-        iamPort: parseInt(values['iam-port'], 10),
+        iamPort,
         adminConfig,
-        useHttps: values.https,
+        useHttps,
         outputFile: outputFile || 'replication-fix-results.json',
-        dryRun: values['dry-run'],
+        dryRun,
     };
 }
 
