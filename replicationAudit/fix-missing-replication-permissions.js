@@ -60,6 +60,9 @@ function getConfig() {
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--iam-port') {
+            if (i + 1 >= args.length) {
+                throw new Error('Missing value for --iam-port');
+            }
             iamPort = parseInt(args[++i], 10);
         } else if (args[i] === '--https') {
             useHttps = true;
