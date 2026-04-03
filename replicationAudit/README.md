@@ -39,16 +39,17 @@ ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
 # Step 3: Find the vault-metadata repd leader IP (port 5300)
 ansible -i env/$ENV_DIR/inventory md1-cluster1 -m shell \
     -a 'curl -s http://localhost:5300/_/raft/leader'
-# Note the "ip" value from the output, e.g., {"ip":"10.160.116.162","port":4300}
+# Note both "ip" and "port" values, e.g., {"ip":"10.160.116.162","port":4300}
+# On 3-server rings the port may differ per node (4300, 4301, etc.)
 
-# Step 4: Set the LEADER_IP variable and run the permission check script
+# Step 4: Set the LEADER variable (ip:port) and run the permission check script
 # Note: replace ctrctl with docker on RHEL/CentOS 7
-LEADER_IP=<leader-ip-from-step-3>
+LEADER=<leader-ip>:<leader-port-from-step-3>
 
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
     -a "cp /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
         ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
-        /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
+        /logs/buckets-with-replication.json $LEADER /logs/missing.json"
 
 # Step 5: Retrieve results
 ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
@@ -276,19 +277,20 @@ This ensures portability while using the exact same protocol and key formats as 
        -a 'curl -s http://localhost:5300/_/raft/leader'
    ```
 
-   This returns JSON like `{"ip":"10.160.116.162","port":4300}` - use the `ip` value.
+   This returns JSON like `{"ip":"10.160.116.162","port":4300}` - use both `ip`
+   and `port` values. On 3-server rings the port may differ per node (4300, 4301, etc.).
 
    **Note:** Vault metadata uses port 5300 for admin.
 
 6. Copy files to `/var/tmp` (mounted in vault container) and run the script:
 
    ```bash
-   LEADER_IP=<leader-ip-from-step-5>
+   LEADER=<leader-ip>:<leader-port-from-step-5>
 
    ansible -i env/$ENV_DIR/inventory runners_s3[0] -m shell \
        -a "cp /root/buckets-with-replication.json {{ env_host_logs}}/scality-vault{{ container_name_suffix | default("")}}/logs && \
            ctrctl exec scality-vault{{ container_name_suffix | default("")}} node /logs/check-replication-permissions.js \
-           /logs/buckets-with-replication.json $LEADER_IP /logs/missing.json"
+           /logs/buckets-with-replication.json $LEADER /logs/missing.json"
    ```
 
 8. Retrieve the output:
@@ -301,13 +303,13 @@ This ensures portability while using the exact same protocol and key formats as 
 ### Command Line Arguments
 
 ```
-node check-replication-permissions.js [input-file] [leader-ip] [output-file] [--include-policies]
+node check-replication-permissions.js [input-file] [leader-ip[:port]] [output-file] [--include-policies]
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `input-file` | /root/buckets-with-replication.json | Input JSON from list script |
-| `leader-ip` | 127.0.0.1 | Vault-metadata repd leader IP |
+| `leader-ip[:port]` | 127.0.0.1:4300 | Vault-metadata repd leader IP and optional port (default 4300) |
 | `output-file` | /root/missing-replication-permissions.json | Output file path |
 | `--include-policies` | (not set) | Include full policy documents in output |
 
@@ -426,7 +428,7 @@ In this example, the policy is missing `s3:ReplicateObject` - it only has
 
 ### Script Logic
 
-1. **Connects to repd**: TCP connection to vault-metadata repd on port 4300
+1. **Connects to repd**: TCP connection to vault-metadata repd (default port 4300, configurable via `ip:port` argument)
 2. **For each bucket's replication role**:
    - Get role ID: `linkRoleArn(arn)` → role ID
    - List attached policies: `policyByRoleId(accountId, roleId, '', '')`
@@ -490,9 +492,10 @@ Output saved to: /tmp/missing.json
 
 **Connection timeout or refused**
 
-- Ensure you're connecting to the correct repd leader IP
-- The script must run inside a container that can reach repd on port 4300
-- Find the leader: `curl -s http://localhost:5300/_/raft/leader`
+- Ensure you're connecting to the correct repd leader IP **and port**
+- On 3-server rings, the leader port may not be 4300 (e.g. 4301, 4302)
+- Find the leader: `curl -s http://localhost:5300/_/raft/leader` — use both `ip` and `port` from the response
+- The script must run inside a container that can reach repd on the leader port
 
 **Script timeout**
 
