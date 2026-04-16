@@ -1,12 +1,13 @@
 {
   "name": "s3utils",
-  "version": "1.17.6",
+  "version": "1.17.7",
   "engines": {
     "node": ">= 22"
   },
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
+    "jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/unit --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
     "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/functional --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
   },
@@ -28,7 +29,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/node-http-handler": "^3.374.0",
-    "@scality/cloudserverclient": "^1.0.4",
+    "@scality/cloudserverclient": "^1.0.8",
     "@senx/warp10": "^2.0.3",
     "@smithy/util-retry": "^4.0.7",
     "JSONStream": "^1.3.5",
