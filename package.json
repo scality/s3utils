@@ -7,6 +7,7 @@
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
+    "jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/unit --testPathPattern='tests/unit/[\\w/-]+\\.[tj]s'",
     "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/functional --testPathPattern='tests/functional/[\\w/-]+\\.[tj]s'"
   },
