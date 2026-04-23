@@ -6,13 +6,15 @@
  * Checks if replication roles have s3:ReplicateObject permission
  * by querying Vault metadata directly via repd protocol.
  *
- * Usage: node check-replication-permissions.js [input-file] [leader-ip] [output-file]
+ * Usage: node check-replication-permissions.js [input-file] [leader-ip[:port]] [output-file]
  *
  * How it connects to vault metadata:
  *
  *   Vault metadata has no HTTP frontend (no bucketd). This script connects
- *   directly to repd (the raft-based metadata store) on TCP port 4300
- *   using a simple protocol: 4-byte length prefix + JSON payload.
+ *   directly to repd (the raft-based metadata store) using a simple
+ *   protocol: 4-byte length prefix + JSON payload. The default repd port
+ *   is 4300 but can be overridden via the leader-ip argument (e.g.
+ *   10.0.0.1:4301).
  */
 
 const net = require('net');
@@ -21,11 +23,23 @@ const fs = require('fs');
 // ===========================================================================
 // Configuration
 // ===========================================================================
+
+/** Parse a leader address string into { ip, port } */
+function parseLeaderAddress(address) {
+    if (!address) {
+        return { ip: '127.0.0.1', port: 4300 };
+    }
+    const [ip, portStr] = address.split(':');
+    return { ip, port: portStr ? parseInt(portStr, 10) : 4300 };
+}
+
+const parsedLeader = parseLeaderAddress(process.argv[3]);
+
 const CONFIG = {
     inputFile: process.argv[2] || '/root/buckets-with-replication.json',
-    leaderIp: process.argv[3] || '127.0.0.1',
+    leaderIp: parsedLeader.ip,
     outputFile: process.argv[4] || '/root/missing-replication-permissions.json',
-    repdPort: 4300,
+    repdPort: parsedLeader.port,
     dbName: 'vaultdb',
     includePolicies: process.argv.includes('--include-policies'),
     requestTimeoutMs: 10000,
@@ -476,5 +490,6 @@ if (require.main === module) {
 
 // Export for testing
 module.exports = {
+    parseLeaderAddress,
     policyAllowsReplication,
 };
