@@ -99,9 +99,24 @@ jobs:
           tmate-server-ed25519-fingerprint: ${{ secrets.TMATE_SERVER_ED25519_FINGERPRINT }}
         if: failure() && runner.debug == '1'
 
+  go-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: BackupRepair/go.mod
+      - name: Run Go tests
+        run: go test -v ./...
+        working-directory: BackupRepair
+
   build:
     name: Build and Push
     needs:
       - tests
+      - go-tests
     uses: ./.github/workflows/build.yml
     secrets: inherit
