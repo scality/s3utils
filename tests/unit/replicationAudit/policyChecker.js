@@ -1,6 +1,29 @@
 const {
+    parseLeaderAddress,
     policyAllowsReplication,
 } = require('../../../replicationAudit/check-replication-permissions');
+
+describe('parseLeaderAddress', () => {
+    test('ip only defaults port to 4300', () => {
+        expect(parseLeaderAddress('10.0.0.1')).toEqual({ ip: '10.0.0.1', port: 4300 });
+    });
+
+    test('ip:port extracts both', () => {
+        expect(parseLeaderAddress('10.0.0.1:4301')).toEqual({ ip: '10.0.0.1', port: 4301 });
+    });
+
+    test('undefined defaults to 127.0.0.1:4300', () => {
+        expect(parseLeaderAddress(undefined)).toEqual({ ip: '127.0.0.1', port: 4300 });
+    });
+
+    test('empty string defaults to 127.0.0.1:4300', () => {
+        expect(parseLeaderAddress('')).toEqual({ ip: '127.0.0.1', port: 4300 });
+    });
+
+    test('custom high port', () => {
+        expect(parseLeaderAddress('172.16.0.5:4304')).toEqual({ ip: '172.16.0.5', port: 4304 });
+    });
+});
 
 describe('policyAllowsReplication', () => {
     const bucketName = 'source-bucket';
