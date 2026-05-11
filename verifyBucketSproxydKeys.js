@@ -196,7 +196,7 @@ function logProgress(message) {
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
         haveDupVersionIds: status.objectsWithDupVersionIds,
         haveBrokenMetadata: status.objectsWithBrokenMetadata,
-        errors: status.objectErrors,
+        errors: status.objectsErrors,
         url: getObjectURL(status.bucketInProgress, status.KeyMarker),
     });
 }
@@ -662,7 +662,12 @@ function main() {
     });
 }
 
-main();
+// Run the scan when this file is launched as a CLI. Skip it when a test
+// requires the file as a module — the test will drive logProgress directly
+// using the exports at the bottom of the file.
+if (require.main === module) {
+    main();
+}
 
 function stop() {
     if (digestsStream) {
@@ -678,4 +683,9 @@ process.on('SIGHUP', stop);
 process.on('SIGQUIT', stop);
 process.on('SIGTERM', stop);
 
-module.exports = { httpRequest };
+module.exports = {
+    httpRequest,
+    status,
+    log,
+    logProgress,
+};
