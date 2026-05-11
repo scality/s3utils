@@ -662,11 +662,17 @@ function main() {
     });
 }
 
-// Run the scan when this file is launched as a CLI. Skip it when a test
-// requires the file as a module — the test will drive logProgress directly
-// using the exports at the bottom of the file.
+// Run the scan and wire up signal handlers only when this file is launched
+// as a CLI. Skip both when a test requires the file as a module — otherwise
+// the SIGINT / SIGTERM handlers would register against the Jest worker
+// process and `stop()` could silently exit it on signal (which would mask
+// CI timeouts as passing runs).
 if (require.main === module) {
     main();
+    process.on('SIGINT', stop);
+    process.on('SIGHUP', stop);
+    process.on('SIGQUIT', stop);
+    process.on('SIGTERM', stop);
 }
 
 function stop() {
@@ -677,11 +683,6 @@ function stop() {
     logProgress('last status');
     process.exit(0);
 }
-
-process.on('SIGINT', stop);
-process.on('SIGHUP', stop);
-process.on('SIGQUIT', stop);
-process.on('SIGTERM', stop);
 
 module.exports = {
     httpRequest,
