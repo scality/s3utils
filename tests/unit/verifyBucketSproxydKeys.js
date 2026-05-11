@@ -212,7 +212,7 @@ describe('verifyBucketSproxydKeys — summary line emits errors count (S3UTILS-2
         logSpy.mockRestore();
     });
 
-    test('emits errors count from status.objectsErrors when non-404 sproxyd errors have been counted', () => {
+    test('should emit errors count from status.objectsErrors when non-404 sproxyd errors have been counted', () => {
         // Use the customer's actual numbers from the bug report: 59,011
         // objects scanned, 27,152 sproxyd errors.
         vbsk.status.objectsScanned = 59011;
@@ -226,18 +226,18 @@ describe('verifyBucketSproxydKeys — summary line emits errors count (S3UTILS-2
         }));
     });
 
-    test('emits errors: 0 (key present, not undefined) when no errors have been counted', () => {
+    test('should emit errors: 0 (key present, not undefined) when no errors have been counted', () => {
         // A clean scan should still emit `errors: 0` in the summary. If the
         // read were misspelled, the value would be undefined and the key
-        // would vanish from the output entirely — so we assert both the
-        // value and the presence of the key.
+        // would vanish from the output entirely — so we first assert the
+        // key is present, then assert the value is 0.
         vbsk.status.objectsScanned = 100;
         vbsk.status.objectsErrors = 0;
 
         vbsk.logProgress('completed scan');
 
         const emitted = logSpy.mock.calls[0][1];
-        expect(emitted.errors).toBe(0);
         expect('errors' in emitted).toBe(true);
+        expect(emitted.errors).toBe(0);
     });
 });
