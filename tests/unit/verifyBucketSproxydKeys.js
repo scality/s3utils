@@ -168,3 +168,76 @@ describe('verifyBucketSproxydKeys', () => {
         });
     });
 });
+
+// Regression test for the bug where `logProgress` read `status.objectErrors`
+// (typo — missing the 's') instead of `status.objectsErrors`. Because
+// JSON.stringify drops undefined values, the `errors` field was silently
+// missing from the summary log line even when non-404 sproxyd errors had
+// been counted. A customer scan with ~27,000 HTTP 422s looked clean as a
+// result. The test below sets the counter, calls logProgress, and checks
+// the emitted summary contains the expected `errors` value.
+
+// The script reads these env vars at startup and exits if any are missing,
+// so we set them before the require. The hosts are fake — no real requests
+// are made because main() doesn't run when the file is required from a test.
+process.env.SPROXYD_HOSTPORT = process.env.SPROXYD_HOSTPORT || 'fake-sproxyd:9999';
+process.env.BUCKETD_HOSTPORT = process.env.BUCKETD_HOSTPORT || 'fake-bucketd:9998';
+process.env.BUCKETS = process.env.BUCKETS || 'test-bucket';
+
+// The script registers a periodic-progress timer at startup. If we leave it
+// alone the timer keeps the Jest worker alive after the tests finish and
+// Jest crashes with "child process exceptions". Swap setInterval for a
+// no-op while we require the file, then put it back so Jest's own internal
+// timers continue to work.
+const origSetInterval = global.setInterval;
+global.setInterval = () => undefined;
+const vbsk = require('../../verifyBucketSproxydKeys');
+global.setInterval = origSetInterval;
+
+describe('verifyBucketSproxydKeys — summary line emits errors count (S3UTILS-236)', () => {
+    let logSpy;
+
+    beforeEach(() => {
+        // Reset the counters so each test starts from zero.
+        Object.keys(vbsk.status).forEach(k => {
+            if (typeof vbsk.status[k] === 'number') {
+                vbsk.status[k] = 0;
+            }
+        });
+        // Spy on the logger so we can inspect what logProgress emits.
+        logSpy = jest.spyOn(vbsk.log, 'info').mockImplementation();
+    });
+
+    afterEach(() => {
+        logSpy.mockRestore();
+    });
+
+    test('emits errors count from status.objectsErrors when non-404 sproxyd errors have been counted', () => {
+        // Use the customer's actual numbers from the bug report: 59,011
+        // objects scanned, 27,152 sproxyd errors.
+        vbsk.status.objectsScanned = 59011;
+        vbsk.status.objectsErrors = 27152;
+
+        vbsk.logProgress('completed scan');
+
+        expect(logSpy).toHaveBeenCalledWith('completed scan', expect.objectContaining({
+            scanned: 59011,
+            errors: 27152,
+        }));
+    });
+
+    test('emits errors: 0 (key present, not undefined) when no errors have been counted', () => {
+        // A clean scan should still emit `errors: 0` in the summary. If the
+        // read were misspelled, the value would be undefined and the key
+        // would vanish from the output entirely — so we assert both the
+        // value and the presence of the key.
+        vbsk.status.objectsScanned = 100;
+        vbsk.status.objectsErrors = 0;
+
+        vbsk.logProgress('completed scan');
+
+        const emitted = logSpy.mock.calls[0][1];
+        expect(emitted.errors).toBe(0);
+        expect('errors' in emitted).toBe(true);
+    });
+});
