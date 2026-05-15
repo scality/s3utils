@@ -17,6 +17,7 @@ const {
     OBJECT_REPAIR_TLS_KEY_PATH,
     OBJECT_REPAIR_TLS_CERT_PATH,
     OBJECT_REPAIR_TLS_CA_PATH,
+    OBJECT_REPAIR_SOCKET_TIMEOUT_SECONDS,
 } = process.env;
 
 const useHttps = (OBJECT_REPAIR_TLS_KEY_PATH !== undefined
@@ -38,9 +39,11 @@ const bucketdAgent = useHttps
             ? [fs.readFileSync(OBJECT_REPAIR_TLS_CA_PATH)]
             : undefined,
         keepAlive: true,
+        timeout: (Number(OBJECT_REPAIR_SOCKET_TIMEOUT_SECONDS) || 300) * 1000,
     })
     : new httpArsn.Agent({
         keepAlive: true,
+        timeout: (Number(OBJECT_REPAIR_SOCKET_TIMEOUT_SECONDS) || 300) * 1000,
     });
 
 let sproxydAlias;
