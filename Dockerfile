@@ -1,5 +1,10 @@
 ARG NODE_VERSION=22.15.0-bookworm-slim
 
+FROM golang:1.24 AS go-builder
+WORKDIR /src
+COPY BackupRepair/ .
+RUN CGO_ENABLED=0 go build -o /backup-repair .
+
 # Use separate builder to retrieve & build node modules
 FROM node:${NODE_VERSION} AS builder
 
@@ -46,6 +51,7 @@ COPY ./ ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules/
 
 COPY --from=builder /usr/src/app/supervisord /usr/local/bin/
+COPY --from=go-builder /backup-repair /usr/src/app/
 
 ENV NO_PROXY localhost,127.0.0.1
 ENV no_proxy localhost,127.0.0.1
