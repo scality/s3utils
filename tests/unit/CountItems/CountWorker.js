@@ -223,6 +223,42 @@ describe('CountItems::CountWorker', () => {
         });
     });
 
+    test('should nullify unsupported serialized bucket info fields', done => {
+        const testSendFn = jest.fn();
+        const w = new CountWorker({
+            log: new DummyLogger(),
+            sendFn: testSendFn,
+            client: mongoMock,
+        });
+        const bucketInfo = {
+            _name: 'test-bucket',
+            _owner: 'any',
+            _ownerDisplayName: 'any',
+            _creationDate: Date.now().toString(),
+            _websiteConfiguration: {
+                _indexDocument: 'index.html',
+            },
+            _bucketLoggingStatus: {
+                _loggingEnabled: {
+                    TargetBucket: 'target-bucket',
+                    TargetPrefix: 'logs/',
+                },
+            },
+        };
+        w.getIsTransient = jest.fn((bucketInfo, cb) => cb(null, true));
+        mongoMock.setup.mockImplementationOnce(cb => cb());
+        mongoMock.close.mockImplementationOnce(cb => cb());
+        mongoMock.client.isConnected.mockImplementationOnce(() => false);
+        mongoMock.getObjectMDStats.mockImplementationOnce((_a, _b, _c, _d, cb) => cb(null, { value: 42 }));
+        w.countItems(bucketInfo, (err, results) => {
+            expect(err).toBeNull();
+            expect(results).toEqual({ value: 42 });
+            expect(bucketInfo._websiteConfiguration).toBeNull();
+            expect(bucketInfo._bucketLoggingStatus).toBeNull();
+            done();
+        });
+    });
+
     describe('CountWorker.getIsTransient method', () => {
         let worker;
         let mockBucketInfo;
