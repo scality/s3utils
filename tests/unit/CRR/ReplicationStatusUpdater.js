@@ -8,6 +8,7 @@ const {
     listVersionsRes,
     listVersionWithMarkerRes,
     getMetadataRes,
+    getBucketReplicationV2Res,
     objectMd,
 } = require('../../utils/crr');
 
@@ -901,6 +902,337 @@ describe('ReplicationStatusUpdater model version guard', () => {
             assert.strictEqual(crr._nUpdated, 1);
             assert.strictEqual(crr._nSkipped, 0);
             assert.strictEqual(crr._nErrors, 0);
+            done();
+        });
+    });
+});
+
+describe('ReplicationStatusUpdater V2 format', () => {
+    // V2 config: rule1 (prefix='', dest-A) and rule2 (prefix='docs/', dest-B)
+    // Object key 'key0' matches only rule1 (dest-A)
+    it('should mark object pending for matching V2 rule (single match)', done => {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger, {
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            // V2 metadata: no top-level destination/storageClass/storageType
+            expect(repInfo.destination).toBeUndefined();
+            expect(repInfo.storageClass).toBeUndefined();
+            expect(repInfo.storageType).toBeUndefined();
+
+            // Source role only at top level
+            expect(repInfo.role).toBe('arn:aws:iam::8765432:role/sourceRole');
+
+            // Backend has per-entry destination and role (account replaced)
+            expect(repInfo.backends).toHaveLength(1);
+            expect(repInfo.backends[0]).toMatchObject({
+                site: 'dest-A',
+                status: 'PENDING',
+                destination: 'arn:aws:s3:::bucket-a',
+                role: 'arn:aws:iam::222222222222:role/repRule',
+                dataStoreVersionId: '',
+            });
+
+            // All pending → top-level PROCESSING (mixed) or PENDING (all same)
+            expect(repInfo.status).toBe('PROCESSING');
+
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nUpdated, 1);
+            assert.strictEqual(crr._nSkipped, 0);
+            done();
+        });
+    });
+
+    it('should mark object pending for both V2 rules when key matches both prefixes', done => {
+        const listVersionDocsKey = {
+            IsTruncated: false,
+            Versions: [{
+                ETag: '"abc"',
+                ChecksumAlgorithm: [],
+                Size: 100,
+                StorageClass: 'STANDARD',
+                Key: 'docs/report.pdf',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
+                IsLatest: true,
+                LastModified: '2024-01-05T13:11:31.861Z',
+                Owner: { DisplayName: 'bart', ID: '0' },
+            }],
+            DeleteMarkers: [],
+            Name: 'bucket0',
+            MaxKeys: 1000,
+            CommonPrefixes: [],
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger, {
+            ListObjectVersionsCommand: listVersionDocsKey,
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            // Both backends present
+            expect(repInfo.backends).toHaveLength(2);
+            const siteA = repInfo.backends.find(b => b.site === 'dest-A');
+            const siteB = repInfo.backends.find(b => b.site === 'dest-B');
+            expect(siteA).toMatchObject({
+                status: 'PENDING',
+                destination: 'arn:aws:s3:::bucket-a',
+                role: 'arn:aws:iam::222222222222:role/repRule',
+            });
+            expect(siteB).toMatchObject({
+                status: 'PENDING',
+                destination: 'arn:aws:s3:::bucket-b',
+                role: 'arn:aws:iam::333333333333:role/repRule',
+            });
+
+            expect(repInfo.destination).toBeUndefined();
+            expect(repInfo.storageClass).toBeUndefined();
+            expect(repInfo.storageType).toBeUndefined();
+
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should skip object when no V2 rule matches its key prefix', done => {
+        const listVersionLogsKey = {
+            IsTruncated: false,
+            Versions: [{
+                ETag: '"abc"',
+                ChecksumAlgorithm: [],
+                Size: 100,
+                StorageClass: 'STANDARD',
+                Key: 'logs/app.log',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItW',
+                IsLatest: true,
+                LastModified: '2024-01-05T13:11:31.861Z',
+                Owner: { DisplayName: 'bart', ID: '0' },
+            }],
+            DeleteMarkers: [],
+            Name: 'bucket0',
+            MaxKeys: 1000,
+            CommonPrefixes: [],
+        };
+
+        // V2 config with only a 'docs/' prefix rule (no empty-prefix catch-all)
+        const v2DocsOnly = {
+            ReplicationConfiguration: {
+                Role: 'arn:aws:iam::8765432:role/sourceRole',
+                Rules: [{
+                    ID: 'rule-docs',
+                    Filter: { Prefix: 'docs/' },
+                    Priority: 1,
+                    Status: 'Enabled',
+                    Destination: {
+                        Bucket: 'arn:aws:s3:::bucket-b',
+                        StorageClass: 'dest-B',
+                        Account: '333333333333',
+                    },
+                }],
+            },
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger, {
+            ListObjectVersionsCommand: listVersionLogsKey,
+            GetBucketReplicationCommand: v2DocsOnly,
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.getMetadata).not.toHaveBeenCalled();
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+
+            assert.strictEqual(crr._nProcessed, 0);
+            assert.strictEqual(crr._nSkipped, 1);
+            assert.strictEqual(crr._nUpdated, 0);
+            done();
+        });
+    });
+
+    it('should filter to SITE_NAME when set in V2 mode', done => {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            siteName: 'dest-A',
+        }, logger, {
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            // Only dest-A backend, not dest-B
+            expect(repInfo.backends).toHaveLength(1);
+            expect(repInfo.backends[0].site).toBe('dest-A');
+            done();
+        });
+    });
+
+    it('should skip V2 object when all applicable sites already match the existing status', done => {
+        // key0 only matches rule1 (prefix='', dest-A); dest-A is already COMPLETED; filter is NEW → skip
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger, {
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = {
+                status: 'COMPLETED',
+                role: 'arn:aws:iam::8765432:role/sourceRole',
+                backends: [{
+                    site: 'dest-A',
+                    status: 'COMPLETED',
+                    destination: 'arn:aws:s3:::bucket-a',
+                    role: 'arn:aws:iam::222222222222:role/repRule',
+                    dataStoreVersionId: '',
+                }],
+                content: ['METADATA', 'DATA'],
+            };
+            cb(null, { Body: JSON.stringify(md) });
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nProcessed, 1);
+            assert.strictEqual(crr._nSkipped, 1);
+            assert.strictEqual(crr._nUpdated, 0);
+            done();
+        });
+    });
+
+    it('should compute PROCESSING top-level status for docs key with mixed backend statuses in V2', done => {
+        const listVersionDocsKey = {
+            IsTruncated: false,
+            Versions: [{
+                ETag: '"abc"', ChecksumAlgorithm: [], Size: 100,
+                StorageClass: 'STANDARD', Key: 'docs/report.pdf',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItW', IsLatest: true,
+                LastModified: '2024-01-05T13:11:31.861Z',
+                Owner: { DisplayName: 'bart', ID: '0' },
+            }],
+            DeleteMarkers: [], Name: 'bucket0', MaxKeys: 1000, CommonPrefixes: [],
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+        }, logger, {
+            ListObjectVersionsCommand: listVersionDocsKey,
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        // dest-A already COMPLETED; dest-B is NEW → both rules match 'docs/report.pdf'
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = {
+                status: 'COMPLETED',
+                role: 'arn:aws:iam::8765432:role/sourceRole',
+                backends: [{
+                    site: 'dest-A',
+                    status: 'COMPLETED',
+                    destination: 'arn:aws:s3:::bucket-a',
+                    role: 'arn:aws:iam::222222222222:role/repRule',
+                    dataStoreVersionId: '',
+                }],
+                content: ['METADATA', 'DATA'],
+            };
+            cb(null, { Body: JSON.stringify(md) });
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            // dest-A COMPLETED, dest-B PENDING → PROCESSING
+            expect(repInfo.status).toBe('PROCESSING');
+            expect(repInfo.backends).toHaveLength(2);
+            const destA = repInfo.backends.find(b => b.site === 'dest-A');
+            const destB = repInfo.backends.find(b => b.site === 'dest-B');
+            expect(destA.status).toBe('COMPLETED');
+            expect(destB.status).toBe('PENDING');
+            done();
+        });
+    });
+
+    it('should update per-backend destination and role when forceUsingConfiguration is true in V2', done => {
+        // Use COMPLETED filter so the object (dest-A COMPLETED) is re-processed with forceUsingConfiguration
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['COMPLETED'],
+            forceUsingConfiguration: true,
+        }, logger, {
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        // Object has dest-A with stale destination/role
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = {
+                status: 'COMPLETED',
+                role: 'arn:aws:iam::8765432:role/sourceRole',
+                backends: [{
+                    site: 'dest-A',
+                    status: 'COMPLETED',
+                    destination: 'arn:aws:s3:::old-bucket',
+                    role: 'arn:aws:iam::999999999999:role/oldRole',
+                    dataStoreVersionId: '',
+                }],
+                content: ['METADATA', 'DATA'],
+            };
+            cb(null, { Body: JSON.stringify(md) });
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            const destA = repInfo.backends.find(b => b.site === 'dest-A');
+            expect(destA.destination).toBe('arn:aws:s3:::bucket-a');
+            expect(destA.role).toBe('arn:aws:iam::222222222222:role/repRule');
             done();
         });
     });
