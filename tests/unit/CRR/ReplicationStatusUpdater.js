@@ -907,6 +907,46 @@ describe('ReplicationStatusUpdater model version guard', () => {
     });
 });
 
+describe('ReplicationStatusUpdater _removeV1Fields', () => {
+    it('should delete V1-only top-level fields from replicationInfo', () => {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 1,
+            replicationStatusToProcess: ['NEW'],
+        }, logger);
+
+        const repInfo = {
+            status: 'PENDING',
+            destination: 'arn:aws:s3:::bucket',
+            storageClass: 'dest-A',
+            storageType: 'aws_s3',
+            dataStoreVersionId: 'v1',
+            role: 'arn:aws:iam::123:role/r',
+            backends: [],
+        };
+        crr._removeV1Fields(repInfo);
+        expect(repInfo.destination).toBeUndefined();
+        expect(repInfo.storageClass).toBeUndefined();
+        expect(repInfo.storageType).toBeUndefined();
+        expect(repInfo.dataStoreVersionId).toBeUndefined();
+        expect(repInfo.status).toBe('PENDING');
+        expect(repInfo.role).toBe('arn:aws:iam::123:role/r');
+    });
+
+    it('should be a no-op when V1 fields are already absent', () => {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 1,
+            replicationStatusToProcess: ['NEW'],
+        }, logger);
+
+        const repInfo = { status: 'PENDING', role: 'arn:aws:iam::123:role/r', backends: [] };
+        expect(() => crr._removeV1Fields(repInfo)).not.toThrow();
+        expect(repInfo.destination).toBeUndefined();
+        expect(repInfo.storageClass).toBeUndefined();
+    });
+});
+
 describe('ReplicationStatusUpdater V2 format', () => {
     // V2 config: rule1 (prefix='', dest-A) and rule2 (prefix='docs/', dest-B)
     // Object key 'key0' matches only rule1 (dest-A)
@@ -944,7 +984,7 @@ describe('ReplicationStatusUpdater V2 format', () => {
                 dataStoreVersionId: '',
             });
 
-            // All pending → top-level PROCESSING (mixed) or PENDING (all same)
+            // All pending → top-level PROCESSING
             expect(repInfo.status).toBe('PROCESSING');
 
             assert.strictEqual(crr._nProcessed, 1);

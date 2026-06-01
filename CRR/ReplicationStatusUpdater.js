@@ -118,18 +118,16 @@ class ReplicationStatusUpdater {
 
 
     /**
-     * Returns true if the replication config uses the legacy V1 format (any rule has a
+     * Returns true if the replication config uses the V1 format (any rule has a
      * comma-separated StorageClass, e.g. "dest-A,dest-B").
      * @private
      * @param {Object} repConfig - The replication configuration from GetBucketReplicationCommand.
      * @returns {boolean}
      */
-    _isLegacyFormat(repConfig) {
-        // Comma-separated StorageClass is always V1 (multiple destinations in one rule)
+    _isV1Format(repConfig) {
         if (repConfig.Rules.some(r => r.Destination.StorageClass?.includes(','))) {
             return true;
         }
-        // V2 rules carry Filter (object), Priority, or Destination.Account; V1 rules have none of these
         return repConfig.Rules.every(r =>
             r.Filter === undefined &&
             r.Priority === undefined &&
@@ -174,6 +172,72 @@ class ReplicationStatusUpdater {
         const destRole = roles.length > 1 ? roles[1].trim() : roles[0].trim();
         if (!account) { return destRole; }
         return destRole.replace(/(arn:aws:iam::)[^:]*(:)/, `$1${account}$2`);
+    }
+
+    /**
+     * Removes V1-only top-level fields from replicationInfo that have no meaning in V2 format.
+     * @private
+     * @param {Object} replicationInfo - The replication info object to mutate.
+     * @returns {void}
+     */
+    _removeV1Fields(replicationInfo) {
+        // eslint-disable-next-line no-param-reassign
+        delete replicationInfo.destination;
+        // eslint-disable-next-line no-param-reassign
+        delete replicationInfo.storageClass;
+        // eslint-disable-next-line no-param-reassign
+        delete replicationInfo.storageType;
+        // eslint-disable-next-line no-param-reassign
+        delete replicationInfo.dataStoreVersionId;
+    }
+
+    /**
+     * Initializes V2 replication info on objMD if it is missing or has no status.
+     * @private
+     * @param {ObjectMD} objMD - The object metadata.
+     * @param {string} sourceRole - The source-side IAM role ARN.
+     * @returns {Object} The (possibly newly created) replicationInfo object.
+     */
+    _initV2ReplicationInfo(objMD, sourceRole) {
+        let replicationInfo = objMD.getReplicationInfo();
+        if (!replicationInfo || !replicationInfo.status) {
+            const ops = objMD.getContentLength() === 0 ? ['METADATA'] : ['METADATA', 'DATA'];
+            objMD.setReplicationInfo({
+                status: 'PENDING',
+                role: sourceRole,
+                backends: [],
+                content: ops,
+                isNFS: null,
+            });
+            replicationInfo = objMD.getReplicationInfo();
+        }
+        return replicationInfo;
+    }
+
+    /**
+     * Applies matching rules to the backends list on objMD, setting each matched site to PENDING.
+     * @private
+     * @param {ObjectMD} objMD - The object metadata.
+     * @param {Array} rulesToUpdate - Pre-filtered rules to apply.
+     * @param {Object} repConfig - The full replication configuration.
+     * @returns {Array} The updated backends array.
+     */
+    _applyRulesToBackends(objMD, rulesToUpdate, repConfig) {
+        const backends = objMD.getReplicationBackends();
+        for (const rule of rulesToUpdate) {
+            const site = rule.Destination.StorageClass;
+            const destination = rule.Destination.Bucket;
+            const role = this._deriveRuleRole(repConfig.Role, rule.Destination.Account);
+            const existing = backends.find(b => b.site === site);
+            if (existing) {
+                existing.status = 'PENDING';
+                existing.destination = destination;
+                existing.role = role;
+            } else {
+                backends.push({ site, status: 'PENDING', destination, role, dataStoreVersionId: '' });
+            }
+        }
+        return backends;
     }
 
     /**
@@ -386,40 +450,9 @@ class ReplicationStatusUpdater {
                 }
 
                 const sourceRole = repConfig.Role.split(',')[0].trim();
-                let replicationInfo = objMD.getReplicationInfo();
-                if (!replicationInfo || !replicationInfo.status) {
-                    const ops = objMD.getContentLength() === 0 ? ['METADATA'] : ['METADATA', 'DATA'];
-                    objMD.setReplicationInfo({
-                        status: 'PENDING',
-                        role: sourceRole,
-                        backends: [],
-                        content: ops,
-                        isNFS: null,
-                    });
-                    replicationInfo = objMD.getReplicationInfo();
-                }
-                // Remove legacy top-level fields that don't belong in V2 format
-                delete replicationInfo.destination;
-                delete replicationInfo.storageClass;
-                delete replicationInfo.storageType;
-                delete replicationInfo.dataStoreVersionId;
-
-                const backends = objMD.getReplicationBackends();
-
-                for (const rule of rulesToUpdate) {
-                    const site = rule.Destination.StorageClass;
-                    const destination = rule.Destination.Bucket;
-                    const role = this._deriveRuleRole(repConfig.Role, rule.Destination.Account);
-                    const existing = backends.find(b => b.site === site);
-                    if (existing) {
-                        existing.status = 'PENDING';
-                        existing.destination = destination;
-                        existing.role = role;
-                    } else {
-                        backends.push({ site, status: 'PENDING', destination, role, dataStoreVersionId: '' });
-                    }
-                }
-                objMD.setReplicationBackends(backends);
+                const replicationInfo = this._initV2ReplicationInfo(objMD, sourceRole);
+                this._removeV1Fields(replicationInfo);
+                const backends = this._applyRulesToBackends(objMD, rulesToUpdate, repConfig);
 
                 if (this.forceUsingConfiguration) {
                     for (const backend of backends) {
@@ -503,8 +536,7 @@ class ReplicationStatusUpdater {
             (repConfig, next) => {
                 const { Rules } = repConfig;
 
-                if (this._isLegacyFormat(repConfig)) {
-                    // V1: single storage class (possibly comma-separated, handled by _markObjectPending)
+                if (this._isV1Format(repConfig)) {
                     const storageClass = this.siteName || Rules[0].Destination.StorageClass;
                     if (!storageClass) {
                         const errMsg = 'missing SITE_NAME environment variable, must be set to'
@@ -526,7 +558,6 @@ class ReplicationStatusUpdater {
                     }, next);
                 }
 
-                // V2: one rule per destination, prefix-matched per object
                 return eachLimit(versions, this.workers, (i, apply) => {
                     const { Key, VersionId, IsLatest } = i;
                     if (this.currentVersionOnly && !IsLatest) {
