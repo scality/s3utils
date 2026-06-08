@@ -18,6 +18,11 @@ function generateKeyId(isMaster, key, versionId) {
 function generateMD(isMaster, objectKey, lastModified, storageClasses) {
     const keyId = generateKeyId(isMaster, objectKey, testVersion);
 
+    const objMD = new ObjectMD()
+        .setKey(objectKey)
+        .setLastModified(lastModified)
+        .setVersionId(testVersion);
+    objMD.setReplicationInfo({ storageClass: storageClasses });
     return {
         _id: {
             id: keyId,
@@ -25,12 +30,7 @@ function generateMD(isMaster, objectKey, lastModified, storageClasses) {
             storageClasses,
             versionId: testVersion,
         },
-        value: new ObjectMD()
-            .setKey(objectKey)
-            .setLastModified(lastModified)
-            .setVersionId(testVersion)
-            .setReplicationStorageClass(storageClasses)
-            .getValue(),
+        value: objMD.getValue(),
     };
 }
 

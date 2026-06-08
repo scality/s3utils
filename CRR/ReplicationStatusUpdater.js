@@ -1,7 +1,7 @@
 const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
-const { ObjectMD } = require('arsenal').models;
+const { ObjectMD, ReplicationConfiguration } = require('arsenal').models;
 const { 
     ListObjectVersionsCommand, 
     GetBucketReplicationCommand 
@@ -118,21 +118,14 @@ class ReplicationStatusUpdater {
 
 
     /**
-     * Returns true if the replication config uses the V1 format (any rule has a
-     * comma-separated StorageClass, e.g. "dest-A,dest-B").
+     * Returns true if the replication config uses the V1 format.
+     * V2 rules carry a Filter element; V1 rules do not.
      * @private
      * @param {Object} repConfig - The replication configuration from GetBucketReplicationCommand.
      * @returns {boolean}
      */
     _isV1Format(repConfig) {
-        if (repConfig.Rules.some(r => r.Destination.StorageClass?.includes(','))) {
-            return true;
-        }
-        return repConfig.Rules.every(r =>
-            r.Filter === undefined &&
-            r.Priority === undefined &&
-            r.Destination.Account === undefined
-        );
+        return repConfig.Rules.every(r => !r.Filter);
     }
 
     /**
@@ -160,21 +153,6 @@ class ReplicationStatusUpdater {
     }
 
     /**
-     * Derives the per-rule destination role ARN by substituting the account ID.
-     * If baseRole is "src,dest" format, uses the dest part as the template.
-     * @private
-     * @param {string} baseRole - The top-level Role from the replication config.
-     * @param {string} [account] - The account ID from Destination.Account.
-     * @returns {string}
-     */
-    _deriveRuleRole(baseRole, account) {
-        const roles = baseRole.split(',');
-        const destRole = roles.length > 1 ? roles[1].trim() : roles[0].trim();
-        if (!account) { return destRole; }
-        return destRole.replace(/(arn:aws:iam::)[^:]*(:)/, `$1${account}$2`);
-    }
-
-    /**
      * Removes V1-only top-level fields from replicationInfo that have no meaning in V2 format.
      * @private
      * @param {Object} replicationInfo - The replication info object to mutate.
@@ -196,10 +174,10 @@ class ReplicationStatusUpdater {
      * @private
      * @param {ObjectMD} objMD - The object metadata.
      * @param {string} sourceRole - The source-side IAM role ARN.
-     * @returns {Object} The (possibly newly created) replicationInfo object.
+     * @returns {void}
      */
     _initV2ReplicationInfo(objMD, sourceRole) {
-        let replicationInfo = objMD.getReplicationInfo();
+        const replicationInfo = objMD.getReplicationInfo();
         if (!replicationInfo || !replicationInfo.status) {
             const ops = objMD.getContentLength() === 0 ? ['METADATA'] : ['METADATA', 'DATA'];
             objMD.setReplicationInfo({
@@ -209,35 +187,7 @@ class ReplicationStatusUpdater {
                 content: ops,
                 isNFS: null,
             });
-            replicationInfo = objMD.getReplicationInfo();
         }
-        return replicationInfo;
-    }
-
-    /**
-     * Applies matching rules to the backends list on objMD, setting each matched site to PENDING.
-     * @private
-     * @param {ObjectMD} objMD - The object metadata.
-     * @param {Array} rulesToUpdate - Pre-filtered rules to apply.
-     * @param {Object} repConfig - The full replication configuration.
-     * @returns {Array} The updated backends array.
-     */
-    _applyRulesToBackends(objMD, rulesToUpdate, repConfig) {
-        const backends = objMD.getReplicationBackends();
-        for (const rule of rulesToUpdate) {
-            const site = rule.Destination.StorageClass;
-            const destination = rule.Destination.Bucket;
-            const role = this._deriveRuleRole(repConfig.Role, rule.Destination.Account);
-            const existing = backends.find(b => b.site === site);
-            if (existing) {
-                existing.status = 'PENDING';
-                existing.destination = destination;
-                existing.role = role;
-            } else {
-                backends.push({ site, status: 'PENDING', destination, role, dataStoreVersionId: '' });
-            }
-        }
-        return backends;
     }
 
     /**
@@ -266,10 +216,10 @@ class ReplicationStatusUpdater {
                 // Either site specific replication info is missing
                 // or are initialized with empty fields.
                 return (!objMD.getReplicationInfo()
-                    || !objMD.getReplicationSiteStatus(site));
+                    || !objMD.getReplicationSiteStatus({ site }));
             }
             return (objMD.getReplicationInfo()
-                && objMD.getReplicationSiteStatus(site) === filter);
+                && objMD.getReplicationSiteStatus({ site }) === filter);
         });
     }
 
@@ -337,34 +287,34 @@ class ReplicationStatusUpdater {
                         : ['METADATA', 'DATA'];
                     replicationInfo = {
                         status: 'PENDING',
-                        content: ops,
                         backends: [],
+                        content: ops,
                         destination,
                         storageClass: '',
                         role: Role,
                         storageType: '',
+                        dataStoreVersionId: '',
                     };
                     objMD.setReplicationInfo(replicationInfo);
                 }
 
                 // Force reset object's replication configuration to match bucket's configuration
                 if (this.forceUsingConfiguration) {
-                    objMD.setReplicationTargetBucket(destination);
+                    objMD.getReplicationInfo().destination = destination;
                     objMD.setReplicationRoles(Role);
                 }
                 // Update replication info with site specific info
-                if (!objMD.getReplicationSiteStatus(storageClass)) {
+                if (!objMD.getReplicationSiteStatus({ site: storageClass })) {
                     // When replicating to multiple destinations,
                     // the storageClass and storageType properties
                     // become comma-separated lists of the storage
                     // classes and types of the replication destinations.
-                    const storageClasses = objMD.getReplicationStorageClass()
-                        ? `${objMD.getReplicationStorageClass()},${storageClass}` : storageClass;
-                    objMD.setReplicationStorageClass(storageClasses);
+                    const ri = objMD.getReplicationInfo();
+                    ri.storageClass = ri.storageClass
+                        ? `${ri.storageClass},${storageClass}` : storageClass;
                     if (this.storageType) {
-                        const storageTypes = objMD.getReplicationStorageType()
-                            ? `${objMD.getReplicationStorageType()},${this.storageType}` : this.storageType;
-                        objMD.setReplicationStorageType(storageTypes);
+                        ri.storageType = ri.storageType
+                            ? `${ri.storageType},${this.storageType}` : this.storageType;
                     }
                     // Add site to the list of replication backends
                     const backends = objMD.getReplicationBackends();
@@ -376,7 +326,7 @@ class ReplicationStatusUpdater {
                     objMD.setReplicationBackends(backends);
                 }
 
-                objMD.setReplicationSiteStatus(storageClass, 'PENDING');
+                objMD.setReplicationSiteStatus({ site: storageClass }, 'PENDING');
                 objMD.setReplicationStatus('PENDING');
                 objMD.updateMicroVersionId();
                 const md = objMD.getSerialized();
@@ -440,31 +390,53 @@ class ReplicationStatusUpdater {
                     return next(new Error('model version regression: refusing to overwrite newer metadata'));
                 }
 
-                const rulesToUpdate = matchingRules.filter(rule =>
-                    this._objectShouldBeUpdated(objMD, rule.Destination.StorageClass)
+                // Adapt AWS SDK rules to arsenal's ReplicationConfigurationMetadata shape
+                const arsenalConfig = {
+                    role: repConfig.Role,
+                    destination: matchingRules[0]?.Destination.Bucket ?? '',
+                    rules: matchingRules.map(r => ({
+                        enabled: r.Status === 'Enabled',
+                        prefix: r.Filter?.Prefix ?? r.Prefix ?? '',
+                        storageClass: r.Destination.StorageClass,
+                        destination: r.Destination.Bucket,
+                        account: r.Destination.Account,
+                        priority: r.Priority,
+                        id: r.ID ?? '',
+                    })),
+                };
+
+                // Capture existing backends before any initialization (to carry forward dataStoreVersionId)
+                const existingBackends = objMD.getReplicationInfo()?.backends;
+
+                // resolveBackends handles prefix matching, priority dedup, and per-backend destination/role
+                const candidateBackends = ReplicationConfiguration.resolveBackends(
+                    arsenalConfig, key, () => false, existingBackends,
                 );
 
-                if (rulesToUpdate.length === 0) {
+                const backendsToUpdate = candidateBackends.filter(b =>
+                    this._objectShouldBeUpdated(objMD, b.site)
+                );
+
+                if (backendsToUpdate.length === 0) {
                     skip = true;
                     return process.nextTick(next);
                 }
 
-                const sourceRole = repConfig.Role.split(',')[0].trim();
-                const replicationInfo = this._initV2ReplicationInfo(objMD, sourceRole);
+                const sourceRole = ReplicationConfiguration.resolveSourceRole(repConfig.Role);
+                this._initV2ReplicationInfo(objMD, sourceRole);
+                const replicationInfo = objMD.getReplicationInfo();
                 this._removeV1Fields(replicationInfo);
-                const backends = this._applyRulesToBackends(objMD, rulesToUpdate, repConfig);
+                objMD.setReplicationInfo(replicationInfo);
 
-                if (this.forceUsingConfiguration) {
-                    for (const backend of backends) {
-                        const rule = matchingRules.find(r => r.Destination.StorageClass === backend.site);
-                        if (rule) {
-                            backend.destination = rule.Destination.Bucket;
-                            backend.role = this._deriveRuleRole(repConfig.Role, rule.Destination.Account);
-                        }
-                    }
-                }
+                // Merge: preserve existing backends for non-updated sites
+                const updatedSites = new Set(backendsToUpdate.map(b => b.site));
+                const finalBackends = [
+                    ...(existingBackends ?? []).filter(b => !updatedSites.has(b.site)),
+                    ...backendsToUpdate,
+                ];
+                objMD.setReplicationBackends(finalBackends);
 
-                objMD.setReplicationStatus(this._computeTopLevelStatus(backends));
+                objMD.setReplicationStatus(this._computeTopLevelStatus(finalBackends));
                 objMD.updateMicroVersionId();
                 const md = objMD.getSerialized();
                 return this.cloudserverclient.putMetadata({
