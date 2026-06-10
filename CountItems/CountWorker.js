@@ -5,6 +5,7 @@ const monitoring = require('../utils/monitoring');
 const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 const PENSIEVE = 'PENSIEVE';
+
 class CountWorker {
     constructor(params) {
         this.log = params.log;
@@ -66,12 +67,16 @@ class CountWorker {
         if (!this.client.client) {
             return callback(new Error('NotConnected'));
         }
-        // 'fromObj' expects that the website configuration is an instance of
-        // WebsiteConfiguration as it is not used in CountItems, we nullify it.
-        if (bucketInfoObj._websiteConfiguration) {
-            Object.assign(bucketInfoObj, { _websiteConfiguration: null });
+        const bucketInfoData = bucketInfoObj.bucketInfo || bucketInfoObj;
+        // 'fromObj' expects class-backed fields to already be instances.
+        // They are not used in CountItems, so we nullify unsupported serialized fields.
+        if (bucketInfoData._websiteConfiguration) {
+            bucketInfoData._websiteConfiguration = null;
         }
-        const bucketInfo = BucketInfo.fromObj(bucketInfoObj.bucketInfo || bucketInfoObj);
+        if (bucketInfoData._bucketLoggingStatus) {
+            bucketInfoData._bucketLoggingStatus = null;
+        }
+        const bucketInfo = BucketInfo.fromObj(bucketInfoData);
         const bucketName = bucketInfo.getName();
         this.log.info(`${process.pid} handling ${bucketName}`);
         return async.waterfall([
