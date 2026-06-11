@@ -130,6 +130,22 @@ describe('crrExistingObjects', () => {
         ]);
     }, 60000);
 
+    it('should replicate existing objects whose key contains 3-byte UTF-8 characters', async () => {
+        await runAndAssert([
+            { Key: '日本語-test.txt', Body: 'data with Japanese characters' },
+            { Key: '中文/文件.dat', Body: 'data with Chinese path segments' },
+            { Key: 'مرحبا-arabic.txt', Body: 'data with Arabic characters' },
+        ]);
+    }, 60000);
+
+    it('should replicate existing objects whose key contains 4-byte UTF-8 characters', async () => {
+        await runAndAssert([
+            { Key: '🌍-planet-key.txt', Body: 'data with emoji key' },
+            { Key: '📁/📄-nested.txt', Body: 'data with emoji path segments' },
+            { Key: '𝔹𝕆𝕃𝔻-math.txt', Body: 'data with mathematical alphanumeric key' },
+        ]);
+    }, 60000);
+
     it('should replicate existing objects with ASCII-only keys', async () => {
         await runAndAssert([
             { Key: 'ascii-test-1.txt', Body: 'ascii data 1' },
