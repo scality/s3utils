@@ -21,8 +21,8 @@ function generateMD(isMaster, objectKey, lastModified, storageClasses) {
     const objMD = new ObjectMD()
         .setKey(objectKey)
         .setLastModified(lastModified)
-        .setVersionId(testVersion);
-    objMD.setReplicationInfo({ storageClass: storageClasses });
+        .setVersionId(testVersion)
+        .setReplicationInfo({ storageClass: storageClasses });
     return {
         _id: {
             id: keyId,
