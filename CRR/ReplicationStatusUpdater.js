@@ -435,6 +435,9 @@ class ReplicationStatusUpdater {
                 this._initV2ReplicationInfo(objMD, sourceRole);
                 const replicationInfo = objMD.getReplicationInfo();
                 this._removeV1Fields(replicationInfo);
+                if (this.forceUsingConfiguration) {
+                    replicationInfo.role = sourceRole;
+                }
                 objMD.setReplicationInfo(replicationInfo);
 
                 const updatedSites = new Set(backendsToUpdate.map(b => b.site));

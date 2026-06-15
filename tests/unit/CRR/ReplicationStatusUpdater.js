@@ -1348,12 +1348,12 @@ describe('ReplicationStatusUpdater V2 format', () => {
             GetBucketReplicationCommand: getBucketReplicationV2Res,
         });
 
-        // Object has dest-A with stale destination/role
+        // Object has dest-A with stale top-level role and stale backend destination/role
         crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
             const md = JSON.parse(getMetadataRes.Body);
             md.replicationInfo = {
                 status: 'COMPLETED',
-                role: 'arn:aws:iam::8765432:role/sourceRole',
+                role: 'arn:aws:iam::OLD:role/staleSourceRole',
                 backends: [{
                     site: 'dest-A',
                     status: 'COMPLETED',
@@ -1373,6 +1373,7 @@ describe('ReplicationStatusUpdater V2 format', () => {
             const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
             const repInfo = body.replicationInfo;
 
+            expect(repInfo.role).toBe('arn:aws:iam::8765432:role/sourceRole');
             const destA = repInfo.backends.find(b => b.site === 'dest-A');
             expect(destA.destination).toBe('arn:aws:s3:::bucket-a');
             expect(destA.role).toBe('arn:aws:iam::222222222222:role/repRule');
