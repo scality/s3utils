@@ -357,8 +357,31 @@ class ReplicationStatusUpdater {
     }
 
     /**
+     * Adapts matched AWS SDK rules to arsenal's ReplicationConfigurationMetadata shape.
+     * @private
+     * @param {Array} matchingRules - Rules already matched to this key.
+     * @param {Object} repConfig - The full replication configuration.
+     * @returns {Object}
+     */
+    _buildArsenalConfig(matchingRules, repConfig) {
+        return {
+            role: repConfig.Role,
+            destination: matchingRules[0]?.Destination.Bucket ?? '',
+            rules: matchingRules.map(r => ({
+                enabled: r.Status === 'Enabled',
+                prefix: r.Filter?.Prefix ?? r.Prefix ?? '',
+                storageClass: r.Destination.StorageClass,
+                destination: r.Destination.Bucket,
+                account: r.Destination.Account,
+                priority: r.Priority,
+                id: r.ID ?? '',
+            })),
+        };
+    }
+
+    /**
      * Marks an object as pending for replication using the V2 multi-destination format.
-     * Writes per-backend destination and role; strips legacy top-level storageClass/storageType/destination.
+     * Writes per-backend destination and role; strips V1-only top-level storageClass/storageType/destination.
      * @private
      * @param {string} bucket - The bucket name.
      * @param {string} key - The object key.
@@ -390,25 +413,11 @@ class ReplicationStatusUpdater {
                     return next(new Error('model version regression: refusing to overwrite newer metadata'));
                 }
 
-                // Adapt AWS SDK rules to arsenal's ReplicationConfigurationMetadata shape
-                const arsenalConfig = {
-                    role: repConfig.Role,
-                    destination: matchingRules[0]?.Destination.Bucket ?? '',
-                    rules: matchingRules.map(r => ({
-                        enabled: r.Status === 'Enabled',
-                        prefix: r.Filter?.Prefix ?? r.Prefix ?? '',
-                        storageClass: r.Destination.StorageClass,
-                        destination: r.Destination.Bucket,
-                        account: r.Destination.Account,
-                        priority: r.Priority,
-                        id: r.ID ?? '',
-                    })),
-                };
+                const arsenalConfig = this._buildArsenalConfig(matchingRules, repConfig);
 
                 // Capture existing backends before any initialization (to carry forward dataStoreVersionId)
                 const existingBackends = objMD.getReplicationInfo()?.backends;
 
-                // resolveBackends handles prefix matching, priority dedup, and per-backend destination/role
                 const candidateBackends = ReplicationConfiguration.resolveBackends(
                     arsenalConfig, key, () => false, existingBackends,
                 );
@@ -428,12 +437,26 @@ class ReplicationStatusUpdater {
                 this._removeV1Fields(replicationInfo);
                 objMD.setReplicationInfo(replicationInfo);
 
-                // Merge: preserve existing backends for non-updated sites
                 const updatedSites = new Set(backendsToUpdate.map(b => b.site));
-                const finalBackends = [
-                    ...(existingBackends ?? []).filter(b => !updatedSites.has(b.site)),
-                    ...backendsToUpdate,
-                ];
+                // Use candidateBackends (always V2-shaped) for skipped sites, but restore
+                // original status and dataStoreVersionId: resolveBackends forces PENDING on every
+                // entry, and can't match V1-format existing backends (missing destination/role),
+                // so it resets dataStoreVersionId to ''.
+                const skippedBackends = candidateBackends
+                    .filter(b => !updatedSites.has(b.site))
+                    .map(b => {
+                        const orig = (existingBackends ?? []).find(e => e.site === b.site);
+                        if (!orig) {
+                            return b;
+                        }
+
+                        return {
+                            ...b,
+                            status: orig.status,
+                            dataStoreVersionId: orig.dataStoreVersionId ?? b.dataStoreVersionId,
+                        };
+                    });
+                const finalBackends = [...skippedBackends, ...backendsToUpdate];
                 objMD.setReplicationBackends(finalBackends);
 
                 objMD.setReplicationStatus(this._computeTopLevelStatus(finalBackends));
