@@ -129,30 +129,6 @@ class ReplicationStatusUpdater {
     }
 
     /**
-     * Returns the subset of rules whose prefix matches the given key, deduplicated by site
-     * (highest Priority wins when two rules target the same StorageClass).
-     * @private
-     * @param {string} key - The object key.
-     * @param {Array} rules - The replication rules from GetBucketReplicationCommand.
-     * @returns {Array}
-     */
-    _getMatchingRules(key, rules) {
-        const siteMap = new Map();
-        for (const rule of rules) {
-            if (rule.Status !== 'Enabled') { continue; }
-            const prefix = rule.Prefix || (rule.Filter && rule.Filter.Prefix) || '';
-            if (!key.startsWith(prefix)) { continue; }
-            const site = rule.Destination.StorageClass;
-            const existing = siteMap.get(site);
-            const priority = rule.Priority || 0;
-            if (!existing || priority > (existing.Priority || 0)) {
-                siteMap.set(site, rule);
-            }
-        }
-        return [...siteMap.values()];
-    }
-
-    /**
      * Computes the aggregate top-level replication status from all backends per the V2 rules:
      *   any FAILED → FAILED; else any PENDING → PROCESSING; else COMPLETED.
      * @private
@@ -305,17 +281,17 @@ class ReplicationStatusUpdater {
     }
 
     /**
-     * Adapts matched AWS SDK rules to arsenal's ReplicationConfigurationMetadata shape.
+     * Adapts AWS SDK replication config to arsenal's ReplicationConfigurationMetadata shape.
      * @private
-     * @param {Array} matchingRules - Rules already matched to this key.
      * @param {Object} repConfig - The full replication configuration.
      * @returns {Object}
      */
-    _buildArsenalConfig(matchingRules, repConfig) {
+    _buildArsenalConfig(repConfig) {
+        const { Role, Rules } = repConfig;
         return {
-            role: repConfig.Role,
-            destination: matchingRules[0]?.Destination.Bucket ?? '',
-            rules: matchingRules.map(r => ({
+            role: Role,
+            destination: Rules[0]?.Destination.Bucket ?? '',
+            rules: Rules.map(r => ({
                 enabled: r.Status === 'Enabled',
                 prefix: r.Filter?.Prefix ?? r.Prefix ?? '',
                 storageClass: r.Destination.StorageClass,
@@ -334,20 +310,23 @@ class ReplicationStatusUpdater {
      * @param {string} bucket - The bucket name.
      * @param {string} key - The object key.
      * @param {string} versionId - The object version ID.
-     * @param {Array} matchingRules - Rules already matched to this key (prefix-filtered, deduped by site).
      * @param {Object} repConfig - The full replication configuration.
      * @param {Function} cb - Callback function.
      * @returns {void}
      */
-    _markObjectPendingV2(bucket, key, versionId, matchingRules, repConfig, cb) {
+    _markObjectPendingV2(bucket, key, versionId, repConfig, cb) {
         this._updateObjectMD(bucket, key, versionId, objMD => {
-            const arsenalConfig = this._buildArsenalConfig(matchingRules, repConfig);
+            const arsenalConfig = this._buildArsenalConfig(repConfig);
             const prev = objMD.getReplicationInfo();
             const existingBackends = prev?.backends;
 
-            const candidateBackends = ReplicationConfiguration.resolveBackends(
+            let candidateBackends = ReplicationConfiguration.resolveBackends(
                 arsenalConfig, key, () => false, existingBackends,
             );
+
+            if (this.siteName) {
+                candidateBackends = candidateBackends.filter(b => b.site === this.siteName);
+            }
 
             const backendsToUpdate = candidateBackends.filter(b =>
                 this._objectShouldBeUpdated(objMD, b.site)
@@ -451,16 +430,17 @@ class ReplicationStatusUpdater {
                         apply();
                         return;
                     }
-                    let matchingRules = this._getMatchingRules(Key, Rules);
-                    if (this.siteName) {
-                        matchingRules = matchingRules.filter(r => r.Destination.StorageClass === this.siteName);
-                    }
-                    if (matchingRules.length === 0) {
+                    const hasMatchingRule = Rules.some(r =>
+                        r.Status === 'Enabled' &&
+                        (!this.siteName || r.Destination.StorageClass === this.siteName) &&
+                        Key.startsWith(r.Prefix || r.Filter?.Prefix || '')
+                    );
+                    if (!hasMatchingRule) {
                         ++this._nSkipped;
                         apply();
                         return;
                     }
-                    this._markObjectPendingV2(bucket, Key, VersionId, matchingRules, repConfig, apply);
+                    this._markObjectPendingV2(bucket, Key, VersionId, repConfig, apply);
                 }, next);
             },
         ], cb);

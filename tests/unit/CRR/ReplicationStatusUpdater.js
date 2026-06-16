@@ -909,27 +909,29 @@ describe('ReplicationStatusUpdater model version guard', () => {
 
 
 describe('ReplicationStatusUpdater._buildArsenalConfig', () => {
-    it('should map AWS SDK rules to arsenal ReplicationConfigurationMetadata shape', () => {
+    it('should map AWS SDK replication config to arsenal ReplicationConfigurationMetadata shape', () => {
         const crr = initializeCrrWithMocks({ buckets: [], workers: 1, replicationStatusToProcess: ['NEW'] }, logger);
-        const matchingRules = [
-            {
-                ID: 'rule1',
-                Status: 'Enabled',
-                Filter: { Prefix: '' },
-                Priority: 1,
-                Destination: { Bucket: 'arn:aws:s3:::bucket-a', StorageClass: 'dest-A', Account: '111111111111' },
-            },
-            {
-                ID: 'rule2',
-                Status: 'Enabled',
-                Filter: { Prefix: 'docs/' },
-                Priority: 2,
-                Destination: { Bucket: 'arn:aws:s3:::bucket-b', StorageClass: 'dest-B', Account: '222222222222' },
-            },
-        ];
-        const repConfig = { Role: 'arn:aws:iam::root:role/src,arn:aws:iam::root:role/dst' };
+        const repConfig = {
+            Role: 'arn:aws:iam::root:role/src,arn:aws:iam::root:role/dst',
+            Rules: [
+                {
+                    ID: 'rule1',
+                    Status: 'Enabled',
+                    Filter: { Prefix: '' },
+                    Priority: 1,
+                    Destination: { Bucket: 'arn:aws:s3:::bucket-a', StorageClass: 'dest-A', Account: '111111111111' },
+                },
+                {
+                    ID: 'rule2',
+                    Status: 'Enabled',
+                    Filter: { Prefix: 'docs/' },
+                    Priority: 2,
+                    Destination: { Bucket: 'arn:aws:s3:::bucket-b', StorageClass: 'dest-B', Account: '222222222222' },
+                },
+            ],
+        };
 
-        const result = crr._buildArsenalConfig(matchingRules, repConfig);
+        const result = crr._buildArsenalConfig(repConfig);
 
         expect(result.role).toBe(repConfig.Role);
         expect(result.destination).toBe('arn:aws:s3:::bucket-a');
