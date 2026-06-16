@@ -258,7 +258,8 @@ class ReplicationStatusUpdater {
             }
 
             if (this.forceUsingConfiguration) {
-                objMD.getReplicationInfo().destination = destination;
+                const ri = objMD.getReplicationInfo();
+                ri.destination = destination;
                 objMD.setReplicationRoles(Role);
             }
 
@@ -277,6 +278,7 @@ class ReplicationStatusUpdater {
 
             objMD.setReplicationSiteStatus({ site: storageClass }, 'PENDING');
             objMD.setReplicationStatus('PENDING');
+            return { skip: false };
         }, cb);
     }
 
@@ -341,7 +343,7 @@ class ReplicationStatusUpdater {
             // resolveBackends can't match V1-format existing backends (no destination/role),
             // so it resets dataStoreVersionId to '' for those — restore it from the original.
             const finalBackends = candidateBackends.map(c => {
-                if (updatedSites.has(c.site)) return c;
+                if (updatedSites.has(c.site)) { return c; }
                 const orig = existingBackends?.find(e => e.site === c.site);
                 return orig
                     ? { ...c, status: orig.status, dataStoreVersionId: orig.dataStoreVersionId ?? c.dataStoreVersionId }
@@ -355,6 +357,7 @@ class ReplicationStatusUpdater {
                 content: prev?.content ?? (objMD.getContentLength() === 0 ? ['METADATA'] : ['METADATA', 'DATA']),
                 isNFS: prev?.isNFS ?? null,
             });
+            return { skip: false };
         }, cb);
     }
 
