@@ -907,45 +907,6 @@ describe('ReplicationStatusUpdater model version guard', () => {
     });
 });
 
-describe('ReplicationStatusUpdater _removeV1Fields', () => {
-    it('should delete V1-only top-level fields from replicationInfo', () => {
-        const crr = initializeCrrWithMocks({
-            buckets: ['bucket0'],
-            workers: 1,
-            replicationStatusToProcess: ['NEW'],
-        }, logger);
-
-        const repInfo = {
-            status: 'PENDING',
-            destination: 'arn:aws:s3:::bucket',
-            storageClass: 'dest-A',
-            storageType: 'aws_s3',
-            dataStoreVersionId: 'v1',
-            role: 'arn:aws:iam::123:role/r',
-            backends: [],
-        };
-        crr._removeV1Fields(repInfo);
-        expect(repInfo.destination).toBeUndefined();
-        expect(repInfo.storageClass).toBeUndefined();
-        expect(repInfo.storageType).toBeUndefined();
-        expect(repInfo.dataStoreVersionId).toBeUndefined();
-        expect(repInfo.status).toBe('PENDING');
-        expect(repInfo.role).toBe('arn:aws:iam::123:role/r');
-    });
-
-    it('should be a no-op when V1 fields are already absent', () => {
-        const crr = initializeCrrWithMocks({
-            buckets: ['bucket0'],
-            workers: 1,
-            replicationStatusToProcess: ['NEW'],
-        }, logger);
-
-        const repInfo = { status: 'PENDING', role: 'arn:aws:iam::123:role/r', backends: [] };
-        expect(() => crr._removeV1Fields(repInfo)).not.toThrow();
-        expect(repInfo.destination).toBeUndefined();
-        expect(repInfo.storageClass).toBeUndefined();
-    });
-});
 
 describe('ReplicationStatusUpdater._buildArsenalConfig', () => {
     it('should map AWS SDK rules to arsenal ReplicationConfigurationMetadata shape', () => {
