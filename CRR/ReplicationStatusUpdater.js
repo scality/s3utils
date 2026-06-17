@@ -342,18 +342,23 @@ class ReplicationStatusUpdater {
             const updatedSites = new Set(backendsToUpdate.map(b => b.site));
             // resolveBackends can't match V1-format existing backends (no destination/role),
             // so it resets dataStoreVersionId to '' for those — restore it from the original.
-            const finalBackends = candidateBackends.map(c => {
+            const candidateSites = new Set(candidateBackends.map(b => b.site));
+            const updatedBackends = candidateBackends.map(c => {
                 if (updatedSites.has(c.site)) { return c; }
                 const orig = existingBackends?.find(e => e.site === c.site);
                 return orig
                     ? { ...c, status: orig.status, dataStoreVersionId: orig.dataStoreVersionId ?? c.dataStoreVersionId }
                     : c;
             });
+            // Preserve backends for sites not targeted by this run (e.g. when SITE_NAME is set),
+            // so they are not silently dropped from the metadata.
+            const preservedBackends = (existingBackends || []).filter(b => !candidateSites.has(b.site));
+            const allBackends = [...updatedBackends, ...preservedBackends];
 
             objMD.setReplicationInfo({
-                status: this._computeTopLevelStatus(finalBackends),
+                status: this._computeTopLevelStatus(allBackends),
                 role: this.forceUsingConfiguration ? sourceRole : (prev?.role || sourceRole),
-                backends: finalBackends,
+                backends: allBackends,
                 content: prev?.content ?? (objMD.getContentLength() === 0 ? ['METADATA'] : ['METADATA', 'DATA']),
                 isNFS: prev?.isNFS ?? null,
             });

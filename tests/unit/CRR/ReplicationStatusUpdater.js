@@ -1343,4 +1343,67 @@ describe('ReplicationStatusUpdater V2 format', () => {
             done();
         });
     });
+
+    it('should preserve backends for sites outside SITE_NAME when updating', done => {
+        // docs/report.pdf matches both rule1 (prefix='', dest-A) and rule2 (prefix='docs/', dest-B)
+        // dest-A is NEW (will be queued); dest-B is COMPLETED (must be preserved)
+        // With SITE_NAME=dest-A, candidateBackends is filtered to dest-A only.
+        // Without the fix, setReplicationInfo replaces backends with [dest-A], silently dropping dest-B.
+        const listVersionDocsKey = {
+            IsTruncated: false,
+            Versions: [{
+                ETag: '"abc"', ChecksumAlgorithm: [], Size: 100,
+                StorageClass: 'STANDARD', Key: 'docs/report.pdf',
+                VersionId: 'aJdO148N3LjN00000000001I4j3QKItW', IsLatest: true,
+                LastModified: '2024-01-05T13:11:31.861Z',
+                Owner: { DisplayName: 'bart', ID: '0' },
+            }],
+            DeleteMarkers: [], Name: 'bucket0', MaxKeys: 1000, CommonPrefixes: [],
+        };
+
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            siteName: 'dest-A',
+        }, logger, {
+            ListObjectVersionsCommand: listVersionDocsKey,
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            // Only dest-B exists in metadata (dest-A was never replicated to)
+            md.replicationInfo = {
+                status: 'COMPLETED',
+                role: 'arn:aws:iam::8765432:role/sourceRole',
+                backends: [{
+                    site: 'dest-B',
+                    status: 'COMPLETED',
+                    destination: 'arn:aws:s3:::bucket-b',
+                    role: 'arn:aws:iam::333333333333:role/repRule',
+                    dataStoreVersionId: 'dest-b-version-id',
+                }],
+                content: ['METADATA', 'DATA'],
+            };
+            cb(null, { Body: JSON.stringify(md) });
+        });
+
+        crr.run(err => {
+            assert.ifError(err);
+
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            const repInfo = body.replicationInfo;
+
+            expect(repInfo.backends).toHaveLength(2);
+            const destA = repInfo.backends.find(b => b.site === 'dest-A');
+            const destB = repInfo.backends.find(b => b.site === 'dest-B');
+
+            expect(destA.status).toBe('PENDING');
+            expect(destB.status).toBe('COMPLETED');
+            expect(destB.dataStoreVersionId).toBe('dest-b-version-id');
+            done();
+        });
+    });
 });
