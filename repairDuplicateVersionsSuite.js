@@ -98,9 +98,15 @@ function httpRequest(method, url, reqBody, cb) {
         `error sending HTTP request to ${url}: ${err.message}`
     )));
     if (reqBody) {
+        let reqBuffer;
+        if (Buffer.isBuffer(reqBody)) {
+            reqBuffer = reqBody;
+        } else {
+            reqBuffer = Buffer.from(reqBody, 'utf8');
+        }
         req.setHeader('content-type', 'application/json');
-        req.setHeader('content-length', reqBody.length);
-        req.write(reqBody);
+        req.setHeader('content-length', reqBuffer.length);
+        req.write(reqBuffer);
     }
     req.end();
 }
