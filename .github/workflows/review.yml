@@ -15,7 +15,7 @@ on:
 jobs:
   review:
     if: github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]'
-    uses: scality/workflows/.github/workflows/claude-code-review.yml@v2.8.3
+    uses: scality/workflows/.github/workflows/claude-code-review.yml@v2
     with:
       allowed-tools: >-
         ${{ github.event_name == 'workflow_dispatch' && '"Bash(gh api repos/*/contents)"' || '' }}
@@ -23,7 +23,7 @@ jobs:
 
   review-dependency-bump:
     if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
-    uses: scality/workflows/.github/workflows/claude-code-dependency-review.yml@v2.8.3
+    uses: scality/workflows/.github/workflows/claude-code-dependency-review.yml@v2
     with:
       ACTIONS_APP_ID: ${{ vars.ACTIONS_APP_ID }}
     secrets: inherit
