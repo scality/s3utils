@@ -4533,9 +4533,9 @@ arraybuffer.prototype.slice@^1.0.4:
   optionalDependencies:
     ioctl "^2.0.2"
 
-"arsenal@git+https://github.com/scality/Arsenal#improvement/ARSN-571/crr-multi":
-  version "8.4.5"
-  resolved "git+https://github.com/scality/Arsenal#c3f3bffde6eeb935e03847df010ac37ac7ba8944"
+"arsenal@git+https://github.com/scality/arsenal#8.4.7":
+  version "8.4.7"
+  resolved "git+https://github.com/scality/arsenal#096cb33f1092b35113a11521bbbb62ef615aed79"
   dependencies:
     "@aws-sdk/client-kms" "^3.975.0"
     "@aws-sdk/client-s3" "^3.975.0"
@@ -6248,7 +6248,6 @@ http-proxy-agent@^7.0.0:
 
 "httpagent@git+https://github.com/scality/httpagent#1.1.0":
   version "1.1.0"
-  uid "8f9958eb9cde086db7819a86582fba640a5f8876"
   resolved "git+https://github.com/scality/httpagent#8f9958eb9cde086db7819a86582fba640a5f8876"
   dependencies:
     agentkeepalive "^4.5.0"
