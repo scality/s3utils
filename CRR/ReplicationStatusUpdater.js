@@ -441,7 +441,7 @@ class ReplicationStatusUpdater {
                     const hasMatchingRule = Rules.some(r =>
                         r.Status === 'Enabled' &&
                         (!this.siteName || r.Destination.StorageClass === this.siteName) &&
-                        Key.startsWith(r.Prefix || r.Filter?.Prefix || '')
+                        Key.startsWith(r.Filter?.Prefix ?? r.Prefix ?? '')
                     );
                     if (!hasMatchingRule) {
                         ++this._nSkipped;
