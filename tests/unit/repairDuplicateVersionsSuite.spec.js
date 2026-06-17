@@ -67,3 +67,79 @@ describe('repairDuplicateVersionsSuite::httpRequest', () => {
         });
     });
 });
+
+describe('repairDuplicateVersionsSuite::putObjectMetadata', () => {
+    let putObjectMetadata;
+    let server;
+    let serverPort;
+    let lastRequest;
+    let responseStatus;
+
+    beforeAll(done => {
+        server = http.createServer((req, res) => {
+            lastRequest = {
+                method: req.method,
+                path: req.url,
+                headers: req.headers,
+                body: '',
+            };
+            req.on('data', chunk => { lastRequest.body += chunk.toString('utf8'); });
+            req.on('end', () => {
+                res.writeHead(responseStatus);
+                res.end();
+            });
+        });
+        server.listen(0, '127.0.0.1', () => {
+            serverPort = server.address().port;
+            // OBJECT_REPAIR_BUCKETD_HOSTPORT is captured at module load time, so
+            // set it before requiring the module via isolateModules.
+            process.env.OBJECT_REPAIR_BUCKETD_HOSTPORT = `127.0.0.1:${serverPort}`;
+            jest.isolateModules(() => {
+                ({ putObjectMetadata } = require('../../repairDuplicateVersionsSuite'));
+            });
+            done();
+        });
+    });
+
+    afterAll(done => {
+        server.close(done);
+    });
+
+    beforeEach(() => {
+        lastRequest = null;
+        responseStatus = 200;
+    });
+
+    test('POSTs JSON-serialised metadata with multi-byte UTF-8 characters to the correct bucketd path', done => {
+        const md = {
+            'content-type': 'text/plain',
+            'size': 42,
+            'key': '日本語🎉',
+        };
+        putObjectMetadata('s3://mybucket/mykey', md, err => {
+            expect(err).toBeFalsy();
+            expect(lastRequest.method).toBe('POST');
+            expect(lastRequest.path).toBe('/default/bucket/mybucket/mykey');
+            expect(JSON.parse(lastRequest.body)).toEqual(md);
+            done();
+        });
+    });
+
+    test('calls back with error immediately when objectUrl does not start with "s3://"', done => {
+        putObjectMetadata('http://mybucket/mykey', {}, err => {
+            expect(err).toBeInstanceOf(Error);
+            expect(err.message).toMatch(/malformed object URL/);
+            expect(lastRequest).toBeNull(); // no HTTP request made
+            done();
+        });
+    });
+
+    test('calls back with error when bucketd returns a non-200 status', done => {
+        responseStatus = 500;
+        putObjectMetadata('s3://mybucket/mykey', {}, err => {
+            expect(err).toBeInstanceOf(Error);
+            expect(err.message).toMatch(/500/);
+            done();
+        });
+    });
+});
