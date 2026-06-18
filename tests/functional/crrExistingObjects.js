@@ -1,3 +1,4 @@
+const { promisify } = require('util');
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
 const { PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
@@ -22,10 +23,12 @@ const SITE_NAME = 'test-site';
 function makeCaptureLogger() {
     const captured = [];
     const inner = new Logger('crrExistingObjects:test:capture');
-    const wrap = level => (msg, data) => {
-        captured.push({ level, message: msg, ...(data || {}) });
-        return inner[level](msg, data);
-    };
+    const wrap = level => (
+        (msg, data) => {
+            captured.push({ level, message: msg, ...(data || {}) });
+            return inner[level](msg, data);
+        }
+    );
     return {
         captured,
         logger: {
@@ -37,12 +40,6 @@ function makeCaptureLogger() {
             trace: wrap('trace'),
         },
     };
-}
-
-function runUpdater(updater) {
-    return new Promise((resolve, reject) => {
-        updater.run(err => (err ? reject(err) : resolve()));
-    });
 }
 
 describe('crrExistingObjects', () => {
@@ -80,7 +77,7 @@ describe('crrExistingObjects', () => {
         log.info('Test accounts deleted');
     });
 
-    async function runAndAssert(testObjects) {
+    async function runTest(testObjects) {
         for (const obj of testObjects) {
             await accountSource.s3Client.send(new PutObjectCommand({
                 Bucket: accountSource.bucketName,
@@ -104,7 +101,7 @@ describe('crrExistingObjects', () => {
             currentVersionOnly: false,
             forceUsingConfiguration: true,
         }, logger);
-        await runUpdater(updater);
+        await promisify(updater.run.bind(updater))();
 
         const objectUpdateErrors = captured.filter(
             entry => entry.level === 'error' && entry.message === 'error updating object',
@@ -123,7 +120,7 @@ describe('crrExistingObjects', () => {
     }
 
     it('should replicate existing objects whose key contains Polish diacritics', async () => {
-        await runAndAssert([
+        await runTest([
             { Key: 'BŚ-test.txt', Body: 'data with Ś' },
             { Key: 'ąęóćśźżł-all-diacritics.txt', Body: 'data with all polish diacritics' },
             { Key: 'mixed/żółć/Łódź.dat', Body: 'mixed path segments' },
@@ -131,7 +128,7 @@ describe('crrExistingObjects', () => {
     }, 60000);
 
     it('should replicate existing objects whose key contains 3-byte UTF-8 characters', async () => {
-        await runAndAssert([
+        await runTest([
             { Key: '日本語-test.txt', Body: 'data with Japanese characters' },
             { Key: '中文/文件.dat', Body: 'data with Chinese path segments' },
             { Key: 'مرحبا-arabic.txt', Body: 'data with Arabic characters' },
@@ -139,7 +136,7 @@ describe('crrExistingObjects', () => {
     }, 60000);
 
     it('should replicate existing objects whose key contains 4-byte UTF-8 characters', async () => {
-        await runAndAssert([
+        await runTest([
             { Key: '🌍-planet-key.txt', Body: 'data with emoji key' },
             { Key: '📁/📄-nested.txt', Body: 'data with emoji path segments' },
             { Key: '𝔹𝕆𝕃𝔻-math.txt', Body: 'data with mathematical alphanumeric key' },
@@ -147,7 +144,7 @@ describe('crrExistingObjects', () => {
     }, 60000);
 
     it('should replicate existing objects with ASCII-only keys', async () => {
-        await runAndAssert([
+        await runTest([
             { Key: 'ascii-test-1.txt', Body: 'ascii data 1' },
             { Key: 'ascii-test-2.txt', Body: 'ascii data 2' },
         ]);

@@ -234,7 +234,11 @@ async function configureCrr(accountSource, accountDest, opts = {}) {
         Statement: [
             {
                 Effect: 'Allow',
-                Action: ['s3:GetObjectVersion', 's3:GetObjectVersionAcl', 's3:ReplicateObject'],
+                Action: [
+                    's3:GetObjectVersion',
+                    's3:GetObjectVersionAcl',
+                    's3:ReplicateObject',
+                ],
                 Resource: [`arn:aws:s3:::${accountSource.bucketName}/*`],
             },
             {
