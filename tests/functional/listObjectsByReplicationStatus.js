@@ -1,7 +1,7 @@
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
-const { PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, CreateBucketCommand, DeleteBucketCommand, DeleteObjectsCommand, ListObjectVersionsCommand } = require('@aws-sdk/client-s3');
-const { CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand, CreateUserCommand, CreateAccessKeyCommand, AttachUserPolicyCommand } = require('@aws-sdk/client-iam');
+const { PutObjectCommand, HeadObjectCommand, CreateBucketCommand } = require('@aws-sdk/client-s3');
+const { CreatePolicyCommand, CreateUserCommand, CreateAccessKeyCommand, AttachUserPolicyCommand } = require('@aws-sdk/client-iam');
 const { listObjectsByReplicationStatus } = require('../../listObjectsByReplicationStatus');
 
 const {
@@ -13,177 +13,11 @@ const {
     adminSecretAccessKey,
     createTestAccount,
     deleteTestAccount,
+    configureCrr,
+    removeCrrConfiguration,
 } = require('../utils/S3Setup');
 
 const log = new Logger('listObjectsByReplicationStatus:test');
-
-async function configureCrr(accountSource, accountDest) {
-    // activate bucket versioning on source and destination buckets
-    log.info('Enabling bucket versioning on source and destination buckets');
-    await accountSource.s3Client.send(new PutBucketVersioningCommand({
-        Bucket: accountSource.bucketName,
-        VersioningConfiguration: {
-            Status: 'Enabled',
-        },
-    }));
-
-    await accountDest.s3Client.send(new PutBucketVersioningCommand({
-        Bucket: accountDest.bucketName,
-        VersioningConfiguration: {
-            Status: 'Enabled',
-        },
-    }));
-
-    log.info('Creating IAM policies and roles for CRR');
-    // create policy
-    const policy = {
-        Version:'2012-10-17',
-        Statement:[
-            {
-                Effect:'Allow',
-                Action:[
-                    's3:GetObjectVersion',
-                    's3:GetObjectVersionAcl',
-                    's3:ReplicateObject'
-                ],
-                Resource:[
-                    `arn:aws:s3:::${accountSource.bucketName}/*`
-                ]
-            },
-            {
-                Effect:'Allow',
-                Action:[
-                    's3:ListBucket',
-                    's3:GetReplicationConfiguration'
-                ],
-                Resource:[
-                    'arn:aws:s3:::source'
-                ]
-            },
-            {
-                Effect:'Allow',
-                Action:[
-                    's3:ReplicateObject',
-                    's3:ReplicateDelete'
-                ],
-                Resource:`arn:aws:s3:::${accountDest.bucketName}/*`
-            }
-        ]
-    };
-    await accountSource.iamClient.send(new CreatePolicyCommand({
-        PolicyName: 'crr-policy',
-        PolicyDocument: JSON.stringify(policy),
-    }));
-
-    await accountDest.iamClient.send(new CreatePolicyCommand({
-        PolicyName: 'crr-policy',
-        PolicyDocument: JSON.stringify(policy),
-    }));
-
-    log.info('Creating IAM roles');
-    // create trust
-    const trust = {
-        Version:'2012-10-17',
-        Statement:[
-            {
-                Effect:'Allow',
-                Principal:{
-                    Service:'backbeat'
-                },
-                Action:'sts:AssumeRole'
-            }
-        ]
-    };
-    await accountSource.iamClient.send(new CreateRoleCommand({
-        RoleName: 'crr-trust-role',
-        AssumeRolePolicyDocument: JSON.stringify(trust),
-    }));
-    await accountDest.iamClient.send(new CreateRoleCommand({
-        RoleName: 'crr-trust-role',
-        AssumeRolePolicyDocument: JSON.stringify(trust),
-    }));
-
-    log.info('Attaching policies to roles');
-    // attach role to policy
-    await accountSource.iamClient.send(new AttachRolePolicyCommand({
-        RoleName: 'crr-trust-role',
-        PolicyArn: `arn:aws:iam::${accountSource.accountId}:policy/crr-policy`,
-    }));
-    await accountDest.iamClient.send(new AttachRolePolicyCommand({
-        RoleName: 'crr-trust-role',
-        PolicyArn: `arn:aws:iam::${accountDest.accountId}:policy/crr-policy`,
-    }));
-
-    log.info('Setting bucket replication configuration on source bucket');
-    const replication = {
-        Role: `arn:aws:iam::${accountSource.accountId}:role/crr-trust-role,arn:aws:iam::${accountDest.accountId}:role/crr-trust-role`,
-        Rules: [
-            {
-                Prefix: '',
-                Status: 'Enabled',
-                Destination: {
-                    Bucket: `arn:aws:s3:::${accountDest.bucketName}`
-                }
-            }
-        ]
-    };
-    await accountSource.s3Client.send(new PutBucketReplicationCommand({
-        Bucket: accountSource.bucketName,
-        ReplicationConfiguration: replication
-    }));
-
-}
-
-async function removeCrrConfiguration(account) {
-    log.info('Removing bucket crr configuration', { bucket: account.bucketName });
-    try {
-        await account.s3Client.send(new DeleteBucketReplicationCommand({ Bucket: account.bucketName }));
-    } catch (err) {
-        log.error('Error removing bucket replication configuration', {
-            bucket: account.bucketName,
-            error: err.message,
-        });
-    }
-
-    // Clean up IAM resources first (roles and policies must be deleted before account)
-    log.info('Cleaning up IAM resources', { account: account.accountName });
-    try {
-        // Detach policy from role
-        await account.iamClient.send(new DetachRolePolicyCommand({
-            RoleName: 'crr-trust-role',
-            PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
-        }));
-        log.info('Detached policy from role');
-    } catch (err) {
-        log.error('Error detaching policy from role', { error: err.message });
-    }
-
-    try {
-        // Delete role
-        await account.iamClient.send(new DeleteRoleCommand({ RoleName: 'crr-trust-role' }));
-        log.info('Deleted IAM role');
-    } catch (err) {
-        log.error('Error deleting role', { error: err.message });
-    }
-
-    try {
-        // Delete policy
-        await account.iamClient.send(new DeletePolicyCommand({
-            PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
-        }));
-        log.info('Deleted IAM policy');
-    } catch (err) {
-        log.error('Error deleting policy', { error: err.message });
-    }
-
-    try {
-        // Delete IAM user
-        await account.iamClient.send(new DeleteUserCommand({ UserName: account.iamUser }));
-        log.info('Deleted IAM user');
-    } catch (err) {
-        log.error('Error deleting IAM user', { error: err.message });
-    }
-}
 
 
 describe('listObjectsByReplicationStatus', () => {
