@@ -376,6 +376,12 @@ function repairObject(objInfo, cb) {
                     loc.key = copiedKeys[loc.key];
                 }
             });
+            // Add some info in the metadata to help forensics, if only to
+            // mark that the metadata has been repaired.
+            objMD.repairedInfo = {
+                lastRepairedAt: new Date().toISOString(),
+                reason: 'duplicate-sproxyd-keys',
+            };
             return putObjectMetadata(objInfo.objectUrl, objMD, err => {
                 if (err) {
                     log.error('error putting object metadata', {

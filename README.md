@@ -1547,6 +1547,24 @@ and ignores other entries.
 cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 OBJECT_REPAIR_SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
 ```
 
+## Effect on object metadata
+
+In addition to updating the `location` field, the repair tool adds a
+`repairedInfo` field to the metadata of every repaired object version:
+
+```json
+"repairedInfo": {
+  "lastRepairedAt": "2026-06-17T10:30:00.000Z",
+  "reason": "duplicate-sproxyd-keys"
+}
+```
+
+This field serves as a forensic marker. `lastRepairedAt` is an ISO
+8601 timestamp of when the repair was performed; `reason` identifies
+the type of inconsistency that triggered the repair. If an object is
+repaired more than once, the field is overwritten with the information
+from the most recent repair.
+
 ## Caveat
 
 While the script is running, there is a possibility, although slim,
