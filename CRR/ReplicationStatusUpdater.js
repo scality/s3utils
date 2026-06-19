@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
@@ -71,6 +72,14 @@ class ReplicationStatusUpdater {
         this.currentVersionOnly = currentVersionOnly;
         this.forceUsingConfiguration = forceUsingConfiguration;
         this.log = log;
+
+        // Random replicationGroupId (7 chars) and instanceId (6 chars) for
+        // microVersionId generation: this tool bypasses CloudServer's
+        // configured values, so per-instance random tokens prevent
+        // collisions with concurrent writers. Sizes match LENGTH_RG and
+        // LENGTH_ID in arsenal's VersionID module.
+        this.replicationGroupId = crypto.randomBytes(4).toString('hex').slice(0, 7);
+        this.instanceId = crypto.randomBytes(3).toString('hex').slice(0, 6);
 
         this._setupClients();
 
@@ -193,7 +202,7 @@ class ReplicationStatusUpdater {
                     return process.nextTick(next);
                 }
 
-                objMD.updateMicroVersionId();
+                objMD.updateMicroVersionId(this.instanceId, this.replicationGroupId);
                 const md = objMD.getSerialized();
                 return this.cloudserverclient.putMetadata({
                     Bucket: bucket,
