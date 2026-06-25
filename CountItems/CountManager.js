@@ -218,6 +218,10 @@ class CountManager {
             }
         });
         this.q.resume();
+        if (this.q.idle()) {
+            this.log.info('no buckets to process, skipping count');
+            process.nextTick(onceCB);
+        }
     }
 }
 
