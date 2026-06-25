@@ -983,8 +983,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 10,
-            bucketInfos: Array(10)
-                .map(() => BucketInfo.deSerialize(testBucketMD)),
+            bucketInfos: Array(10).fill()
+                .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
         const testCB = jest.fn();
