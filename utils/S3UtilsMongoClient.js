@@ -249,7 +249,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     targetCount = 'versionCount';
                     targetData = 'versionData';
 
-                    if (entry.value.replicationInfo.backends.length > 0
+                    if (entry.value.replicationInfo?.backends?.length > 0
                         && this._isReplicationEntryStalled(entry, cmpDate)) {
                         stalledCount++;
                     }
@@ -480,7 +480,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
         };
 
         // only count it in current dataStore if object is not in transient or replication not completed
-        if (!isTransient || entry.value.replicationInfo.status !== 'COMPLETED') {
+        if (!isTransient || entry.value.replicationInfo?.status !== 'COMPLETED') {
             results.location[entry.value.dataStoreName] = size;
             // We do not support restores to custom location yet. If we do,
             // the destination would be present in the object metadata. For now,
@@ -492,7 +492,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 results.location[bucketInfo.getLocationConstraint()] = size;
             }
         }
-        entry.value.replicationInfo.backends.forEach(rep => {
+        entry.value.replicationInfo?.backends?.forEach(rep => {
             // count it in the replication destination location if replication compeleted
             if (rep.status === 'COMPLETED') {
                 results.location[rep.site] = size;
