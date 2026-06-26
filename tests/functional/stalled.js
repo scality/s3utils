@@ -70,13 +70,12 @@ function createStalledObject(objName, lastModified) {
             backends: [],
             content: [],
             destination: '',
-            storageClass: '',
+            storageClass: 'location-1,location-2',
             role: '',
             storageType: '',
             dataStoreVersionId: '',
             isNFS: null,
         })
-        .setReplicationStorageClass('location-1,location-2')
         .getValue();
 }
 

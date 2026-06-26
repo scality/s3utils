@@ -154,6 +154,37 @@ const getMetadataRes = {
 
 const putMetadataRes = { versionId: '98295539708053999999RG001  ' };
 
+// V2 bucket replication config: one rule per destination, each with an Account field
+const getBucketReplicationV2Res = {
+    ReplicationConfiguration: {
+        Role: 'arn:aws:iam::8765432:role/sourceRole,arn:aws:iam::111111111111:role/repRule',
+        Rules: [
+            {
+                ID: 'rule1-dest-A',
+                Filter: { Prefix: '' },
+                Priority: 1,
+                Status: 'Enabled',
+                Destination: {
+                    Bucket: 'arn:aws:s3:::bucket-a',
+                    StorageClass: 'dest-A',
+                    Account: '222222222222',
+                },
+            },
+            {
+                ID: 'rule1-dest-B',
+                Filter: { Prefix: 'docs/' },
+                Priority: 2,
+                Status: 'Enabled',
+                Destination: {
+                    Bucket: 'arn:aws:s3:::bucket-b',
+                    StorageClass: 'dest-B',
+                    Account: '333333333333',
+                },
+            },
+        ],
+    },
+};
+
 /**
  * Initializes the ReplicationStatusUpdater class with mock methods for testing.
  *
@@ -206,6 +237,7 @@ module.exports = {
     listVersionsRes,
     listVersionWithMarkerRes,
     getBucketReplicationRes,
+    getBucketReplicationV2Res,
     getMetadataRes,
     putMetadataRes,
     objectMd,
