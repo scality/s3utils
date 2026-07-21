@@ -1059,6 +1059,50 @@ function uploadObjects(client, bucketName, objectList, callback) {
     }, callback);
 }
 
+describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
+    const bucketInfo = BucketInfo.fromObj({ ...testBucketMD });
+    const locationConfig = { 'us-east-1': { objectId: 'us-east-1' } };
+    const bucketResource = `test-bucket_${testBucketCreationDate}`;
+
+    it('should seed zero-value bucket, account and location entries and return true', () => {
+        const collRes = { bucket: {}, location: {}, account: {} };
+        const log = { warn: sinon.spy() };
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, false, log);
+        assert.strictEqual(seeded, true);
+        assert.deepStrictEqual(Object.keys(collRes.bucket), [bucketResource]);
+        assert.deepStrictEqual(Object.keys(collRes.account), [testAccountCanonicalId]);
+        assert.deepStrictEqual(Object.keys(collRes.location), ['us-east-1']);
+        assert.strictEqual(log.warn.called, false);
+    });
+
+    it('should warn and seed nothing when no __usersbucket creation date is available', () => {
+        const collRes = { bucket: {}, location: {}, account: {} };
+        const log = { warn: sinon.spy() };
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, undefined, bucketInfo, locationConfig, false, log);
+        assert.strictEqual(seeded, false);
+        assert.deepStrictEqual(collRes, { bucket: {}, location: {}, account: {} });
+        assert.strictEqual(log.warn.calledOnce, true);
+    });
+
+    it('should warn and seed nothing when the scan had processing errors', () => {
+        const collRes = { bucket: {}, location: {}, account: {} };
+        const log = { warn: sinon.spy() };
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, true, log);
+        assert.strictEqual(seeded, false);
+        assert.deepStrictEqual(collRes, { bucket: {}, location: {}, account: {} });
+        assert.strictEqual(log.warn.calledOnce, true);
+    });
+
+    it('should seed nothing when the bucket already produced metrics', () => {
+        const collRes = { bucket: { existing: {} }, location: {}, account: {} };
+        const log = { warn: sinon.spy() };
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, false, log);
+        assert.strictEqual(seeded, false);
+        assert.deepStrictEqual(collRes, { bucket: { existing: {} }, location: {}, account: {} });
+        assert.strictEqual(log.warn.called, false);
+    });
+});
+
 describe('S3UtilsMongoClient, tests', () => {
     const hr = 1000 * 60 * 60;
     let client;
@@ -1150,13 +1194,75 @@ describe('S3UtilsMongoClient, tests', () => {
         dataStore: 'us-east-1',
     };
 
+    const zeroUsedCapacity = {
+        current: 0n,
+        nonCurrent: 0n,
+        _currentCold: 0n,
+        _nonCurrentCold: 0n,
+        _currentRestored: 0n,
+        _currentRestoring: 0n,
+        _nonCurrentRestored: 0n,
+        _nonCurrentRestoring: 0n,
+        _incompleteMPUParts: 0n,
+    };
+    const zeroObjectCount = {
+        current: 0n,
+        nonCurrent: 0n,
+        _currentCold: 0n,
+        _nonCurrentCold: 0n,
+        _currentRestored: 0n,
+        _currentRestoring: 0n,
+        _nonCurrentRestored: 0n,
+        _nonCurrentRestoring: 0n,
+        _incompleteMPUUploads: 0n,
+        deleteMarker: 0n,
+    };
+    const zeroMetricsEntry = {
+        usedCapacity: zeroUsedCapacity,
+        objectCount: zeroObjectCount,
+    };
     const tests = [
         [
-            'getObjectMDStats() should return zero-result when no objects in the bucket',
+            'getObjectMDStats() should seed zero-value metrics for an empty bucket, account and location',
             {
                 bucketName: 'test-bucket',
                 isVersioned: false,
                 objectList: [],
+            },
+            {
+                dataManaged: {
+                    locations: { 'us-east-1': { curr: 0, prev: 0 } },
+                    total: { curr: 0, prev: 0 },
+                },
+                objects: 0,
+                stalled: 0,
+                versions: 0,
+                dataMetrics: {
+                    bucket: {
+                        [`test-bucket_${testBucketCreationDate}`]: {
+                            ...zeroMetricsEntry,
+                            locations: { 'us-east-1': { ...zeroMetricsEntry } },
+                        },
+                    },
+                    location: {
+                        'us-east-1': { ...zeroMetricsEntry },
+                    },
+                    account: {
+                        [testAccountCanonicalId]: {
+                            ...zeroMetricsEntry,
+                            locations: { 'us-east-1': { ...zeroMetricsEntry } },
+                        },
+                    },
+                },
+            },
+        ],
+        [
+            'getObjectMDStats() should not seed metrics when the bucket has no __usersbucket creation date',
+            {
+                bucketName: 'test-bucket-no-usersbucket',
+                isVersioned: false,
+                objectList: [],
+                skipUsersBucket: true,
             },
             {
                 dataManaged: {
@@ -2806,20 +2912,23 @@ describe('S3UtilsMongoClient, tests', () => {
             isVersioned,
             objectList,
             inflights,
+            skipUsersBucket,
         } = testCase;
         return async.waterfall([
             next => createBucket(client, bucketName, isVersioned, err => next(err)),
-            next => client.putObject(
-                USERSBUCKET,
-                `${testBucketMD._owner}${constants.splitter}${bucketName}`,
-                testUserBucketInfo.value,
-                {
-                    versioning: false,
-                    versionId: null,
-                },
-                logger,
-                next,
-            ),
+            next => (skipUsersBucket
+                ? next()
+                : client.putObject(
+                    USERSBUCKET,
+                    `${testBucketMD._owner}${constants.splitter}${bucketName}`,
+                    testUserBucketInfo.value,
+                    {
+                        versioning: false,
+                        versionId: null,
+                    },
+                    logger,
+                    next,
+                )),
             next => uploadObjects(client, bucketName, objectList, err => next(err)),
             next => client.getBucketAttributes(bucketName, logger, next),
             (bucketInfo, next) => {
@@ -2845,6 +2954,42 @@ describe('S3UtilsMongoClient, tests', () => {
             next => client.deleteBucket(bucketName, logger, next),
         ], done);
     }));
+
+    it('getObjectMDStats() should not seed metrics when entries fail processing', done => {
+        const name = 'test-bucket-scan-errors';
+        return async.waterfall([
+            next => createBucket(client, name, false, err => next(err)),
+            next => client.putObject(
+                USERSBUCKET,
+                `${testBucketMD._owner}${constants.splitter}${name}`,
+                testUserBucketInfo.value,
+                { versioning: false, versionId: null },
+                logger,
+                next,
+            ),
+            next => uploadObjects(
+                client,
+                name,
+                [{ name: 'obj1', ownerId: testAccountCanonicalId, lastModified: new Date(Date.now()) }],
+                err => next(err),
+            ),
+            next => client.getBucketAttributes(name, logger, next),
+            (bucketInfo, next) => {
+                // Every entry fails _processEntryData, so collRes stays empty even
+                // though the bucket has an object: seeding zero here would under-report.
+                const stub = sinon.stub(client, '_processEntryData').returns({ error: new Error('boom') });
+                return client.getObjectMDStats(name, BucketInfo.fromObj(bucketInfo), false, logger, (err, res) => {
+                    stub.restore();
+                    if (err) {
+                        return next(err);
+                    }
+                    assert.deepStrictEqual(res.dataMetrics.bucket, {}, 'must not seed when entries failed processing');
+                    return next();
+                });
+            },
+            next => client.deleteBucket(name, logger, next),
+        ], done);
+    });
 });
 
 describe('S3UtilsMongoClient, update inflight deltas', () => {
