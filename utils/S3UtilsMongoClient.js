@@ -16,7 +16,7 @@ const __COUNT_ITEMS = 'countitems';
 const BigIntMax = (...args) => args.reduce((max, current) => {
     const maxAsBigInt = BigInt(max);
     const currentAsBigInt = BigInt(current);
-    return maxAsBigInt > currentAsBigInt ? max : current;
+    return maxAsBigInt > currentAsBigInt ? maxAsBigInt : currentAsBigInt;
 });
 
 const baseMetricsObject = {
@@ -74,7 +74,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
             // convert inflights to a map with _id: usedCapacity._inflight
             const inflightsMap = {};
             for (const inflight of inflights) {
-                const inflightValue = inflight.usedCapacity?._inflight || 0n;
+                // `_inflight` is stored as a BSON Long and the driver promotes it to a
+                // Number on read, so it has to be converted before being mixed with
+                // the BigInt metrics below.
+                const inflightValue = BigInt(inflight.usedCapacity?._inflight ?? 0);
                 inflightsMap[inflight._id] = inflightValue;
             }
 
@@ -83,7 +86,12 @@ class S3UtilsMongoClient extends MongoClientInterface {
                 const id = entry._id;
                 if (id.startsWith('bucket_')) {
                     const inflightDocument = inflightsMap[id];
-                    const inflight = inflightDocument ? BigIntMax(0n, inflightDocument - entry.usedCapacity._inflightsPreScan) : 0n;
+                    // The metrics have been through `convertNumberToLong`, and the
+                    // field is only stored when non-zero.
+                    const preScan = BigInt(entry.usedCapacity._inflightsPreScan ?? 0);
+                    const inflight = inflightDocument
+                        ? BigIntMax(0n, inflightDocument - preScan)
+                        : 0n;
                     if (inflight) {
                         // Inflights remaining after the scan are part of the "current" bytes,
                         // and stored in _inflightsDelta
