@@ -893,6 +893,39 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
         ],
         [
             'should add content-length to cold storage location and current dataStore '
+            + 'when object is restoring with string typed timestamps',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey6b',
+                value: {
+                    ...objectMdTemp,
+                    dataStoreName: 'cold-location',
+                    replicationInfo: {
+                        backends: [],
+                    },
+                    archive: {
+                        archiveInfo: {},
+                        restoreRequestedAt: new Date(Date.now() - 1000).toISOString(),
+                        restoreCompletedAt: null,
+                        restoreWillExpireAt: null,
+                    },
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {
+                        'us-east-1': 42,
+                        'cold-location': 42,
+                    },
+                },
+            },
+        ],
+        [
+            'should add content-length to cold storage location and current dataStore '
             + 'when object is restored',
             testBucketName,
             true,
@@ -907,6 +940,38 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                         archiveInfo: {},
                         restoreCompletedAt: new Date(Date.now() - 1000),
                         restoreWillExpireAt: new Date(Date.now() + 1000),
+                    },
+                    'x-amz-storage-class': 'cold-location',
+                },
+            },
+            locationConfig,
+            {
+                data: {
+                    account: { [testAccountCanonicalId]: 42 },
+                    bucket: { [`${testBucketName}_${testBucketCreationDate}`]: 42 },
+                    location: {
+                        'us-east-1': 42,
+                        'cold-location': 42,
+                    },
+                },
+            },
+        ],
+        [
+            'should add content-length to cold storage location and current dataStore '
+            + 'when object is restored with string typed timestamps',
+            testBucketName,
+            true,
+            {
+                _id: 'testkey6c',
+                value: {
+                    ...objectMdTemp,
+                    'replicationInfo': {
+                        backends: [],
+                    },
+                    'archive': {
+                        archiveInfo: {},
+                        restoreCompletedAt: new Date(Date.now() - 1000).toISOString(),
+                        restoreWillExpireAt: new Date(Date.now() + 1000).toISOString(),
                     },
                     'x-amz-storage-class': 'cold-location',
                 },
@@ -3174,31 +3239,55 @@ describe('S3UtilsMongoClient, cold object helpers', () => {
         assert.strictEqual(mongoTestClient._isObjectCold(coldObject), true);
     });
 
-    it('should detect a restoring object', () => {
-        const restoringObject = {
-            value: {
-                ...coldObjectMdTemp,
-                archive: new ObjectMDArchive({}, new Date(Date.now() - 5000), 10),
-                dataStoreName: 'cold-location',
-            },
-        };
-        assert.strictEqual(mongoTestClient._isObjectRestoring(restoringObject), true);
-    });
+    // Arsenal types the archive timestamps `Date | string` and stores them as
+    // given, so both forms reach these helpers.
+    describe.each([
+        ['Date', date => date],
+        ['string', date => date.toISOString()],
+    ])('with %s timestamps', (label, stored) => {
+        it('should detect a restoring object', () => {
+            const restoringObject = {
+                value: {
+                    ...coldObjectMdTemp,
+                    archive: new ObjectMDArchive({}, stored(new Date(Date.now() - 5000)), 10),
+                    dataStoreName: 'cold-location',
+                },
+            };
+            assert.strictEqual(mongoTestClient._isObjectRestoring(restoringObject), true);
+        });
 
-    it('should detect a restored object', () => {
-        const restoredObject = {
-            value: {
-                ...coldObjectMdTemp,
-                archive: new ObjectMDArchive(
-                    {},
-                    new Date(Date.now() - 5000),
-                    10,
-                    new Date(Date.now() - 1000),
-                    new Date(Date.now() + 10000),
-                ),
-                dataStoreName: 'us-east-1',
-            },
-        };
-        assert.strictEqual(mongoTestClient._isObjectRestored(restoredObject), true);
+        it('should detect a restored object', () => {
+            const restoredObject = {
+                value: {
+                    ...coldObjectMdTemp,
+                    archive: new ObjectMDArchive(
+                        {},
+                        stored(new Date(Date.now() - 5000)),
+                        10,
+                        stored(new Date(Date.now() - 1000)),
+                        stored(new Date(Date.now() + 10000)),
+                    ),
+                    dataStoreName: 'us-east-1',
+                },
+            };
+            assert.strictEqual(mongoTestClient._isObjectRestored(restoredObject), true);
+        });
+
+        it('should detect an object with an expired restore as cold', () => {
+            const expiredObject = {
+                value: {
+                    ...coldObjectMdTemp,
+                    archive: new ObjectMDArchive(
+                        {},
+                        stored(new Date(Date.now() - 90000)),
+                        10,
+                        stored(new Date(Date.now() - 80000)),
+                        stored(new Date(Date.now() - 1000)),
+                    ),
+                    dataStoreName: 'cold-location',
+                },
+            };
+            assert.strictEqual(mongoTestClient._isObjectCold(expiredObject), true);
+        });
     });
 });
