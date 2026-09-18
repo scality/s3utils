@@ -5,6 +5,7 @@ const assert = require('assert');
 const werelogs = require('werelogs');
 const { BucketInfo, ObjectMD, ObjectMDArchive } = require('arsenal').models;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { Long } = require('mongodb');
 const { constants, errors } = require('arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const {
@@ -18,6 +19,7 @@ const {
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 const USERSBUCKET = '__usersbucket';
+const INFOSTORE = '__infostore';
 
 const mongoTestClient = new S3UtilsMongoClient({});
 
@@ -3127,13 +3129,13 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
                     {
                         _id: 'bucket_bucket1_1715849127256',
                         usedCapacity: {
-                            _inflight: 3000n,
+                            _inflight: 3000,
                         },
                     },
                     {
                         _id: 'bucket_bucket2_1715849127257',
                         usedCapacity: {
-                            _inflight: 5000n,
+                            _inflight: 5000,
                         },
                     },
                 ],
@@ -3150,6 +3152,74 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
         // for account, we have the current and the sum of bucket's inflight deltas
         // as they belong to this account: 2000 + 2900 + 3500
         assert.strictEqual(output[2].usedCapacity.current, 8400n);
+    });
+
+    // `updateInflightDeltas` mutates the entries it is given, so build a fresh set
+    // rather than sharing `metrics` with the tests above.
+    const longMetrics = () => [
+        {
+            _id: 'bucket_bucket1_1715849127256',
+            accountOwnerID: '1234',
+            usedCapacity: { current: 1000n, _inflightsPreScan: 100n },
+        },
+        {
+            _id: 'bucket_bucket2_1715849127257',
+            accountOwnerID: '1234',
+            usedCapacity: { current: 1000n, _inflightsPreScan: 1500n },
+        },
+        {
+            _id: 'account_1234',
+            usedCapacity: { current: 2000n },
+        },
+    ].map(entry => S3UtilsMongoClient.convertNumberToLong(entry));
+
+    it('should compute the inflights deltas with the types mongodb returns', async () => {
+        // `__infostore` stores BSON Longs and the driver promotes them to Numbers on
+        // read, while the metrics have already been through `convertNumberToLong` by
+        // the time this runs: neither side of the arithmetic is a BigInt in production.
+        const collection = await client.getCollection(INFOSTORE);
+        await collection.deleteMany({});
+        await collection.insertMany([
+            {
+                _id: 'bucket_bucket1_1715849127256',
+                usedCapacity: { _inflight: Long.fromNumber(3000) },
+            },
+            {
+                _id: 'bucket_bucket2_1715849127257',
+                usedCapacity: { _inflight: Long.fromNumber(5000) },
+            },
+        ]);
+
+        const output = await client.updateInflightDeltas(longMetrics(), logger);
+
+        // first bucket: 1000 current + (3000 post scan - 100 pre scan) = 3900
+        assert.strictEqual(BigInt(output[0].usedCapacity.current), 3900n);
+        // second bucket: 1000 current + (5000 post scan - 1500 pre scan) = 4500
+        assert.strictEqual(BigInt(output[1].usedCapacity.current), 4500n);
+        // account: 2000 current + 2900 + 3500 = 8400
+        assert.strictEqual(BigInt(output[2].usedCapacity.current), 8400n);
+    });
+
+    it('should compute the inflights delta when there was no pre scan value', async () => {
+        // `_inflightsPreScan` is only stored when non-zero, so a bucket which only
+        // gained inflights during the scan carries no pre scan value at all.
+        const collection = await client.getCollection(INFOSTORE);
+        await collection.deleteMany({});
+        await collection.insertOne({
+            _id: 'bucket_bucket1_1715849127256',
+            usedCapacity: { _inflight: Long.fromNumber(3000) },
+        });
+
+        const output = await client.updateInflightDeltas([
+            S3UtilsMongoClient.convertNumberToLong({
+                _id: 'bucket_bucket1_1715849127256',
+                accountOwnerID: '1234',
+                usedCapacity: { current: 1000n },
+            }),
+        ], logger);
+
+        // 1000 current + (3000 post scan - 0 pre scan) = 4000
+        assert.strictEqual(BigInt(output[0].usedCapacity.current), 4000n);
     });
 });
 
