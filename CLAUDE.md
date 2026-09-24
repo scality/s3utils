@@ -91,7 +91,7 @@ Many scripts are also designed to run inside Docker containers with proper netwo
 
 ### Technology Stack
 
-- **Runtime:** Node.js 22+
+- **Runtime:** Node.js 24+
 - **AWS SDK:** v3 (client-s3, smithy packages)
 - **Scality Libraries:**
   - `arsenal`: Core S3 data models and utilities

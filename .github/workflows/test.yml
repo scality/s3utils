@@ -58,7 +58,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'yarn'
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
