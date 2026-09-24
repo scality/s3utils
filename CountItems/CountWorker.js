@@ -1,6 +1,6 @@
 const assert = require('assert');
 const async = require('async');
-const { BucketInfo } = require('arsenal').models;
+const { BucketInfo } = require('@scality/arsenal').models;
 const monitoring = require('../utils/monitoring');
 const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 

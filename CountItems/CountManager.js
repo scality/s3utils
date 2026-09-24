@@ -1,5 +1,5 @@
 const async = require('async');
-const { once } = require('arsenal').jsutil;
+const { once } = require('@scality/arsenal').jsutil;
 const { validStorageMetricLevels } = require('./utils/constants');
 const { consolidateDataMetrics } = require('./utils/utils');
 const monitoring = require('../utils/monitoring');

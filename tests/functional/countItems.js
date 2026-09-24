@@ -1,8 +1,8 @@
 const cluster = require('cluster');
 const async = require('async');
 const werelogs = require('werelogs');
-const { BucketInfo, ObjectMD } = require('arsenal').models;
-const { constants } = require('arsenal');
+const { BucketInfo, ObjectMD } = require('@scality/arsenal').models;
+const { constants } = require('@scality/arsenal');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
 const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');

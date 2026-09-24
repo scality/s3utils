@@ -1,4 +1,4 @@
-const arsenal = require('arsenal');
+const arsenal = require('@scality/arsenal');
 const bucketclient = require('bucketclient');
 
 const { BucketClientInterface } = arsenal.storage.metadata.bucketclient;

@@ -2,11 +2,11 @@ const util = require('util');
 const async = require('async');
 const assert = require('assert');
 const werelogs = require('werelogs');
-const { BucketInfo } = require('arsenal').models;
-const { versioning, constants } = require('arsenal');
+const { BucketInfo } = require('@scality/arsenal').models;
+const { versioning, constants } = require('@scality/arsenal');
 
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
-const { ObjectMDArchive } = require('arsenal/build/lib/models');
+const { ObjectMDArchive } = require('@scality/arsenal/build/lib/models');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
 const {

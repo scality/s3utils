@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const os = require('os');
-const { jsutil } = require('arsenal');
+const { jsutil } = require('@scality/arsenal');
 
 const { startServer } = require('./server');
 const log = require('./log');

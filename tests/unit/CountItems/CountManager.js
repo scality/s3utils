@@ -1,4 +1,4 @@
-const { BucketInfo } = require('arsenal').models;
+const { BucketInfo } = require('@scality/arsenal').models;
 
 const CountManager = require('../../../CountItems/CountManager');
 

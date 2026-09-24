@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { http, https } = require('httpagent');
-const { ObjectMD } = require('arsenal').models;
+const { ObjectMD } = require('@scality/arsenal').models;
 
 const { S3Client, ListObjectVersionsCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
 const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');

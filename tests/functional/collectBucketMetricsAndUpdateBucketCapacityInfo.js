@@ -1,7 +1,7 @@
 const async = require('async');
 const werelogs = require('werelogs');
 const assert = require('assert');
-const { constants } = require('arsenal');
+const { constants } = require('@scality/arsenal');
 const S3UtilsMongoClient = require('../../utils/S3UtilsMongoClient');
 const { testBucketMD, testBucketCreationDate, testUserBucketInfo } = require('../constants');
 const { collectBucketMetricsAndUpdateBucketCapacityInfo } = require('../../DataReport/collectBucketMetricsAndUpdateBucketCapacityInfo');

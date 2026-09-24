@@ -1,5 +1,5 @@
 const { v4: uuid } = require('uuid');
-const { once } = require('arsenal').jsutil;
+const { once } = require('@scality/arsenal').jsutil;
 const { deserializeBigInts, serializeBigInts } = require('./utils/utils');
 
 class CountWorkerObj {

@@ -1,6 +1,6 @@
-const { MongoClientInterface } = require('arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('@scality/arsenal').storage.metadata.mongoclient;
 const { Long } = require('mongodb');
-const { errors, constants } = require('arsenal');
+const { errors, constants } = require('@scality/arsenal');
 const async = require('async');
 const { promisify } = require('util');
 const { validStorageMetricLevels } = require('../CountItems/utils/constants');

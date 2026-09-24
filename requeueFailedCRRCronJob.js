@@ -6,8 +6,8 @@ const { http: httpArsn } = require('httpagent');
 const { Producer } = require('node-rdkafka');
 const { scheduleJob } = require('node-schedule');
 
-const { errors } = require('arsenal');
-const VID_SEP = require('arsenal').versioning.VersioningConstants
+const { errors } = require('@scality/arsenal');
+const VID_SEP = require('@scality/arsenal').versioning.VersioningConstants
     .VersionId.Separator;
 const { Logger } = require('werelogs');
 

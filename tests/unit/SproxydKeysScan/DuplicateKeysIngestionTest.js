@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { errors } = require('arsenal');
+const { errors } = require('@scality/arsenal');
 const { RaftJournalReader } = require('../../../ObjectRepair/DuplicateKeysIngestion');
 const { subscribers } = require('../../../ObjectRepair/SproxydKeysSubscribers');
 

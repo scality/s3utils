@@ -1,5 +1,5 @@
 const async = require('async');
-const { jsutil } = require('arsenal');
+const { jsutil } = require('@scality/arsenal');
 
 class StalledRequestHandler {
     constructor(client, params) {

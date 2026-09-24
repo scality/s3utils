@@ -3,7 +3,7 @@ const http = require('http');
 const { http: httpArsn } = require('httpagent');
 const stream = require('stream');
 
-const { versioning } = require('arsenal');
+const { versioning } = require('@scality/arsenal');
 
 const httpAgent = new httpArsn.Agent({
     keepAlive: true,

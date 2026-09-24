@@ -2,8 +2,8 @@ const { MongoError } = require('mongodb');
 const {
     isMasterKey,
     VersionID: { encode },
-} = require('arsenal').versioning;
-const { once } = require('arsenal').jsutil;
+} = require('@scality/arsenal').versioning;
+const { once } = require('@scality/arsenal').jsutil;
 
 class StalledEntry {
     constructor(bucketName, key, versionId, storageClass, forceRetry) {

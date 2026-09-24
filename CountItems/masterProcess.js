@@ -1,6 +1,6 @@
 const werelogs = require('werelogs');
-const { network } = require('arsenal');
-const { reshapeExceptionError } = require('arsenal').errorUtils;
+const { network } = require('@scality/arsenal');
+const { reshapeExceptionError } = require('@scality/arsenal').errorUtils;
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
 const CountMaster = require('./CountMaster');

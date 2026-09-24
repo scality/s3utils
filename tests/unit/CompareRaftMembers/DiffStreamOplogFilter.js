@@ -1,7 +1,7 @@
 const http = require('http');
 const stream = require('stream');
 
-const { shuffle } = require('arsenal');
+const { shuffle } = require('@scality/arsenal');
 
 const DiffStreamOplogFilter = require('../../../CompareRaftMembers/DiffStreamOplogFilter');
 

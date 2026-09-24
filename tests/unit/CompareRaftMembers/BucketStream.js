@@ -1,6 +1,6 @@
 const http = require('http');
 
-const { versioning } = require('arsenal');
+const { versioning } = require('@scality/arsenal');
 
 const BucketStream = require('../../../CompareRaftMembers/BucketStream');
 
