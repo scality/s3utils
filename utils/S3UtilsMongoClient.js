@@ -1102,7 +1102,8 @@ class S3UtilsMongoClient extends MongoClientInterface {
      */
     _isObjectCold(entry) {
         return entry.value.archive
-            && (!entry.value.archive.restoreRequestedAt || entry.value.archive.restoreWillExpireAt <= Date.now());
+            && (!entry.value.archive.restoreRequestedAt
+                || new Date(entry.value.archive.restoreWillExpireAt) <= Date.now());
     }
 
     /**
@@ -1112,8 +1113,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
      */
     _isObjectRestoring(entry) {
         return entry.value.archive
-            && entry.value.archive.restoreRequestedAt <= Date.now()
-            && (!entry.value.archive.restoreCompletedAt || entry.value.archive.restoreCompletedAt > Date.now());
+            && new Date(entry.value.archive.restoreRequestedAt) <= Date.now()
+            && (!entry.value.archive.restoreCompletedAt
+                || new Date(entry.value.archive.restoreCompletedAt) > Date.now());
     }
 
     /**
@@ -1123,8 +1125,9 @@ class S3UtilsMongoClient extends MongoClientInterface {
      */
     _isObjectRestored(entry) {
         return entry.value.archive
-            && entry.value.archive.restoreCompletedAt && (entry.value.archive.restoreCompletedAt <= Date.now())
-            && entry.value.archive.restoreWillExpireAt > Date.now();
+            && entry.value.archive.restoreCompletedAt
+            && (new Date(entry.value.archive.restoreCompletedAt) <= Date.now())
+            && new Date(entry.value.archive.restoreWillExpireAt) > Date.now();
     }
 }
 
