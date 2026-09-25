@@ -2,7 +2,7 @@ const async = require('async');
 
 const {
     MongoClientInterface,
-} = require('arsenal').storage.metadata.mongoclient;
+} = require('@scality/arsenal').storage.metadata.mongoclient;
 
 class MongoClientInterfaceStalled extends MongoClientInterface {
     constructor(params) {

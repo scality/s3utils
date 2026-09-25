@@ -1,4 +1,4 @@
-const { BucketInfo } = require('arsenal').models;
+const { BucketInfo } = require('@scality/arsenal').models;
 const werelogs = require('werelogs');
 
 const { testBucketMD } = require('../../constants');

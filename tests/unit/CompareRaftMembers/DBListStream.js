@@ -1,7 +1,7 @@
 const assert = require('assert');
 const stream = require('stream');
 
-const { versioning } = require('arsenal');
+const { versioning } = require('@scality/arsenal');
 
 const DBListStream = require('../../../CompareRaftMembers/DBListStream');
 

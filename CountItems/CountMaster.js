@@ -1,5 +1,5 @@
 const async = require('async');
-const { reshapeExceptionError } = require('arsenal').errorUtils;
+const { reshapeExceptionError } = require('@scality/arsenal').errorUtils;
 
 class CountMaster {
     constructor(params) {

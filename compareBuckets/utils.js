@@ -3,7 +3,7 @@ const async = require('async');
 const { URL } = require('url');
 const { http: httpArsn } = require('httpagent');
 
-const { jsutil } = require('arsenal');
+const { jsutil } = require('@scality/arsenal');
 
 const httpAgent = new httpArsn.Agent({
     keepAlive: true,

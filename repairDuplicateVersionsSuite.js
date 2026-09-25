@@ -8,7 +8,7 @@ const { http: httpArsn, https: httpsArsn } = require('httpagent');
 const { URL } = require('url');
 const readline = require('readline');
 
-const { jsutil, errors } = require('arsenal');
+const { jsutil, errors } = require('@scality/arsenal');
 const { Logger } = require('werelogs');
 
 const {

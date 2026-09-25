@@ -1,6 +1,6 @@
 const async = require('async');
 const werelogs = require('werelogs');
-const { BucketInfo, ObjectMD } = require('arsenal').models;
+const { BucketInfo, ObjectMD } = require('@scality/arsenal').models;
 
 const {
     MongoClientInterfaceStalled,

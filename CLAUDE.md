@@ -94,7 +94,7 @@ Many scripts are also designed to run inside Docker containers with proper netwo
 - **Runtime:** Node.js 24+
 - **AWS SDK:** v3 (client-s3, smithy packages)
 - **Scality Libraries:**
-  - `arsenal`: Core S3 data models and utilities
+  - `@scality/arsenal`: Core S3 data models and utilities
   - `bucketclient`: Bucket metadata client
   - `vaultclient`: Authentication service client
   - `werelogs`: Structured logging

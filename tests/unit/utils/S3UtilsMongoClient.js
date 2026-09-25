@@ -3,10 +3,10 @@ const async = require('async');
 const util = require('util');
 const assert = require('assert');
 const werelogs = require('werelogs');
-const { BucketInfo, ObjectMD, ObjectMDArchive } = require('arsenal').models;
+const { BucketInfo, ObjectMD, ObjectMDArchive } = require('@scality/arsenal').models;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { Long } = require('mongodb');
-const { constants, errors } = require('arsenal');
+const { constants, errors } = require('@scality/arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const {
     mongoMemoryServerParams,

@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
-const { ObjectMD, ReplicationConfiguration } = require('arsenal').models;
+const { ObjectMD, ReplicationConfiguration } = require('@scality/arsenal').models;
 const { 
     ListObjectVersionsCommand, 
     GetBucketReplicationCommand 

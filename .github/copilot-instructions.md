@@ -6,7 +6,7 @@ When reviewing pull requests in this repository, check the following areas:
 | ---- | ------------- |
 | Async error handling | Uncaught promise rejections, missing error callbacks, swallowed errors in streams, missing `.on('error')` handlers |
 | Stream handling | Backpressure issues, proper cleanup on error, no leaked file descriptors, correct use of transform/pipeline |
-| Dependency pinning | Git-based deps (`arsenal`, `vaultclient`, `bucketclient`, `werelogs`, `httpagent`) must pin to a tag, not a branch |
+| Dependency pinning | Scality deps (`@scality/arsenal`, `vaultclient`, `bucketclient`, `werelogs`, `httpagent`) must pin to a released version or tag, never a branch |
 | Logging | Proper use of `werelogs` — no `console.log` in production code, log levels match severity |
 | Async/await usage | Prefer `async`/`await` over raw promise chains (`.then`/`.catch`) and callbacks for new code; ensure `await` is not missing on async calls |
 | Import placement | All `require()` statements must be at the top of the file, never inside functions, blocks, or `describe` scopes |

@@ -1,6 +1,6 @@
 const { waterfall } = require('async');
 const { Logger } = require('werelogs');
-const { errors } = require('arsenal');
+const { errors } = require('@scality/arsenal');
 const { httpRequest } = require('../repairDuplicateVersionsSuite');
 const { SproxydKeysProcessor } = require('./DuplicateKeysWindow');
 const { ProxyLoggerCreator, AggregateLogger } = require('./Logging');

@@ -1,7 +1,7 @@
 const async = require('async');
 const stream = require('stream');
 
-const { jsutil } = require('arsenal');
+const { jsutil } = require('@scality/arsenal');
 
 /**
  * Output differences between two streams, where each stream emits

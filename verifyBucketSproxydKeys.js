@@ -5,7 +5,7 @@ const async = require('async');
 const { URL } = require('url');
 const jsonStream = require('JSONStream');
 
-const { jsutil, versioning } = require('arsenal');
+const { jsutil, versioning } = require('@scality/arsenal');
 const { Logger } = require('werelogs');
 
 const getObjectURL = require('./VerifyBucketSproxydKeys/getObjectURL');

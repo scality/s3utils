@@ -6,7 +6,7 @@ const jsonStream = require('JSONStream');
 const { http: httpArsn } = require('httpagent');
 
 const { Logger } = require('werelogs');
-const { jsutil, errors, versioning } = require('arsenal');
+const { jsutil, errors, versioning } = require('@scality/arsenal');
 
 const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
 const getRepairStrategy = require('./RepairObjects/getRepairStrategy');

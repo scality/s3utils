@@ -1,6 +1,6 @@
 const werelogs = require('werelogs');
 const assert = require('assert');
-const { models } = require('arsenal');
+const { models } = require('@scality/arsenal');
 
 const {
     initializeCrrWithMocks,

@@ -1,5 +1,5 @@
 const werelogs = require('werelogs');
-const { reshapeExceptionError } = require('arsenal').errorUtils;
+const { reshapeExceptionError } = require('@scality/arsenal').errorUtils;
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
 const CountWorker = require('./CountWorker');

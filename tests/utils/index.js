@@ -1,8 +1,8 @@
-const { ObjectMD } = require('arsenal').models;
+const { ObjectMD } = require('@scality/arsenal').models;
 const {
     VersionID: { encode },
     VersioningConstants,
-} = require('arsenal').versioning;
+} = require('@scality/arsenal').versioning;
 
 const { StalledEntry } = require('../../StalledRetry/CursorWrapper');
 
