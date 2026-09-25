@@ -38,7 +38,7 @@
     "bucketclient": "scality/bucketclient#8.3.0",
     "express": "^5.1.0",
     "heapdump": "^0.3.15",
-    "httpagent": "git+https://github.com/scality/httpagent#1.1.0",
+    "httpagent": "scality/httpagent#1.1.0",
     "level": "^9.0.0",
     "mongodb": "^6.17.0",
     "needle": "^3.3.1",
@@ -49,11 +49,6 @@
     "vaultclient": "scality/vaultclient#8.5.1",
     "werelogs": "scality/werelogs#semver:^8.2.4",
     "xml2js": "^0.6.2"
-  },
-  "resolutions": {
-    "ioctl": "2.0.2",
-    "jsprim": "1.4.2",
-    "string-width": "4.2.3"
   },
   "devDependencies": {
     "@aws-sdk/client-iam": "^3.962.0",
