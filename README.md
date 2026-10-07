@@ -164,6 +164,29 @@ Example:
 
 `VERSION_ID_MARKER="123456789"`
 
+#### ALLOW_NEW_SITE
+
+By default, the script only accepts `SITE_NAME` if it is a known
+replication destination:
+
+* listed in the `StorageClass` of the bucket replication rules, or
+* already in the object replication info (`storageClass`).
+
+A backend for an unknown site is never processed and leaves the object
+PENDING forever. So at the first object with an unknown site, the script
+stops the bucket (logged once, nothing written for that object) and
+continues with the next bucket. The buckets stopped are listed at the end.
+Objects with no replication site yet are accepted when the bucket rules
+don't set a `StorageClass` either, since there is nothing to compare.
+
+Set `ALLOW_NEW_SITE=true` to add a destination that existing objects
+don't know yet, e.g. a new DR site with a new name on S3C, where the
+bucket rules use the default replication endpoint (no `StorageClass`).
+
+Example:
+
+`ALLOW_NEW_SITE=true`
+
 
 ### Example use cases
 
@@ -220,6 +243,13 @@ export TARGET_REPLICATION_STATUS=NEW,PENDING,COMPLETED,FAILED
 export MAX_UPDATES=10000
 ```
 
+If the new DR site has a different name and the bucket replication rules
+don't set it in `StorageClass`, also set:
+
+```
+export ALLOW_NEW_SITE=true
+```
+
 #### Re-sync a DR site back to the primary site
 
 When objects have been lost from the primary site you can re-sync
@@ -232,6 +262,45 @@ from the DR bucket to the primary bucket):
 export TARGET_REPLICATION_STATUS=REPLICA
 export MAX_UPDATES=10000
 ```
+
+# Remove a replication site from object metadata
+
+Clean up objects left PENDING forever by a `crrExistingObjects.js` run
+with a wrong `SITE_NAME`. The script removes the site from the object
+replication info (backends, storageClass, storageType) and recomputes
+the global replication status from the remaining sites:
+
+* all remaining sites COMPLETED -> COMPLETED, nothing is replicated again
+* a remaining site PENDING -> PENDING, the object is requeued for that site
+* a remaining site FAILED -> FAILED
+* the site was the only site -> replication info reset to empty (never
+  replicated). Run `crrExistingObjects.js` with the right `SITE_NAME` to
+  replicate the object.
+
+Object versions and delete markers are both processed. A version where the
+site is the only backend but `storageClass` lists other sites is not changed
+and is logged for manual review.
+
+```
+node removeReplicationSite.js bucket1[,bucket2...]
+```
+
+## Mandatory environment variables
+
+* **ENDPOINT**, **ACCESS_KEY**, **SECRET_KEY**
+* **SITE_TO_REMOVE**: the wrong site name to remove
+
+## Optional environment variables
+
+* **DRY_RUN**: `true` by default, only logs what would change. Set
+  `DRY_RUN=false` to write the changes.
+* **TARGET_PREFIX**: only process keys with this prefix
+* **WORKERS**: parallel metadata updates (default 10)
+* **MAX_UPDATES**: stop after this many updates, and log the bucket list,
+  `KEY_MARKER` and `VERSION_ID_MARKER` to resume. Use it to limit the
+  number of objects requeued at once.
+* **KEY_MARKER**, **VERSION_ID_MARKER**: resume where an earlier run stopped
+* **DEBUG**: set to 1 for debug logs
 
 # Empty a versioned bucket
 

@@ -25,6 +25,7 @@ const MAX_SCANNED = (process.env.MAX_SCANNED
 const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
 const CURRENT_VERSION_ONLY = process.env.CURRENT_VERSION_ONLY === 'true' || process.env.CURRENT_VERSION_ONLY === '1' || false;
+const ALLOW_NEW_SITE = process.env.ALLOW_NEW_SITE === 'true' || process.env.ALLOW_NEW_SITE === '1' || false;
 
 const {
     ACCESS_KEY,
@@ -94,6 +95,7 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     versionIdMarker: VERSION_ID_MARKER,
     currentVersionOnly: CURRENT_VERSION_ONLY,
     forceUsingConfiguration: FORCE_USING_CONFIGURATION,
+    allowNewSite: ALLOW_NEW_SITE,
 }, log);
 
 replicationStatusUpdater.run(err => {

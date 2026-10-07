@@ -100,6 +100,7 @@ describe('crrExistingObjects', () => {
             versionIdMarker: 'testVersionIdMarker',
             currentVersionOnly: true,
             forceUsingConfiguration: true,
+            allowNewSite: false,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();
@@ -137,6 +138,7 @@ describe('crrExistingObjects', () => {
             versionIdMarker: undefined,
             currentVersionOnly: false,
             forceUsingConfiguration: false,
+            allowNewSite: false,
         }, expect.anything());
 
         expect(mockFatal).not.toHaveBeenCalled();

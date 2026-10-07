@@ -32,6 +32,8 @@ class ReplicationStatusUpdater {
      * @param {string} [params.versionIdMarker] - (Optional) Version ID marker for resuming object listing.
      * @param {boolean} [params.currentVersionOnly] - (Optional) Whether to process only the current version of objects.
      * @param {boolean} [params.forceUsingConfiguration] - (Optional) Force reset replication target to bucket's configuration.
+     * @param {boolean} [params.allowNewSite] - (Optional) Accept a site that is not in the bucket
+     * replication rules and not in the object replication info.
      */
     constructor(params, log) {
         const {
@@ -51,6 +53,7 @@ class ReplicationStatusUpdater {
             versionIdMarker,
             currentVersionOnly,
             forceUsingConfiguration,
+            allowNewSite,
         } = params;
 
         // inputs
@@ -70,6 +73,7 @@ class ReplicationStatusUpdater {
         this.inputVersionIdMarker = versionIdMarker;
         this.currentVersionOnly = currentVersionOnly;
         this.forceUsingConfiguration = forceUsingConfiguration;
+        this.allowNewSite = allowNewSite;
         this.log = log;
 
         this._setupClients();
@@ -82,6 +86,8 @@ class ReplicationStatusUpdater {
         this._nUpdated = 0;
         this._nErrors = 0;
         this._bucketInProgress = null;
+        this._bucketStopped = false;
+        this._stoppedBuckets = [];
         this._VersionIdMarker = null;
         this._KeyMarker = null;
     }
@@ -138,6 +144,67 @@ class ReplicationStatusUpdater {
     }
 
     /**
+     * Returns the sites set in the StorageClass of the bucket replication rules.
+     * Empty when the rules use the default replication endpoint (no StorageClass).
+     * @private
+     * @param {Array} rules - Bucket replication rules.
+     * @returns {Array<string>} Site names.
+     */
+    _getConfiguredSites(rules) {
+        return (rules || [])
+            .map(rule => rule.Destination && rule.Destination.StorageClass)
+            .filter(Boolean)
+            .flatMap(storageClass => storageClass.split(','))
+            .map(site => site.split(':preferred_read')[0]);
+    }
+
+    /**
+     * Returns the sites in the object replication info (storageClass).
+     * Empty when the object was never set up for replication.
+     * @private
+     * @param {ObjectMD} objMD - Object metadata.
+     * @returns {Array<string>} Site names.
+     */
+    _getObjectSites(objMD) {
+        const storageClass = objMD.getReplicationInfo()
+            && objMD.getReplicationStorageClass();
+        if (!storageClass) {
+            return [];
+        }
+        return storageClass.split(',')
+            .map(site => site.split(':preferred_read')[0]);
+    }
+
+    /**
+     * Checks that the site is a known replication destination: in the bucket rules
+     * (StorageClass) or in the object replication info (storageClass).
+     * This make sure we don't create a backend no replication processor handles to avoid the
+     * object staying PENDING forever.
+     *
+     * | Bucket rule           | Object sites | SITE_NAME | Result                                     |
+     * |-----------------------|--------------|-----------|--------------------------------------------|
+     * | StorageClass=lab-9512 | none         | lab-9512  | processed                                  |
+     * | StorageClass=lab-9512 | none         | foo       | skipped (known sites = [lab-9512])         |
+     * | no StorageClass       | lab-9512     | lab-9512  | processed                                  |
+     * | no StorageClass       | lab-9512     | foo       | skipped (known sites = [lab-9512])         |
+     * | no StorageClass       | none         | lab-9512  | processed                                  |
+     * | no StorageClass       | none         | foo       | processed: nothing to compare, not caught  |
+     * | no StorageClass       | none         | unset     | error "missing SITE_NAME" (_markPending)   |
+     *
+     * NOTE: if no StorageClass, S3C will use the default replication endpoint from 
+     * the federation config (env_replication_endpoints).
+     * @private
+     * @param {ObjectMD} objMD - Object metadata.
+     * @param {string} site - Destination site name.
+     * @param {Array<string>} configuredSites - Sites set in the bucket replication rules.
+     * @returns {boolean} True if the site is known, or nothing to compare against.
+     */
+    _isKnownSite(objMD, site, configuredSites) {
+        const knownSites = configuredSites.concat(this._getObjectSites(objMD));
+        return knownSites.length === 0 || knownSites.includes(site);
+    }
+
+    /**
      * Marks an object as pending for replication.
      * @private
      * @param {string} bucket - The bucket name.
@@ -145,6 +212,7 @@ class ReplicationStatusUpdater {
      * @param {string} versionId - The object version ID.
      * @param {string} storageClass - The storage class for replication.
      * @param {Object} repConfig - The replication configuration.
+     * @param {Array<string>} configuredSites - Sites set in the bucket replication rules.
      * @param {Function} cb - Callback function.
      * @returns {void}
      */
@@ -154,6 +222,7 @@ class ReplicationStatusUpdater {
         versionId,
         storageClass,
         repConfig,
+        configuredSites,
         cb,
     ) {
         let objMD;
@@ -185,6 +254,28 @@ class ReplicationStatusUpdater {
                 }
 
                 if (!this._objectShouldBeUpdated(objMD, storageClass)) {
+                    skip = true;
+                    return process.nextTick(next);
+                }
+                // The site must be in the bucket rules (StorageClass) or already in the
+                // object replication info. Without StorageClass (S3C default endpoint),
+                // only the object replication info knows the site.
+                if (!this.allowNewSite
+                    && !this._isKnownSite(objMD, storageClass, configuredSites)) {
+                    // one unknown site is enough: SITE_NAME is wrong for this bucket,
+                    // stop it instead of scanning (and logging) every object
+                    if (!this._bucketStopped) {
+                        this._bucketStopped = true;
+                        this.log.error('unknown replication site, stopping bucket. '
+                            + 'Check SITE_NAME, or set ALLOW_NEW_SITE=true to add a new destination', {
+                            bucket,
+                            key,
+                            versionId,
+                            site: storageClass,
+                            bucketSites: configuredSites,
+                            objectSites: this._getObjectSites(objMD),
+                        });
+                    }
                     skip = true;
                     return process.nextTick(next);
                 }
@@ -322,14 +413,20 @@ class ReplicationStatusUpdater {
                 if (!this.siteName) {
                     this.log.warn(`missing SITE_NAME environment variable, triggering replication to the ${storageClass} storage class`);
                 }
+                const configuredSites = this._getConfiguredSites(Rules);
                 return eachLimit(versions, this.workers, (i, apply) => {
                     const { Key, VersionId, IsLatest } = i;
+                    if (this._bucketStopped) {
+                        // bucket stopped on an unknown site: don't start new objects
+                        apply();
+                        return;
+                    }
                     if (this.currentVersionOnly && !IsLatest) {
                         ++this._nSkipped;
                         apply();
                         return;
                     }
-                    this._markObjectPending(bucket, Key, VersionId, storageClass, repConfig, apply);
+                    this._markObjectPending(bucket, Key, VersionId, storageClass, repConfig, configuredSites, apply);
                 }, next);
             },
         ], cb);
@@ -345,6 +442,7 @@ class ReplicationStatusUpdater {
     _triggerCRROnBucket(bucketName, cb) {
         const bucket = bucketName.trim();
         this._bucketInProgress = bucket;
+        this._bucketStopped = false;
         this.log.info(`starting task for bucket: ${bucket}`);
         if (this.inputKeyMarker || this.inputVersionIdMarker) {
             // resume from where we left off in previous script launch
@@ -377,6 +475,9 @@ class ReplicationStatusUpdater {
                 },
             ),
             async () => {
+                if (this._bucketStopped) {
+                    return false;
+                }
                 if (this._nUpdated >= this.maxUpdates || this._nProcessed >= this.maxScanned) {
                     this._logProgress();
                     let remainingBuckets;
@@ -417,7 +518,12 @@ class ReplicationStatusUpdater {
                     return;
                 }
                 this._logProgress();
-                this.log.info(`completed task for bucket: ${bucket}`);
+                if (this._bucketStopped) {
+                    this._stoppedBuckets.push(bucket);
+                    this.log.error(`stopped task for bucket: ${bucket}, unknown replication site`);
+                } else {
+                    this.log.info(`completed task for bucket: ${bucket}`);
+                }
                 cb();
             },
         );
@@ -434,6 +540,13 @@ class ReplicationStatusUpdater {
             if (err) {
                 cb(err);
                 return;
+            }
+            if (this._stoppedBuckets.length > 0) {
+                this.log.error('buckets stopped on an unknown replication site, check SITE_NAME '
+                    + 'or set ALLOW_NEW_SITE=true', {
+                    site: this.siteName,
+                    buckets: this._stoppedBuckets,
+                });
             }
             cb();
         });
