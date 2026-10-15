@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const stream = require('stream');
 
+const { jsutil } = require('@scality/arsenal');
 const { Logger } = require('werelogs');
 const { ClassicLevel } = require('classic-level');
 
@@ -204,9 +205,20 @@ function streamDbDiff(db, dbPath, cb) {
         bucketdPort: BUCKETD_PORT,
         digestsDb,
     });
+    // .pipe() does not forward errors: report the first one from any stream
+    const done = jsutil.once(err => {
+        if (err) {
+            log.error('error during scan of database', { dbPath, error: err.message });
+        } else {
+            log.info('completed scan of database', { dbPath });
+        }
+        cb(err);
+    });
 
     dbRawStream
+        .on('error', done)
         .pipe(dbListStream)
+        .on('error', done)
         .pipe(diffStream);
     dbListStream
         .on('data', () => {
@@ -221,14 +233,8 @@ function streamDbDiff(db, dbPath, cb) {
                 });
             }
         })
-        .on('end', () => {
-            log.info('completed scan of database', { dbPath });
-            cb();
-        })
-        .on('error', err => {
-            log.error('error from diff stream', { dbPath, error: err.message });
-            cb(err);
-        });
+        .on('end', () => done())
+        .on('error', done);
 }
 
 function scanDb(dbPath, cb) {
@@ -237,7 +243,10 @@ function scanDb(dbPath, cb) {
         if (err) {
             return cb(err);
         }
-        return streamDbDiff(db, dbPath, cb);
+        return streamDbDiff(db, dbPath, streamErr => db.close().then(
+            () => cb(streamErr),
+            closeErr => cb(streamErr || closeErr),
+        ));
     });
 }
 

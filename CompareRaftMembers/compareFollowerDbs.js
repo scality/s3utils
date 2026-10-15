@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const stream = require('stream');
 
+const { jsutil } = require('@scality/arsenal');
 const { Logger } = require('werelogs');
 const { ClassicLevel } = require('classic-level');
 
@@ -208,11 +209,26 @@ function openDb(dbPath, cb) {
 }
 
 function streamDbsDiff(dbs, dbPair, cb) {
+    // .pipe() does not forward errors: report the first one from any stream
+    const done = jsutil.once(err => {
+        if (err) {
+            log.error(
+                'error during comparison of database pair',
+                { db1: dbPair[0], db2: dbPair[1], error: err.message },
+            );
+        } else {
+            log.info('completed scan of database pair', { db1: dbPair[0], db2: dbPair[1] });
+        }
+        cb(err);
+    });
     const dbListStreams = dbs.map((db, i) => {
         const dbPath = dbPair[i];
         const dbRawStream = levelReadStream(db);
         const dbListStream = new DBListStream({ dbName: path.basename(dbPath) });
-        dbRawStream.pipe(dbListStream);
+        dbRawStream
+            .on('error', done)
+            .pipe(dbListStream)
+            .on('error', done);
         return dbListStream;
     });
     dbListStreams[0]
@@ -230,17 +246,8 @@ function streamDbsDiff(dbs, dbPair, cb) {
                 });
             }
         })
-        .on('end', () => {
-            log.info('completed scan of database pair', { db1: dbPair[0], db2: dbPair[1] });
-            cb();
-        })
-        .on('error', err => {
-            log.error(
-                'error from diff stream',
-                { db1: dbPair[0], db2: dbPair[1], error: err.message },
-            );
-            cb(err);
-        });
+        .on('end', () => done())
+        .on('error', done);
 }
 
 function compareDbs(dbPair, cb) {
@@ -252,7 +259,10 @@ function compareDbs(dbPair, cb) {
         if (err) {
             return cb(err);
         }
-        return streamDbsDiff(dbs, dbPair, cb);
+        return streamDbsDiff(dbs, dbPair, streamErr => Promise.all(dbs.map(db => db.close())).then(
+            () => cb(streamErr),
+            closeErr => cb(streamErr || closeErr),
+        ));
     });
 }
 

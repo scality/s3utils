@@ -102,6 +102,19 @@ describe('levelReadStream', () => {
         expect(iterator.close).toHaveBeenCalled();
     });
 
+    test('should keep the read error when closing the iterator also fails', async () => {
+        const iterator = {
+            next: async () => {
+                throw new Error('read failure');
+            },
+            close: async () => {
+                throw new Error('close failure');
+            },
+        };
+        const readable = levelReadStream({ iterator: () => iterator });
+        await expect(collect(readable)).rejects.toThrow('read failure');
+    });
+
     test('should report a failure to close the iterator', async () => {
         const iterator = {
             next: () => new Promise(() => {}),

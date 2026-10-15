@@ -25,7 +25,7 @@ class LevelReadStream extends Readable {
     }
 
     _destroy(err, callback) {
-        this.dbIterator.close().then(() => callback(err), callback);
+        this.dbIterator.close().then(() => callback(err), closeErr => callback(err || closeErr));
     }
 }
 
