@@ -1,7 +1,7 @@
 const async = require('async');
 const stream = require('stream');
 
-const Level = require('level');
+const { ClassicLevel } = require('classic-level');
 
 const MAX_BATCH_SIZE = 100;
 const MAX_QUEUE_SIZE = 1000;
@@ -21,19 +21,19 @@ class BlockDigestsStorage extends stream.Writable {
      * @param {string} [params.levelPath] - path to LevelDB database
      * to write to
      * @param {string} [params.db] - custom db object, must contain
-     * the methods "batch" and "close" following levelup's API -
+     * the promise-based methods "batch" and "close" of classic-level -
      * currently used for unit tests
      */
     constructor(params) {
         super({ objectMode: true });
         const { levelPath, db } = params;
         if (levelPath) {
-            this.db = new Level(params.levelPath);
+            this.db = new ClassicLevel(params.levelPath);
         } else {
             this.db = db;
         }
         this.cargo = async.cargo((tasks, cb) => {
-            this.db.batch(tasks, cb);
+            this.db.batch(tasks).then(() => cb(), cb);
         }, MAX_BATCH_SIZE);
     }
 
@@ -55,10 +55,10 @@ class BlockDigestsStorage extends stream.Writable {
 
     _final(callback) {
         if (this.cargo.idle()) {
-            this.db.close(callback);
+            this.db.close().then(() => callback(), callback);
         } else {
             this.cargo.drain(() => {
-                this.db.close(callback);
+                this.db.close().then(() => callback(), callback);
             });
         }
     }

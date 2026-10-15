@@ -6,11 +6,12 @@ const path = require('path');
 const stream = require('stream');
 
 const { Logger } = require('werelogs');
-const Level = require('level');
+const { ClassicLevel } = require('classic-level');
 
 const DBListStream = require('./DBListStream');
 const DiffStreamOplogFilter = require('./DiffStreamOplogFilter');
 const KeyValueStreamDiff = require('./KeyValueStreamDiff');
+const levelReadStream = require('./levelReadStream');
 
 const DEFAULT_PARALLEL_SCANS = 4;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
@@ -197,14 +198,19 @@ if (EXCLUDE_FROM_CSEQS) {
         .pipe(DIFF_OUTPUT_STREAM);
 }
 
-function compareDbs(dbPair, cb) {
-    log.info(
-        'starting comparison of pair of databases',
-        { db1: dbPair[0], db2: dbPair[1] },
-    );
-    const dbListStreams = dbPair.map(dbPath => {
-        const db = new Level(dbPath);
-        const dbRawStream = db.createReadStream();
+// classic-level opens lazily: open explicitly so that a missing database fails the scan
+function openDb(dbPath, cb) {
+    const db = new ClassicLevel(dbPath, { createIfMissing: false });
+    db.open().then(() => cb(null, db), err => {
+        log.error('unable to open database', { dbPath, error: (err.cause || err).message });
+        cb(err);
+    });
+}
+
+function streamDbsDiff(dbs, dbPair, cb) {
+    const dbListStreams = dbs.map((db, i) => {
+        const dbPath = dbPair[i];
+        const dbRawStream = levelReadStream(db);
         const dbListStream = new DBListStream({ dbName: path.basename(dbPath) });
         dbRawStream.pipe(dbListStream);
         return dbListStream;
@@ -235,6 +241,19 @@ function compareDbs(dbPair, cb) {
             );
             cb(err);
         });
+}
+
+function compareDbs(dbPair, cb) {
+    log.info(
+        'starting comparison of pair of databases',
+        { db1: dbPair[0], db2: dbPair[1] },
+    );
+    async.map(dbPair, openDb, (err, dbs) => {
+        if (err) {
+            return cb(err);
+        }
+        return streamDbsDiff(dbs, dbPair, cb);
+    });
 }
 
 function main() {

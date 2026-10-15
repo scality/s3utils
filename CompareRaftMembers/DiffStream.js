@@ -2,6 +2,7 @@ const stream = require('stream');
 
 const BucketStream = require('./BucketStream');
 const BlockDigestsStream = require('./BlockDigestsStream');
+const levelReadStream = require('./levelReadStream');
 
 /**
  * Output differences between the input stream, consisting of
@@ -386,7 +387,7 @@ class DiffStream extends stream.Transform {
      * @return {undefined}
      */
     _createDigestsDbStream(fromItem) {
-        this.currentDbDigestsStream = this.digestsDb.createReadStream({
+        this.currentDbDigestsStream = levelReadStream(this.digestsDb, {
             gte: fromItem.fullKey,
             // '0' is the ASCII character following '/': this restricts
             // the digest's lastKey to be from the current bucket

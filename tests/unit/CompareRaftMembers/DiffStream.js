@@ -49,36 +49,27 @@ class MockBucketStream extends stream.Readable {
     }
 }
 
-class MockDigestsStream extends stream.Readable {
-    constructor(digestsToStream) {
-        super({ objectMode: true });
-        this.digestsToStream = digestsToStream;
-    }
-
-    _read() {
-        setTimeout(() => {
-            if (this.digestsToStream.length > 0) {
-                this.push(this.digestsToStream.shift());
-            } else {
-                this.push(null);
-            }
-        }, 5);
-    }
-}
-
 class MockDigestsDB {
     constructor(storedDigests) {
         this.storedDigests = storedDigests;
     }
 
-    createReadStream(params) {
+    // mimics the iterators of abstract-level databases
+    iterator(params) {
         const { gte, lt } = params || {};
-        return new MockDigestsStream(
-            this.storedDigests.filter(
-                digestEntry => (!gte || digestEntry.key >= gte)
-                    && (!lt || digestEntry.key < lt),
-            ),
+        const digests = this.storedDigests.filter(
+            digestEntry => (!gte || digestEntry.key >= gte)
+                && (!lt || digestEntry.key < lt),
         );
+        return {
+            next: () => new Promise(resolve => {
+                setTimeout(() => {
+                    const digest = digests.shift();
+                    resolve(digest && [digest.key, digest.value]);
+                }, 5);
+            }),
+            close: async () => {},
+        };
     }
 }
 

@@ -6,11 +6,12 @@ const path = require('path');
 const stream = require('stream');
 
 const { Logger } = require('werelogs');
-const Level = require('level');
+const { ClassicLevel } = require('classic-level');
 
 const DBListStream = require('./DBListStream');
 const DiffStream = require('./DiffStream');
 const DiffStreamOplogFilter = require('./DiffStreamOplogFilter');
+const levelReadStream = require('./levelReadStream');
 
 const DEFAULT_PARALLEL_SCANS = 4;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
@@ -183,13 +184,20 @@ if (EXCLUDE_FROM_CSEQS) {
 
 let digestsDb;
 if (LISTING_DIGESTS_INPUT_DIR) {
-    digestsDb = new Level(LISTING_DIGESTS_INPUT_DIR, { createIfMissing: false });
+    digestsDb = new ClassicLevel(LISTING_DIGESTS_INPUT_DIR, { createIfMissing: false });
 }
 
-function scanDb(dbPath, cb) {
-    log.info('starting scan of database', { dbPath });
-    const db = new Level(dbPath);
-    const dbRawStream = db.createReadStream();
+// classic-level opens lazily: open explicitly so that a missing database fails the scan
+function openDb(dbPath, cb) {
+    const db = new ClassicLevel(dbPath, { createIfMissing: false });
+    db.open().then(() => cb(null, db), err => {
+        log.error('unable to open database', { dbPath, error: (err.cause || err).message });
+        cb(err);
+    });
+}
+
+function streamDbDiff(db, dbPath, cb) {
+    const dbRawStream = levelReadStream(db);
     const dbListStream = new DBListStream({ dbName: path.basename(dbPath) });
     const diffStream = new DiffStream({
         bucketdHost: BUCKETD_HOST,
@@ -223,13 +231,36 @@ function scanDb(dbPath, cb) {
         });
 }
 
+function scanDb(dbPath, cb) {
+    log.info('starting scan of database', { dbPath });
+    openDb(dbPath, (err, db) => {
+        if (err) {
+            return cb(err);
+        }
+        return streamDbDiff(db, dbPath, cb);
+    });
+}
+
 function main() {
     log.info('starting scan');
     async.series([
+        // classic-level opens lazily: open explicitly to fail early on a missing digests database
+        done => {
+            if (!digestsDb) {
+                return done();
+            }
+            return digestsDb.open().then(() => done(), err => {
+                log.error('unable to open listing digests database', {
+                    path: LISTING_DIGESTS_INPUT_DIR,
+                    error: (err.cause || err).message,
+                });
+                done(err);
+            });
+        },
         done => async.eachLimit(DATABASES_LIST, PARALLEL_SCANS, scanDb, done),
         done => {
             if (digestsDb) {
-                digestsDb.close(done);
+                digestsDb.close().then(() => done(), done);
             } else {
                 done();
             }
