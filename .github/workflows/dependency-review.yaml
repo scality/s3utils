@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout Repository'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: 'Dependency Review'
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5.0.0
         with:
           # aws-sdk v2 is intentionally used as a devDependency because the
           # fix-missing-replication-permissions script runs inside the vault
