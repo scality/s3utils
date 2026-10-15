@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const v8 = require('v8');
 const werelogs = require('werelogs');
-const heapdump = require('heapdump');
 
 const logger = new werelogs.Logger('Utils::HeapProfiler');
 
@@ -10,15 +10,14 @@ function generateFilename(dir) {
 }
 
 function writeSnapshot(filename) {
-    heapdump.writeSnapshot(filename, (err, filename) => {
-        if (err) {
-            logger.error(`unable to write heapdump to ${filename}:`, {
-                error: err,
-            });
-        } else {
-            logger.debug(`heapdump written to ${filename}:`);
-        }
-    });
+    try {
+        v8.writeHeapSnapshot(filename);
+        logger.debug(`heapdump written to ${filename}:`);
+    } catch (err) {
+        logger.error(`unable to write heapdump to ${filename}:`, {
+            error: err,
+        });
+    }
 }
 
 module.exports = (dir, interval) => {
