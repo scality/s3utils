@@ -1,6 +1,7 @@
 const werelogs = require('werelogs');
 const assert = require('assert');
 const { models } = require('@scality/arsenal');
+const { GetBucketReplicationCommand, ListObjectVersionsCommand } = require('@aws-sdk/client-s3');
 
 const {
     initializeCrrWithMocks,
@@ -30,7 +31,7 @@ describe('ReplicationStatusUpdater', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2); // One for listObjectVersions, one for getBucketReplication
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     MaxKeys: 10,
@@ -41,7 +42,7 @@ describe('ReplicationStatusUpdater', () => {
             }));
             
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' }),
+                constructor: GetBucketReplicationCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0'
                 })
@@ -103,7 +104,7 @@ describe('ReplicationStatusUpdater', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     MaxKeys: 10,
@@ -114,7 +115,7 @@ describe('ReplicationStatusUpdater', () => {
             }));
             
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' }),
+                constructor: GetBucketReplicationCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0'
                 })
@@ -379,7 +380,7 @@ describe('ReplicationStatusUpdater', () => {
 
                 expect(crr.s3.send).toHaveBeenCalledTimes(2);
                 expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                    constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                    constructor: ListObjectVersionsCommand,
                     input: expect.objectContaining({
                         Bucket: 'bucket0',
                         MaxKeys: 10,
@@ -390,7 +391,7 @@ describe('ReplicationStatusUpdater', () => {
                 }));
                 
                 expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                    constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' }),
+                    constructor: GetBucketReplicationCommand,
                     input: expect.objectContaining({
                         Bucket: 'bucket0'
                     })
@@ -431,10 +432,10 @@ describe('ReplicationStatusUpdater with specifics', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' })
+                constructor: ListObjectVersionsCommand
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
             
             expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
@@ -463,7 +464,7 @@ describe('ReplicationStatusUpdater with specifics', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(4);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     Prefix: undefined,
@@ -473,10 +474,10 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 })
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(3, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     KeyMarker: 'key0',
@@ -484,7 +485,7 @@ describe('ReplicationStatusUpdater with specifics', () => {
                 })
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(4, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
 
             expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
@@ -513,10 +514,10 @@ describe('ReplicationStatusUpdater with specifics', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' })
+                constructor: ListObjectVersionsCommand
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
             expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
             expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
@@ -542,7 +543,7 @@ describe('ReplicationStatusUpdater with specifics', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     Prefix: undefined,
@@ -570,7 +571,7 @@ describe('ReplicationStatusUpdater with specifics', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' }),
+                constructor: ListObjectVersionsCommand,
                 input: expect.objectContaining({
                     Bucket: 'bucket0',
                     Prefix: undefined,
@@ -724,10 +725,10 @@ describe('ReplicationStatusUpdater with currentVersionOnly', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' })
+                constructor: ListObjectVersionsCommand
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
 
             expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
@@ -805,10 +806,10 @@ describe('ReplicationStatusUpdater with currentVersionOnly', () => {
 
             expect(crr.s3.send).toHaveBeenCalledTimes(2);
             expect(crr.s3.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'ListObjectVersionsCommand' })
+                constructor: ListObjectVersionsCommand
             }));
             expect(crr.s3.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
-                constructor: expect.objectContaining({ name: 'GetBucketReplicationCommand' })
+                constructor: GetBucketReplicationCommand
             }));
 
             expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(2);
