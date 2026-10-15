@@ -1,5 +1,5 @@
 const { S3Client } = require('@aws-sdk/client-s3');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { ConfiguredRetryStrategy } = require('@smithy/util-retry');
 const http = require('http');
 const https = require('https');
@@ -39,7 +39,7 @@ const createS3Client = ({ accessKey, secretKey, endpoint }, log) => {
                 // so https will work but there will be no security enforced
                 rejectUnauthorized: false
             }),
-            requestTimeout: 60000,
+            socketTimeout: 60000,
         }),
         retryStrategy: new ConfiguredRetryStrategy(
             AWS_SDK_REQUEST_RETRIES, // maxAttempts

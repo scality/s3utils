@@ -31,7 +31,7 @@ class Client {
 
         const requestHandler = {
             connectionTimeout: 60000,
-            requestTimeout: 60000,
+            socketTimeout: 60000,
         };
         if (isHttps) {
             requestHandler.httpsAgent = httpAgent;

@@ -6,7 +6,7 @@ const {
     ListMultipartUploadsCommand,
     AbortMultipartUploadCommand, 
 } = require('@aws-sdk/client-s3');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { Logger } = require('werelogs');
 
 const log = new Logger('s3utils::emptyBucket');

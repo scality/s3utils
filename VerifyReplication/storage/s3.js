@@ -1,5 +1,5 @@
 const { S3Client, HeadObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { ConfiguredRetryStrategy } = require('@smithy/util-retry');
 const fs = require('fs');
 const http = require('http');
@@ -61,7 +61,7 @@ function getClient(params) {
         requestHandler: new NodeHttpHandler({
             httpAgent,
             httpsAgent,
-            requestTimeout: httpTimeout || 300000,
+            socketTimeout: httpTimeout || 300000,
         }),
     };
 

@@ -3,7 +3,7 @@ const { http, https } = require('httpagent');
 const { ObjectMD } = require('@scality/arsenal').models;
 
 const { S3Client, ListObjectVersionsCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { ConfiguredRetryStrategy } = require('@smithy/util-retry');
 const { doWhilst, eachSeries, filterLimit } = require('async');
 
@@ -186,7 +186,7 @@ const s3 = new S3Client({
     requestHandler: new NodeHttpHandler({
         httpAgent: agent,
         httpsAgent: agent,
-        requestTimeout: 60000,
+        socketTimeout: 60000,
     }),
     retryStrategy: new ConfiguredRetryStrategy(
         AWS_SDK_REQUEST_RETRIES,

@@ -1,6 +1,6 @@
 const async = require('async');
 const { S3Client, ListObjectVersionsCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
-const { NodeHttpHandler } = require('@aws-sdk/node-http-handler');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const http = require('http');
 
 const { Logger } = require('werelogs');
@@ -185,7 +185,7 @@ function listObjectsByReplicationStatus(options) {
         tls: false,
         requestHandler: new NodeHttpHandler({
             httpAgent: new http.Agent({ keepAlive: true }),
-            requestTimeout: 60000,
+            socketTimeout: 60000,
         }),
     });
 
