@@ -1,13 +1,17 @@
-const randomize = require('randomatic');
-const range = require('lodash/range');
+const crypto = require('crypto');
 const { setupProcessor } = require('../../utils/setupProcessor');
+
+const range = n => Array.from({ length: n }, (_, i) => i);
 
 describe('SproxydKeysSubscribers', () => {
     describe('DuplicateSproxydKeyFoundHandler', () => {
         const [processor, duplicateHandler] = setupProcessor(10);
 
         const key = 'test-2021-11-24T19-41-08-494Z/2\u000098362217123979999997RG001 ';
-        const version = () => `${randomize('0', 3)}.${randomize('0', 3)}`;
+        const version = () => {
+            const digits = () => String(crypto.randomInt(1000)).padStart(3, '0');
+            return `${digits()}.${digits()}`;
+        };
 
         test('the higher (older) version is always repaired and then the lower (newer) version is set in map', () => {
             range(100).forEach(idx => {

@@ -1,7 +1,10 @@
-const randomize = require('randomatic');
-const range = require('lodash/range');
+const crypto = require('crypto');
 const { BoundedMap, MultiMap } = require('../../../ObjectRepair/DuplicateKeysWindow');
 const { setupProcessor } = require('../../utils/setupProcessor');
+
+const range = n => Array.from({ length: n }, (_, i) => i);
+
+const randomize = (_pattern, length) => crypto.randomBytes(length / 2).toString('hex').toUpperCase();
 
 describe('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
