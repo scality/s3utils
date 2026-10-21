@@ -1,9 +1,10 @@
-const { S3Client, CreateBucketCommand, ListBucketsCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand } = require('@aws-sdk/client-s3');
+const { S3Client, CreateBucketCommand, ListBucketsCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { IAMClient, CreateUserCommand, CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand, ListRolesCommand, ListAttachedRolePoliciesCommand, ListUsersCommand, ListAttachedUserPoliciesCommand, DetachUserPolicyCommand } = require('@aws-sdk/client-iam');
 const { promisify } = require('util');
 const { Logger } = require('werelogs');
 const admincredentials = require('vaultclient/tests/utils/admincredentials.json');
 const crypto = require('crypto');
+const CloudserverClient = require('../../Clients/CloudserverClient');
 
 const log = new Logger('S3Setup');
 
@@ -244,7 +245,7 @@ async function configureCrr(accountSource, accountDest, opts = {}) {
             {
                 Effect: 'Allow',
                 Action: ['s3:ListBucket', 's3:GetReplicationConfiguration'],
-                Resource: ['arn:aws:s3:::source'],
+                Resource: [`arn:aws:s3:::${accountSource.bucketName}`],
             },
             {
                 Effect: 'Allow',
@@ -358,11 +359,65 @@ async function removeCrrConfiguration(account) {
     }
 }
 
+/**
+ * Put an object in the account bucket.
+ * @param {Object} account - object returned by createTestAccount
+ * @param {string} key - object key
+ * @param {string} [body] - object data
+ * @returns {Promise<string>} version ID
+ */
+async function putObject(account, key, body = `data of ${key}`) {
+    const res = await account.s3Client.send(new PutObjectCommand({
+        Bucket: account.bucketName, Key: key, Body: body,
+    }));
+    return res.VersionId;
+}
+
+function cloudserverClientFor(account) {
+    return new CloudserverClient(`http://${s3Host}:${s3Port}`,
+        account.accountAccessKey, account.accountSecretKey);
+}
+
+/**
+ * Read the replication info of an object version, through the backbeat metadata route.
+ * @param {Object} account - object returned by createTestAccount
+ * @param {string} key - object key
+ * @param {string} versionId - version ID
+ * @returns {Promise<Object>} replicationInfo
+ */
+async function getReplicationInfo(account, key, versionId) {
+    const client = cloudserverClientFor(account);
+    const res = await promisify(client.getMetadata.bind(client))({
+        Bucket: account.bucketName, Key: key, VersionId: versionId,
+    });
+    return JSON.parse(res.Body).replicationInfo;
+}
+
+/**
+ * Overwrite the replication info of an object version, through the backbeat metadata route.
+ * @param {Object} account - object returned by createTestAccount
+ * @param {string} key - object key
+ * @param {string} versionId - version ID
+ * @param {Object} replicationInfo - new replication info
+ * @returns {Promise<undefined>} resolves when written
+ */
+async function setReplicationInfo(account, key, versionId, replicationInfo) {
+    const client = cloudserverClientFor(account);
+    const params = { Bucket: account.bucketName, Key: key, VersionId: versionId };
+    const res = await promisify(client.getMetadata.bind(client))(params);
+    const md = JSON.parse(res.Body);
+    md.replicationInfo = replicationInfo;
+    await promisify(client.putMetadata.bind(client))({ ...params, Body: JSON.stringify(md) });
+}
+
 module.exports = {
     createTestAccount,
     deleteTestAccount,
     configureCrr,
     removeCrrConfiguration,
+    putObject,
+    getReplicationInfo,
+    setReplicationInfo,
     iamHost,
     iamPort,
     s3Host,

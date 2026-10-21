@@ -164,6 +164,69 @@ Example:
 
 `VERSION_ID_MARKER="123456789"`
 
+#### ALLOW_NEW_SITE
+
+A backend for a site that no replication processor handles leaves the
+object PENDING forever. So the script checks `SITE_NAME` when it has
+something reliable to compare against:
+
+* the object already replicates: `SITE_NAME` must be one of its sites
+  (backend sites, or `storageClass` on older objects), or a site named in
+  the `StorageClass` of the bucket replication rules
+* the object was never replicated and every bucket rule names its site in
+  `StorageClass`: `SITE_NAME` must be one of those sites
+
+Otherwise the object is accepted: a rule without `StorageClass` uses the
+S3C default replication site, set in the federation config
+(`env_replication_endpoints`), which the script can't read.
+
+At the first object with an unknown site, the script writes nothing for
+it, stops, logs the object and the sites it compared against, logs the
+bucket list, `KEY_MARKER` and `VERSION_ID_MARKER` to resume from that
+point, and exits with code 1. Check `SITE_NAME`, then re-run from the
+resume point with the right `SITE_NAME`, or with `ALLOW_NEW_SITE=true`.
+
+The check can't run on objects with nothing to compare against, so objects
+processed before the stop may already have the wrong `SITE_NAME`. Before
+re-running with the right `SITE_NAME`, run
+[removeReplicationSite](#remove-a-replication-site-from-object-metadata) in dry run with
+`SITE_TO_REMOVE=<wrong SITE_NAME>` on the same buckets: it lists the
+objects that got the wrong site. If there are any, run it again with
+`DRY_RUN=false`. Skip the cleanup if `SITE_NAME` was in fact right (see
+below).
+
+If the cleanup reset objects (the wrong site was their only site), they
+are back to "never replicated" and they are before the resume point. So
+re-run crrExistingObjects with the right `SITE_NAME` from the start of the
+stopped run: same bucket list, same `KEY_MARKER` and `VERSION_ID_MARKER`
+as that run, if it had any. With the default
+`TARGET_REPLICATION_STATUS=NEW` this is safe: objects that already have the
+right site are skipped.
+
+Set `ALLOW_NEW_SITE=true` to skip the check when the object must get a
+site it doesn't know yet and that is the S3C default site:
+
+* a DR failback (re-sync the replicas of the DR site back to the primary
+  site with `SITE_NAME=<primary site>`), for replicas written by S3C 9.5,
+  also on clusters later upgraded: a replica keeps the replication info of
+  its source, so it only knows the DR site itself
+* a new DR site with a new name, when the bucket rules use the default
+  replication endpoint (no `StorageClass`)
+
+Example:
+
+`ALLOW_NEW_SITE=true`
+
+#### Notes on S3C versions
+
+* S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
+  Re-triggering one site with `SITE_NAME` also re-sends the objects under
+  the `sourceCheckIfSizeGreaterThanMB` limit of the Backbeat config
+  (100 MB by default) to the other sites of the object.
+* S3C 10.1: requeueing objects that already exist at the destination can
+  leave them PENDING, because of the microVersionId format written by
+  s3utils 1.18 (S3C-11591).
+
 
 ### Example use cases
 
@@ -220,6 +283,13 @@ export TARGET_REPLICATION_STATUS=NEW,PENDING,COMPLETED,FAILED
 export MAX_UPDATES=10000
 ```
 
+If the new DR site has a different name and the bucket replication rules
+don't set it in `StorageClass`, also set:
+
+```
+export ALLOW_NEW_SITE=true
+```
+
 #### Re-sync a DR site back to the primary site
 
 When objects have been lost from the primary site you can re-sync
@@ -232,6 +302,79 @@ from the DR bucket to the primary bucket):
 export TARGET_REPLICATION_STATUS=REPLICA
 export MAX_UPDATES=10000
 ```
+
+# Remove a replication site from object metadata
+
+Clean up objects left PENDING forever by a `crrExistingObjects.js` run
+with a wrong `SITE_NAME`. The script removes the site from the object
+replication info (backends, storageClass, storageType) and recomputes
+the global replication status from the remaining sites:
+
+* all remaining sites COMPLETED -> COMPLETED, nothing is replicated again
+* a remaining site PENDING -> PENDING, the object is requeued for that site
+* a remaining site FAILED -> FAILED
+* a replica site left -> REPLICA, the object stays a replica
+* the site was the only site -> replication info reset to empty (never
+  replicated), a replica keeps `isReplica`. Run `crrExistingObjects.js`
+  with the right `SITE_NAME` to replicate the object.
+
+Object versions and delete markers are both processed.
+
+**Warning**: the script reads the object metadata, then writes it back.
+A tag, ACL, retention or legal hold change on the same version in between
+is lost. Run it when no such change happens on the target buckets.
+
+```
+node removeReplicationSite.js bucket1[,bucket2...]
+```
+
+## Mandatory environment variables
+
+* **ENDPOINT**, **ACCESS_KEY**, **SECRET_KEY**
+* **SITE_TO_REMOVE**: the wrong site name to remove
+
+## Optional environment variables
+
+* **DRY_RUN**: `true` by default, only logs what would change. Set
+  `DRY_RUN=false` to write the changes.
+* **TARGET_PREFIX**: only process keys with this prefix
+* **WORKERS**: parallel metadata updates (default 10)
+* **LISTING_LIMIT**: listing page size (default 1000)
+* **MAX_UPDATES**: stop once this many updates are reached, at the end of
+  the current listing page (so up to `LISTING_LIMIT` more), and log the
+  bucket list, `KEY_MARKER` and `VERSION_ID_MARKER` to resume. Use it to
+  limit the number of objects requeued at once.
+* **MAX_SCANNED**: same, on the number of scanned versions. Use it to split
+  a large bucket into batches: the script reads the metadata of every
+  version, even when few of them need a change.
+* **KEY_MARKER**, **VERSION_ID_MARKER**: resume where an earlier run stopped
+* **FORCE_REMOVE_CONFIGURED_SITE**: by default, the script refuses to remove
+  a site that a bucket replication rule names in `StorageClass`, since it is
+  a real destination, and stops. Set it to `true` to remove it anyway.
+* **DEBUG**: set to 1 for debug logs
+
+## Procedure
+
+1. Dry run on the source buckets, check the logs, then run with
+   `DRY_RUN=false`.
+2. On S3C 9.5, do the same on the destination buckets (see notes).
+3. Dry run again on both: it must report `updated: 0`.
+4. Objects reset to "never replicated": run `crrExistingObjects.js` with
+   the right `SITE_NAME` to replicate them.
+
+## Notes
+
+* S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
+  After a run with a wrong `SITE_NAME`, the real site re-sends the objects
+  under the `sourceCheckIfSizeGreaterThanMB` limit of the Backbeat config
+  (100 MB by default), and their replicas on the destination carry the
+  wrong site (`dr=REPLICA, foo=PENDING`). It is harmless while they are
+  replicas, but run the script on the destination buckets too, at least
+  before using them as a source (DR failback). Replicas stay REPLICA.
+* S3C 10.1: an object left PENDING by the script is requeued. If it
+  already exists at the destination, it can stay PENDING because of the
+  microVersionId format written by s3utils 1.18 (S3C-11591). Check those
+  objects after the run.
 
 # Empty a versioned bucket
 
