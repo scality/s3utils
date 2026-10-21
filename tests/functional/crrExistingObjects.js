@@ -1,7 +1,7 @@
 const { promisify } = require('util');
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
-const { PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { HeadObjectCommand } = require('@aws-sdk/client-s3');
 const ReplicationStatusUpdater = require('../../CRR/ReplicationStatusUpdater');
 
 const {
@@ -15,10 +15,14 @@ const {
     deleteTestAccount,
     configureCrr,
     removeCrrConfiguration,
+    putObject,
+    getReplicationInfo,
 } = require('../utils/S3Setup');
 
 const log = new Logger('crrExistingObjects:test');
 const SITE_NAME = 'test-site';
+// default replication site of the cloudserver under test (workbench: "sf")
+const DEFAULT_SITE = process.env.CRR_DEFAULT_SITE || 'sf';
 
 function makeCaptureLogger() {
     const captured = [];
@@ -79,11 +83,7 @@ describe('crrExistingObjects', () => {
 
     async function runTest(testObjects) {
         for (const obj of testObjects) {
-            await accountSource.s3Client.send(new PutObjectCommand({
-                Bucket: accountSource.bucketName,
-                Key: obj.Key,
-                Body: obj.Body,
-            }));
+            await putObject(accountSource, obj.Key, obj.Body);
             log.info('Uploaded object', { key: obj.Key });
         }
 
@@ -100,6 +100,9 @@ describe('crrExistingObjects', () => {
             listingLimit: 1000,
             currentVersionOnly: false,
             forceUsingConfiguration: true,
+            // these tests check key encoding: SITE_NAME is not the bucket's
+            // default replication site, so allow it explicitly
+            allowNewSite: true,
         }, logger);
         await promisify(updater.run.bind(updater))();
 
@@ -148,5 +151,25 @@ describe('crrExistingObjects', () => {
             { Key: 'ascii-test-1.txt', Body: 'ascii data 1' },
             { Key: 'ascii-test-2.txt', Body: 'ascii data 2' },
         ]);
+    }, 60000);
+    it('should stop the run when SITE_NAME is not a known replication site', async () => {
+        const versionId = await putObject(accountSource, 'obj-1');
+
+        const updater = new ReplicationStatusUpdater({
+            buckets: [accountSource.bucketName],
+            replicationStatusToProcess: ['NEW', 'PENDING', 'COMPLETED', 'FAILED'],
+            workers: 10,
+            accessKey: accountSource.accountAccessKey,
+            secretKey: accountSource.accountSecretKey,
+            endpoint,
+            siteName: 'wrong-site',
+        }, log);
+        await expect(promisify(updater.run.bind(updater))())
+            .rejects.toThrow('stopped on an unknown replication site');
+
+        expect(updater._nUpdated).toBe(0);
+        expect(updater._unknownSite).toEqual(expect.objectContaining({ key: 'obj-1' }));
+        const repInfo = await getReplicationInfo(accountSource, 'obj-1', versionId);
+        expect(repInfo.backends.map(b => b.site)).toEqual([DEFAULT_SITE]);
     }, 60000);
 });
