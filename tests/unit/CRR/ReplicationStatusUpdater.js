@@ -1408,3 +1408,243 @@ describe('ReplicationStatusUpdater V2 format', () => {
         });
     });
 });
+
+describe('ReplicationStatusUpdater site validation', () => {
+    // bucket rule relying on the default replication endpoint (no StorageClass), as on S3C
+    const defaultEndpointReplicationRes = {
+        ReplicationConfiguration: {
+            Role: 'arn:aws:iam::root:role/s3-replication-role',
+            Rules: [{
+                ID: 'r0',
+                Prefix: '',
+                Status: 'Enabled',
+                Destination: { Bucket: 'arn:aws:s3:::destination' },
+            }],
+        },
+    };
+    const replicatedReplicationInfo = {
+        status: 'COMPLETED',
+        backends: [{ site: 'destination', status: 'COMPLETED', dataStoreVersionId: '' }],
+        content: ['DATA', 'METADATA'],
+        destination: 'arn:aws:s3:::destination',
+        storageClass: 'destination',
+        role: 'arn:aws:iam::root:role/s3-replication-role',
+        storageType: '',
+        dataStoreVersionId: '',
+    };
+
+    function initCrr(params, replicationRes, replicationInfo) {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            ...params,
+        }, logger, replicationRes ? { GetBucketReplicationCommand: replicationRes } : {});
+        if (replicationInfo) {
+            crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+                const md = JSON.parse(getMetadataRes.Body);
+                md.replicationInfo = replicationInfo;
+                cb(null, { Body: JSON.stringify(md) });
+            });
+        }
+        return crr;
+    }
+
+    it('should stop the run when every rule names its site and SITE_NAME is not one of them', done => {
+        // default fixture: rule with StorageClass=aws-location, object never replicated
+        const crr = initCrr({ siteName: 'foo' });
+        crr.run(err => {
+            assert(err);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nUpdated, 0);
+            assert.strictEqual(crr._unknownSite.bucket, 'bucket0');
+            done();
+        });
+    });
+
+    it('should accept a never-replicated object when a rule has no StorageClass (mixed rules)', done => {
+        // R6: the default site of the rule without StorageClass can't be checked
+        const res = JSON.parse(JSON.stringify(defaultEndpointReplicationRes));
+        res.ReplicationConfiguration.Rules.push({
+            ID: 'r1',
+            Prefix: 'other/',
+            Status: 'Enabled',
+            Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'primary' },
+        });
+        const crr = initCrr({ siteName: 'destination' }, res);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should accept a site known by the object but not in the bucket rules', done => {
+        // rule names aws-location, object already replicates to destination
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            null, replicatedReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should accept the default endpoint site when rules mix StorageClass and no StorageClass', done => {
+        const res = JSON.parse(JSON.stringify(defaultEndpointReplicationRes));
+        res.ReplicationConfiguration.Rules.push({
+            ID: 'r1',
+            Prefix: 'other/',
+            Status: 'Enabled',
+            Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'aws-location' },
+        });
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            res, replicatedReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should accept a SITE_NAME listed with preferred_read in the bucket rules', done => {
+        const res = JSON.parse(JSON.stringify(defaultEndpointReplicationRes));
+        res.ReplicationConfiguration.Rules[0].Destination.StorageClass = 'aws-location:preferred_read,foo';
+        const crr = initCrr({ siteName: 'aws-location' }, res);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            done();
+        });
+    });
+
+    it('should stop the run when the object replicates to another site (CERSAI case)', done => {
+        const crr = initCrr({ siteName: 'foo' }, defaultEndpointReplicationRes, replicatedReplicationInfo);
+        crr.run(err => {
+            assert(err);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nUpdated, 0);
+            done();
+        });
+    });
+
+    it('should mark an object with no replication info when rules have no StorageClass', done => {
+        // no site in the rule nor in the object: nothing to compare, the site is accepted
+        const crr = initCrr({ siteName: 'destination' }, defaultEndpointReplicationRes);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should stop the run at the first unknown site and keep the resume point', done => {
+        // listing always returns next markers: an unstopped run would loop forever
+        const endlessListing = {
+            ...listVersionsRes,
+            IsTruncated: true,
+            NextKeyMarker: 'next-key',
+            NextVersionIdMarker: 'next-version',
+        };
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0', 'bucket1'],
+            workers: 1,
+            replicationStatusToProcess: ['NEW'],
+            siteName: 'foo',
+            keyMarker: 'resume-key',
+            versionIdMarker: 'resume-version',
+        }, logger, {
+            ListObjectVersionsCommand: endlessListing,
+            GetBucketReplicationCommand: defaultEndpointReplicationRes,
+        });
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = replicatedReplicationInfo;
+            cb(null, { Body: JSON.stringify(md) });
+        });
+        const errorSpy = jest.spyOn(crr.log, 'error');
+        crr.run(err => {
+            assert(err);
+            // bucket0 only: one listing + one GetBucketReplication, first object only
+            expect(crr.s3.send).toHaveBeenCalledTimes(2);
+            expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            // markers of the stopped page, to resume from there
+            assert.strictEqual(crr._KeyMarker, 'resume-key');
+            assert.strictEqual(crr._VersionIdMarker, 'resume-version');
+            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(
+                'bucket list "bucket0,bucket1" and the following environment variables set: '
+                + 'KEY_MARKER=resume-key VERSION_ID_MARKER=resume-version'));
+            errorSpy.mockRestore();
+            done();
+        });
+    });
+
+    it('should not stop on unknown sites when allowNewSite is set', done => {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 1,
+            replicationStatusToProcess: ['NEW'],
+            siteName: 'foo',
+            allowNewSite: true,
+        }, logger, {
+            ListObjectVersionsCommand: listVersionsRes,
+            GetBucketReplicationCommand: defaultEndpointReplicationRes,
+        });
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = replicatedReplicationInfo;
+            cb(null, { Body: JSON.stringify(md) });
+        });
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(2);
+            assert.strictEqual(crr._unknownSite, null);
+            done();
+        });
+    });
+
+    // newer arsenal (multi-destination CRR): sites in backends, no top-level storageClass
+    const backendsOnlyReplicationInfo = {
+        status: 'COMPLETED',
+        backends: [{ site: 'destination', status: 'COMPLETED', dataStoreVersionId: '' }],
+        content: ['DATA', 'METADATA'],
+    };
+
+    it('should read the object sites from backends when storageClass is missing', done => {
+        const crr = initCrr({ siteName: 'foo' }, defaultEndpointReplicationRes, backendsOnlyReplicationInfo);
+        crr.run(err => {
+            assert(err);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            done();
+        });
+    });
+
+    it('should accept a site known only from backends when storageClass is missing', done => {
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            defaultEndpointReplicationRes, backendsOnlyReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+
+    it('should add a new site when allowNewSite is set', done => {
+        const crr = initCrr({ siteName: 'foo', allowNewSite: true },
+            defaultEndpointReplicationRes, replicatedReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
+            const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            assert.strictEqual(replicationInfo.storageClass, 'destination,foo');
+            assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+});
