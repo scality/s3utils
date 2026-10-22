@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { eachLimit } = require('async');
-const { ObjectMD } = require('arsenal').models;
+const { ObjectMD } = require('@scality/arsenal').models;
 const { ListObjectVersionsCommand, GetBucketReplicationCommand } = require('@aws-sdk/client-s3');
 const CloudserverClient = require('../Clients/CloudserverClient');
 const createS3Client = require('../Clients/s3Client');
