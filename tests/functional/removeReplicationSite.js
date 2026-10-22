@@ -153,7 +153,8 @@ describe('removeReplicationSite', () => {
         const cleaned = await getReplicationInfo(accountSource, 'obj-1', versionId);
         expect(cleaned.status).toBe('');
         expect(cleaned.backends).toEqual([]);
-        expect(cleaned.storageClass).toBe('');
+        // empty: '' with arsenal 8.2, absent with arsenal 8.5 (new format)
+        expect(cleaned.storageClass || '').toBe('');
     }, 60000);
     it('should refuse to remove a site named in the bucket rule', async () => {
         const versionId = await putObject(accountSource, 'obj-1');
