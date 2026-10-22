@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { promisify } = require('util');
 const { eachLimit } = require('async');
 const { ObjectMD } = require('arsenal').models;
@@ -112,6 +113,12 @@ class ReplicationSiteRemover {
         this.forceRemoveConfiguredSite = params.forceRemoveConfiguredSite === true;
         this.log = log;
 
+        // Random replicationGroupId (7 chars) and instanceId (6 chars) for
+        // microVersionId generation, as in ReplicationStatusUpdater: this tool
+        // bypasses CloudServer's configured values.
+        this.replicationGroupId = crypto.randomBytes(4).toString('hex').slice(0, 7);
+        this.instanceId = crypto.randomBytes(3).toString('hex').slice(0, 6);
+
         this.s3 = createS3Client({
             accessKey: params.accessKey,
             secretKey: params.secretKey,
@@ -217,11 +224,14 @@ class ReplicationSiteRemover {
                     }
                 } else {
                     objMD.setReplicationBackends(remaining)
-                        .setReplicationStorageClass(storageClass)
-                        .setReplicationStorageType(storageType)
                         .setReplicationStatus(newStatus);
+                    // deprecated fields, still present on metadata in the old single-destination
+                    // format (S3C 9.5): keep them in line with the backends
+                    const ri = objMD.getReplicationInfo();
+                    ri.storageClass = storageClass;
+                    ri.storageType = storageType;
                 }
-                objMD.updateMicroVersionId();
+                objMD.updateMicroVersionId(this.instanceId, this.replicationGroupId);
                 await this._putMetadata({ ...params, Body: objMD.getSerialized() });
             }
             this.stats.updated += 1;
