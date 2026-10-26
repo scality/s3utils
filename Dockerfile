@@ -58,7 +58,8 @@ ENV no_proxy localhost,127.0.0.1
 
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install -r utapi/requirements.txt
+RUN pip install --upgrade "pip>=26.2.2" && \
+    pip install -r utapi/requirements.txt
 
 ## This section duplicates S3C Federation Dockerfile, this needs to be refactored
 # Rename the "node" user to "scality" and setup associated env variables
