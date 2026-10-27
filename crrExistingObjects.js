@@ -15,7 +15,6 @@ const { SITE_NAME } = process.env;
 let { STORAGE_TYPE } = process.env;
 let { TARGET_REPLICATION_STATUS } = process.env;
 const { TARGET_PREFIX } = process.env;
-const FORCE_USING_CONFIGURATION = process.env.FORCE_USING_CONFIGURATION === 'true' || process.env.FORCE_USING_CONFIGURATION === '1' || false;
 const WORKERS = (process.env.WORKERS
     && Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES
@@ -78,6 +77,11 @@ log.info('Objects with replication status '
     + `${replicationStatusToProcess.join(' or ')} `
     + 'will be reset to PENDING to trigger CRR');
 
+if (process.env.FORCE_USING_CONFIGURATION) {
+    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket '
+        + 'replication configuration');
+}
+
 const replicationStatusUpdater = new ReplicationStatusUpdater({
     buckets: BUCKETS,
     replicationStatusToProcess,
@@ -94,7 +98,6 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     keyMarker: KEY_MARKER,
     versionIdMarker: VERSION_ID_MARKER,
     currentVersionOnly: CURRENT_VERSION_ONLY,
-    forceUsingConfiguration: FORCE_USING_CONFIGURATION,
     allowNewSite: ALLOW_NEW_SITE,
 }, log);
 

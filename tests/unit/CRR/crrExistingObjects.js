@@ -3,12 +3,14 @@ const werelogs = require('werelogs');
 const mockFatal = jest.fn();
 const mockInfo = jest.fn();
 const mockError = jest.fn();
+const mockWarn = jest.fn();
 
 jest.mock('werelogs', () => ({
     Logger: jest.fn().mockImplementation(() => ({
         fatal: mockFatal,
         info: mockInfo,
         error: mockError,
+        warn: mockWarn,
     })),
     configure: jest.fn(),
 }));
@@ -41,6 +43,7 @@ describe('crrExistingObjects', () => {
         mockFatal.mockClear();
         mockInfo.mockClear();
         mockError.mockClear();
+        mockWarn.mockClear();
         mockCrrRun.mockClear();
         mockCrrStop.mockClear();
 
@@ -99,9 +102,10 @@ describe('crrExistingObjects', () => {
             keyMarker: 'testKeyMarker',
             versionIdMarker: 'testVersionIdMarker',
             currentVersionOnly: true,
-            forceUsingConfiguration: true,
             allowNewSite: false,
         }, expect.anything());
+        // FORCE_USING_CONFIGURATION is set: we ignore it and warn.
+        expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('FORCE_USING_CONFIGURATION is ignored'));
 
         expect(mockFatal).not.toHaveBeenCalled();
         expect(mockError).not.toHaveBeenCalled();
@@ -137,7 +141,6 @@ describe('crrExistingObjects', () => {
             keyMarker: undefined,
             versionIdMarker: undefined,
             currentVersionOnly: false,
-            forceUsingConfiguration: false,
             allowNewSite: false,
         }, expect.anything());
 
