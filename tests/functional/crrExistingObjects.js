@@ -99,7 +99,6 @@ describe('crrExistingObjects', () => {
             storageType: '',
             listingLimit: 1000,
             currentVersionOnly: false,
-            forceUsingConfiguration: true,
             // these tests check key encoding: SITE_NAME is not the bucket's
             // default replication site, so allow it explicitly
             allowNewSite: true,
