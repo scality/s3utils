@@ -159,19 +159,25 @@ class ReplicationStatusUpdater {
      * @returns {boolean} True if both are the same.
      */
     _isSameBackend(existing, candidate, replicationInfo) {
-        // With the SITE_NAME fallback (step 3 of _markObjectPending), the candidate is the
-        // object backend itself. So it is the same, even with no bucket to compare (S3C 9.5).
+        // When no rule sends the key to SITE_NAME anymore, step 3 of _markObjectPending
+        // takes the candidates from the object backends themselves. Then the candidate is
+        // the object backend, the same JavaScript object, and it is the same backend.
+        // We need this check for a backend written by S3C 9.5: it has no bucket, so the
+        // checks below would compare the top-level destination with nothing, and fail.
+        // Example: the object has destination backup-sf and the backend [site sf, no
+        // bucket]. The rules now only name dr3. With SITE_NAME=sf, step 3 takes that
+        // backend as the candidate, and we find it here.
         if (existing === candidate) {
             return true;
         }
         if (existing.site !== candidate.site) {
             return false;
         }
-        if (!existing.destination) {
-            return !replicationInfo?.destination
-                || candidate.destination === replicationInfo.destination;
+        if (existing.destination) {
+            return existing.destination === candidate.destination;
         }
-        return existing.destination === candidate.destination;
+        return !replicationInfo?.destination
+            || candidate.destination === replicationInfo.destination;
     }
 
     /**
@@ -369,6 +375,11 @@ class ReplicationStatusUpdater {
      * Stops the run when we don't know SITE_NAME (see _isKnownSite), unless
      * ALLOW_NEW_SITE is set. We stop the whole run, not only this object: if SITE_NAME is
      * wrong here, it's probably wrong for every bucket.
+     * This function only decides for one object: it skips it, and sets _unknownSite. The
+     * callers stop the run. _markPending doesn't start new objects once _unknownSite is
+     * set, and the listing stops at this page and keeps its markers as the resume point.
+     * Objects already started still finish: we write the ones with a known site, and we
+     * skip the ones with an unknown site here.
      * @private
      * @param {ObjectMD} objMD - Object metadata.
      * @param {string} bucket - The bucket name.
@@ -507,26 +518,21 @@ class ReplicationStatusUpdater {
             //    TARGET_REPLICATION_STATUS.
             //    No backend means the object was never sent to this site and bucket: NEW picks
             //    it. That's also the case when a rule moved to another bucket on the same site.
-            //    We match on the site and the bucket, not on the role. A bucket has one owner
-            //    on a site, so we don't need the role to tell two backends apart. And the role
-            //    can change after the object was sent: we still need to find its backend, so
-            //    we can send the object again with the new role.
             //    Example: site sf, bucket backup-sf has an object backend, COMPLETED. Site dr2,
             //    bucket backup-dr2 has no backend.
-            //    Example: say the backend for site sf, bucket backup-sf has role ...crr-typo,
-            //    because the bucket Role had a typo back then. The rule now gives role
-            //    ...crr-dst. We still find the backend, and PENDING picks it.
             //
-            // 5. TARGET_REPLICATION_STATUS picks the candidates to send again.
+            // 5. TARGET_REPLICATION_STATUS picks the candidates to send again. Each object
+            //    target holds the candidate, the object backend we found for it, and whether
+            //    we pick it.
             //    Example: NEW picks dr2. COMPLETED would pick sf.
-            const pairs = candidateBackends.map(candidate => {
+            const objectTargets = candidateBackends.map(candidate => {
                 const existing = existingBackends.find(e => this._isSameBackend(e, candidate, prev));
                 const selected = this._statusShouldBeProcessed(existing?.status);
                 return { candidate, existing, selected };
             });
 
             // Nothing picked: we write nothing, and the object counts as skipped.
-            if (!pairs.some(p => p.selected)) {
+            if (!objectTargets.some(t => t.selected)) {
                 return { skip: true };
             }
 
@@ -552,12 +558,12 @@ class ReplicationStatusUpdater {
             //    Example: [site sf, bucket backup-sf, COMPLETED (as it was);
             //              site dr2, bucket backup-dr2, PENDING]
             const allBackends = existingBackends.map(existing => {
-                const pair = pairs.find(p => p.existing === existing);
+                const target = objectTargets.find(t => t.existing === existing);
                 // Picked: send it again, to the site and bucket of the rule, with the role
                 // of the rule. Not picked, or no rule for it: leave it as it is.
-                return pair?.selected ? { ...pair.candidate, status: 'PENDING' } : existing;
+                return target?.selected ? { ...target.candidate, status: 'PENDING' } : existing;
             });
-            for (const { candidate, existing, selected } of pairs) {
+            for (const { candidate, existing, selected } of objectTargets) {
                 // Picked and not on the object yet: add it at the end.
                 if (selected && !existing) {
                     allBackends.push({ ...candidate, status: 'PENDING' });

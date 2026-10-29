@@ -103,7 +103,7 @@ sf (D1) and dr2 (D2), `a.pdf` goes to sf (D1).
 
 No rule sends objects to dr3. The script logs the warning "SITE_NAME is
 not a site of the bucket rules", once per bucket. It skips the objects
-with no backend for dr3. With `TARGET_REPLICATION_STATUS=FAILED`,
+with no backend for dr3. With `TARGET_REPLICATION_STATUS` having the value `FAILED`,
 `COMPLETED` or `PENDING`, it still requeues the objects that have a dr3
 backend with that status, to their own bucket. The run doesn't stop.
 
@@ -203,16 +203,17 @@ object PENDING forever. So before it writes an object, the script checks
 `SITE_NAME` when it has something reliable to compare against. Objects it
 skips are not checked: they get no backend. So only
 `TARGET_REPLICATION_STATUS=NEW` can stop on an unknown site: with
-`FAILED`, `COMPLETED` or `PENDING`, the script only writes objects that
-already have a backend for `SITE_NAME`. The checks are:
+`TARGET_REPLICATION_STATUS` having the value `FAILED`, `COMPLETED` or
+`PENDING`, the script only writes objects that already have a backend for
+`SITE_NAME`.
 
-* the object already replicates: `SITE_NAME` must be one of its sites
-  (backend sites, or `storageClass` on older objects), or a site named in
-  the `StorageClass` of the bucket replication rules
-
-Otherwise the object is accepted: a rule without `StorageClass` uses the
-S3C default replication site, set in the federation config
-(`env_replication_endpoints`), which the script can't read.
+The script checks objects that already replicate: `SITE_NAME` must be one
+of the sites of the object (backend sites, or `storageClass` on older
+objects), or a site named in the `StorageClass` of the bucket replication
+rules. It accepts an object that was never replicated: a rule without
+`StorageClass` uses the S3C default replication site, set in the
+federation config (`env_replication_endpoints`), which the script can't
+read.
 
 When every bucket rule names its site in `StorageClass` and `SITE_NAME` is
 none of them, the script doesn't stop: no rule gives the object a backend
@@ -331,16 +332,18 @@ export ALLOW_NEW_SITE=true
 #### Replicate existing objects to the new bucket of a rule
 
 When a rule now sends its objects to another bucket on the same site, the
-objects already replicated have a backend for the old bucket only. `NEW`
-picks the new bucket and keeps the backend of the old one:
+objects already replicated have a backend for the old bucket only.
+`TARGET_REPLICATION_STATUS=NEW` picks the new bucket and keeps the backend
+of the old one:
 
 ```
 export TARGET_REPLICATION_STATUS=NEW
 export MAX_UPDATES=10000
 ```
 
-`COMPLETED` doesn't send them to the new bucket: it only requeues the
-buckets the objects were already sent to, and that a rule still uses.
+Note: `TARGET_REPLICATION_STATUS=COMPLETED` doesn't send them to the new
+bucket: it only requeues the buckets the objects were already sent to, and
+that a rule still uses.
 
 #### Re-sync a DR site back to the primary site
 
