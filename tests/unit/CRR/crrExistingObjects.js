@@ -94,7 +94,6 @@ describe('crrExistingObjects', () => {
             secretKey: 'testSecretKey',
             endpoint: 'http://fake.endpoint',
             siteName: 'testSite',
-            storageType: 'testStorage',
             targetPrefix: 'testPrefix',
             listingLimit: 2000,
             maxUpdates: 100, // or a more specific expectation
@@ -104,8 +103,9 @@ describe('crrExistingObjects', () => {
             currentVersionOnly: true,
             allowNewSite: false,
         }, expect.anything());
-        // FORCE_USING_CONFIGURATION is set: we ignore it and warn.
+        // FORCE_USING_CONFIGURATION and STORAGE_TYPE are set: we ignore them and warn.
         expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('FORCE_USING_CONFIGURATION is ignored'));
+        expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('STORAGE_TYPE is ignored'));
 
         expect(mockFatal).not.toHaveBeenCalled();
         expect(mockError).not.toHaveBeenCalled();
@@ -120,11 +120,15 @@ describe('crrExistingObjects', () => {
         process.env.ACCESS_KEY = 'testAccessKey';
         process.env.SECRET_KEY = 'testSecretKey';
         process.env.ENDPOINT = 'http://fake.endpoint';
+        // FORCE_USING_CONFIGURATION=false never turned it on: we don't warn.
+        process.env.FORCE_USING_CONFIGURATION = 'false';
+        delete process.env.STORAGE_TYPE;
 
         require('../../../crrExistingObjects');
 
         const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
 
+        expect(mockWarn).not.toHaveBeenCalled();
         expect(ReplicationStatusUpdater).toHaveBeenCalledTimes(1);
         expect(ReplicationStatusUpdater).toHaveBeenCalledWith({
             buckets: ['bucket1', 'bucket2'],
@@ -133,7 +137,6 @@ describe('crrExistingObjects', () => {
             accessKey: 'testAccessKey',
             secretKey: 'testSecretKey',
             endpoint: 'http://fake.endpoint',
-            storageType: '',
             targetPrefix: undefined,
             listingLimit: 1000,
             maxUpdates: undefined,

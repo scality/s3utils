@@ -254,7 +254,6 @@ describe('ReplicationStatusUpdater', () => {
                 cb(null, { Body: JSON.stringify(objectMd) });
             });
             crr.siteName = 'aws-location';
-            crr.storageType = 'aws_s3';
             crr.replicationStatusToProcess = params.replicationStatusToProcess;
             crr.run(err => {
                 assert.ifError(err);

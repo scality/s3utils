@@ -24,7 +24,6 @@ class ReplicationStatusUpdater {
      * @param {Object} log - The logging object used for logging purposes within the instance.
      *
      * @param {string} [params.siteName] - (Optional) Name of the destination site.
-     * @param {string} [params.storageType] - (Optional) Type of the destination site (aws_s3, azure...).
      * @param {string} [params.targetPrefix] - (Optional) Prefix to target for replication.
      * @param {number} [params.listingLimit] - (Optional) Limit for listing objects.
      * @param {number} [params.maxUpdates] - (Optional) Maximum number of updates to perform.
@@ -44,7 +43,6 @@ class ReplicationStatusUpdater {
             secretKey,
             endpoint,
             siteName,
-            storageType,
             targetPrefix,
             listingLimit,
             maxUpdates,
@@ -63,7 +61,6 @@ class ReplicationStatusUpdater {
         this.secretKey = secretKey;
         this.endpoint = endpoint;
         this.siteName = siteName;
-        this.storageType = storageType;
         this.targetPrefix = targetPrefix;
         this.listingLimit = listingLimit;
         this.maxUpdates = maxUpdates;
@@ -219,11 +216,13 @@ class ReplicationStatusUpdater {
      * Checks that the site is a known replication destination.
      * An unknown site creates a backend no replication processor handles -> the
      * object stays PENDING forever.
-     * If there is something reliable to compare against, the site must be in it:
-     * - the object already replicates: its sites plus the rule sites
-     * - every rule names its site (StorageClass): the rule sites
-     * Otherwise accept. A rule without StorageClass uses the S3C default site from
-     * the federation config (env_replication_endpoints). This script can't read it.
+     * When the object already replicates, the site must be one of its sites or one of
+     * the rule sites. Otherwise we accept it: a rule without StorageClass uses the S3C
+     * default site from the federation config (env_replication_endpoints), and this
+     * script can't read it.
+     * We don't need a check for "every rule names its site": then we only write a site
+     * that a rule names (_markObjectPending, step 2), or a site the object already has
+     * (step 3). Both are known.
      *
      * "names X": a rule has StorageClass=X.
      *
@@ -259,9 +258,7 @@ class ReplicationStatusUpdater {
     _isKnownSite(objMD, site, rules) {
         const ruleSites = this._getConfiguredSites(rules);
         const objectSites = this._getObjectSites(objMD);
-        const canCheck = objectSites.length > 0
-            || rules.every(rule => rule.Destination && rule.Destination.StorageClass);
-        return !canCheck || ruleSites.concat(objectSites).includes(site);
+        return objectSites.length === 0 || ruleSites.concat(objectSites).includes(site);
     }
 
     /**

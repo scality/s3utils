@@ -257,14 +257,10 @@ Example:
 
 #### Notes on S3C versions
 
-* s3utils 1.19 and later run on S3C 10.1 and later only. They write the
-  object metadata like cloudserver 9.4+: each backend has its own
-  destination bucket and role, whatever the bucket rule format (`Prefix`
-  or `Filter`).
-* S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
-  Re-triggering one site with `SITE_NAME` also re-sends the objects under
-  the `sourceCheckIfSizeGreaterThanMB` limit of the Backbeat config
-  (100 MB by default) to the other sites of the object.
+* s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16
+  and later, only. They write the object metadata like S3C 10.1 does: each
+  backend has its own destination bucket and role, whatever the bucket
+  rule format (`Prefix` or `Filter`). On S3C 9.5, use s3utils 1.18.
 * S3C 10.1: requeueing objects that already exist at the destination can
   leave them PENDING, because of the microVersionId format written by
   s3utils 1.18 (S3C-11591).
