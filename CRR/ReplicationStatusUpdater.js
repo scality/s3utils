@@ -148,18 +148,20 @@ class ReplicationStatusUpdater {
      * A backend written by S3C 9.5 has no bucket: its bucket is the top-level destination
      * of the object. A backend of a public cloud site has no bucket, and the object has no
      * top-level destination: there, the site is enough.
-     * When sameRole is false, a backend still matches after the role changed. We need it to
-     * send the object again with the new role: backbeat keeps refusing the old one (BadRole).
+     * We don't compare the role. A bucket has one owner on a site, so we don't need the
+     * role to tell two backends apart. And we need a backend to match after the role
+     * changed: then we send the object again with the new role, because backbeat keeps
+     * refusing the old one (BadRole).
      * Example: the bucket Role had a typo, and the customer fixed it. The object backend is
-     * site sf, bucket d1, role typo-role. The rule now gives role replication-role.
+     * site sf, bucket d1, role typo-role. The rule now gives role replication-role. We
+     * still find the backend.
      * @private
      * @param {Object} existing - Backend of the object.
      * @param {Object} candidate - Backend built from the bucket rules.
      * @param {Object} [replicationInfo] - Replication info of the object.
-     * @param {boolean} [sameRole] - When true, we also compare the role.
      * @returns {boolean} True if both are the same.
      */
-    _isSameBackend(existing, candidate, replicationInfo, sameRole) {
+    _isSameBackend(existing, candidate, replicationInfo) {
         // With the SITE_NAME fallback (step 3 of _markObjectPending), the candidate is the
         // object backend itself. So it is the same, even with no bucket to compare (S3C 9.5).
         if (existing === candidate) {
@@ -172,8 +174,7 @@ class ReplicationStatusUpdater {
             return !replicationInfo?.destination
                 || candidate.destination === replicationInfo.destination;
         }
-        return existing.destination === candidate.destination
-            && (!sameRole || existing.role === candidate.role);
+        return existing.destination === candidate.destination;
     }
 
     /**
@@ -509,18 +510,20 @@ class ReplicationStatusUpdater {
             //    TARGET_REPLICATION_STATUS.
             //    No backend means the object was never sent to this site and bucket: NEW picks
             //    it. That's also the case when a rule moved to another bucket on the same site.
-            //    We look for the same role first: two rules can send to the same site and
-            //    bucket with two Destination.Account, and each one must find its own backend.
-            //    Then we look without the role: the role changed since the object was sent.
-            //    Example: sf has the object backend, COMPLETED. dr2 has no backend.
-            //    Example: say the sf backend has role ...crr-typo, because the bucket Role had
-            //    a typo back then. We still find it, and PENDING picks it.
+            //    We match on the site and the bucket, not on the role. A bucket has one owner
+            //    on a site, so we don't need the role to tell two backends apart. And the role
+            //    can change after the object was sent: we still need to find its backend, so
+            //    we can send the object again with the new role.
+            //    Example: site sf, bucket backup-sf has an object backend, COMPLETED. Site dr2,
+            //    bucket backup-dr2 has no backend.
+            //    Example: say the backend for site sf, bucket backup-sf has role ...crr-typo,
+            //    because the bucket Role had a typo back then. The rule now gives role
+            //    ...crr-dst. We still find the backend, and PENDING picks it.
             //
             // 5. TARGET_REPLICATION_STATUS picks the candidates to send again.
             //    Example: NEW picks dr2. COMPLETED would pick sf.
             const pairs = candidateBackends.map(candidate => {
-                const existing = existingBackends.find(e => this._isSameBackend(e, candidate, prev, true))
-                    || existingBackends.find(e => this._isSameBackend(e, candidate, prev));
+                const existing = existingBackends.find(e => this._isSameBackend(e, candidate, prev));
                 const selected = this._statusShouldBeProcessed(existing?.status);
                 return { candidate, existing, selected };
             });

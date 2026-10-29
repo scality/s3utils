@@ -1827,9 +1827,6 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
             site: 'sf', status, dataStoreVersionId: '', destination: 'arn:aws:s3:::d1', role,
         });
         const withBackends = backends => ({ ...cloudserverReplicationInfo, backends });
-        const withAccount = (rule, account, id) => ({
-            ...rule, ID: id, Destination: { ...rule.Destination, Account: account },
-        });
 
         it('should requeue the backend in place with the new role', done => {
             const crr = initCrr({ replicationStatusToProcess: ['PENDING'] },
@@ -1848,20 +1845,6 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
                 assert.ifError(err);
                 expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
                 assert.strictEqual(crr._nSkipped, 1);
-                done();
-            });
-        });
-
-        it('should match each backend on its own role when two rules use the same bucket', done => {
-            const roleA = 'arn:aws:iam::111111111111:role/dst';
-            const roleB = 'arn:aws:iam::222222222222:role/dst';
-            const crr = initCrr({ replicationStatusToProcess: ['FAILED'] },
-                replication(withAccount(v1Rule('d1', 'sf'), '111111111111', 'rA'),
-                    withAccount(v1Rule('d1', 'sf'), '222222222222', 'rB')),
-                withBackends([backend(roleA, 'COMPLETED'), backend(roleB, 'FAILED')]));
-            crr.run(err => {
-                assert.ifError(err);
-                expect(written(crr).backends).toEqual([backend(roleA, 'COMPLETED'), backend(roleB, 'PENDING')]);
                 done();
             });
         });
