@@ -14,6 +14,15 @@ const {
 
 const logger = new werelogs.Logger('ReplicationStatusUpdater::tests', 'debug', 'debug');
 
+// The backend we write for the default fixture rule (V1, StorageClass aws-location).
+const newBackend = {
+    site: 'aws-location',
+    status: 'PENDING',
+    dataStoreVersionId: '',
+    destination: 'arn:aws:s3:::destination',
+    role: 'arn:aws:iam::root:role/s3-replication-role',
+};
+
 describe('ReplicationStatusUpdater', () => {
     it('should process bucket for CRR', done => {
         const crr = initializeCrrWithMocks({
@@ -55,28 +64,15 @@ describe('ReplicationStatusUpdater', () => {
             }, expect.any(Function));
 
             expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
-            const expectedReplicationInfo = {
+            // We write a bucket and a role on each backend, for a V1 rule too.
+            const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            expect(replicationInfo).toEqual({
                 status: 'PENDING',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: '',
-                dataStoreVersionId: '',
-            };
-            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    Body: expect.stringContaining(JSON.stringify(expectedReplicationInfo)),
-                }),
-                expect.any(Function),
-            );
+                backends: [newBackend],
+                content: ['METADATA', 'DATA'],
+                isNFS: null,
+            });
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nSkipped, 0);
@@ -143,6 +139,37 @@ describe('ReplicationStatusUpdater', () => {
         });
     });
 
+    // An object written by S3C 9.5: its backends have no bucket and no role.
+    const oldFormat = (backends, storageClass, storageType) => ({
+        status: backends.some(b => b.status === 'FAILED') ? 'FAILED' : 'COMPLETED',
+        backends,
+        content: ['METADATA', 'DATA'],
+        destination: 'arn:aws:s3:::destination',
+        storageClass,
+        role: 'arn:aws:iam::root:role/s3-replication-role',
+        storageType,
+        dataStoreVersionId: '',
+    });
+    // What we write when we replace every S3C 9.5 backend: no top-level destination.
+    const replacedOldFormat = {
+        status: 'PENDING',
+        role: 'arn:aws:iam::root:role/s3-replication-role',
+        backends: [newBackend],
+        content: ['METADATA', 'DATA'],
+        isNFS: null,
+    };
+    // What we write when we keep an S3C 9.5 backend: it gets the top-level destination of
+    // the object (see _upgradeBackends), and we don't write the top-level destination.
+    const fromOldFormat = backends => ({
+        status: 'PENDING',
+        role: 'arn:aws:iam::root:role/s3-replication-role',
+        backends,
+        content: ['METADATA', 'DATA'],
+        isNFS: null,
+    });
+    const keptOldBackend = (site, status) => ({
+        site, status, dataStoreVersionId: '', destination: 'arn:aws:s3:::destination',
+    });
     [
         {
             description: 'for an object with a null replication info',
@@ -150,19 +177,10 @@ describe('ReplicationStatusUpdater', () => {
             replicationStatusToProcess: ['NEW'],
             expectedReplicationInfo: {
                 status: 'PENDING',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
+                backends: [newBackend],
+                content: ['METADATA', 'DATA'],
+                isNFS: null,
             },
         }, {
             description: 'for an object with empty replication info',
@@ -179,182 +197,49 @@ describe('ReplicationStatusUpdater', () => {
             replicationStatusToProcess: ['NEW'],
             expectedReplicationInfo: {
                 status: 'PENDING',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
                 role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
+                backends: [newBackend],
+                content: ['METADATA', 'DATA'],
+                isNFS: null,
             },
         }, {
             description: 'for an object with a failed replication',
-            replicationInfo: {
-                status: 'FAILED',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'FAILED',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
-            },
+            replicationInfo: oldFormat(
+                [{ site: 'aws-location', status: 'FAILED', dataStoreVersionId: '' }], 'aws-location', 'aws_s3'),
             replicationStatusToProcess: ['FAILED'],
-            expectedReplicationInfo: {
-                status: 'PENDING',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
-            },
+            // We replace the only S3C 9.5 backend, so we drop the top-level destination.
+            expectedReplicationInfo: replacedOldFormat,
         }, {
             description: 'for an object with a completed replication',
-            replicationInfo: {
-                status: 'COMPLETED',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'COMPLETED',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
-            },
+            replicationInfo: oldFormat(
+                [{ site: 'aws-location', status: 'COMPLETED', dataStoreVersionId: '' }], 'aws-location', 'aws_s3'),
             replicationStatusToProcess: ['COMPLETED'],
-            expectedReplicationInfo: {
-                status: 'PENDING',
-                backends: [
-                    {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'aws_s3',
-                dataStoreVersionId: '',
-            },
+            expectedReplicationInfo: replacedOldFormat,
         }, {
             description: 'of a single site for an object with multiple replication destinations',
-            replicationInfo: {
-                status: 'FAILED',
-                backends: [
-                    {
-                        site: 'azure-location',
-                        status: 'COMPLETED',
-                        dataStoreVersionId: '',
-                    },
-                    {
-                        site: 'aws-location',
-                        status: 'FAILED',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'azure-location,aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'azure,aws_s3',
-                dataStoreVersionId: '',
-            },
+            replicationInfo: oldFormat([
+                { site: 'azure-location', status: 'COMPLETED', dataStoreVersionId: '' },
+                { site: 'aws-location', status: 'FAILED', dataStoreVersionId: '' },
+            ], 'azure-location,aws-location', 'azure,aws_s3'),
             replicationStatusToProcess: ['FAILED'],
-            expectedReplicationInfo: {
-                status: 'PENDING',
-                backends: [
-                    {
-                        site: 'azure-location',
-                        status: 'COMPLETED',
-                        dataStoreVersionId: '',
-                    }, {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'azure-location,aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'azure,aws_s3',
-                dataStoreVersionId: '',
-            },
+            // The backends keep their order: we replace aws-location in place.
+            expectedReplicationInfo: fromOldFormat([
+                keptOldBackend('azure-location', 'COMPLETED'),
+                newBackend,
+            ]),
         }, {
             description: 'of a single non initialized site for an object with multiple replication destinations',
-            replicationInfo: {
-                status: 'FAILED',
-                backends: [
-                    {
-                        site: 'azure-location',
-                        status: 'COMPLETED',
-                        dataStoreVersionId: '',
-                    },
-                    {
-                        site: 'azure-location-2',
-                        status: 'FAILED',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'azure-location,azure-location-2',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'azure,azure',
-                dataStoreVersionId: '',
-            },
+            replicationInfo: oldFormat([
+                { site: 'azure-location', status: 'COMPLETED', dataStoreVersionId: '' },
+                { site: 'azure-location-2', status: 'FAILED', dataStoreVersionId: '' },
+            ], 'azure-location,azure-location-2', 'azure,azure'),
             replicationStatusToProcess: ['NEW'],
-            expectedReplicationInfo: {
-                status: 'PENDING',
-                backends: [
-                    {
-                        site: 'azure-location',
-                        status: 'COMPLETED',
-                        dataStoreVersionId: '',
-                    }, {
-                        site: 'azure-location-2',
-                        status: 'FAILED',
-                        dataStoreVersionId: '',
-                    }, {
-                        site: 'aws-location',
-                        status: 'PENDING',
-                        dataStoreVersionId: '',
-                    },
-                ],
-                content: ['METADATA', 'DATA'],
-                destination: 'arn:aws:s3:::destination',
-                storageClass: 'azure-location,azure-location-2,aws-location',
-                role: 'arn:aws:iam::root:role/s3-replication-role',
-                storageType: 'azure,azure,aws_s3',
-                dataStoreVersionId: '',
-            },
+            // The backends keep their order: we add the new one at the end.
+            expectedReplicationInfo: fromOldFormat([
+                keptOldBackend('azure-location', 'COMPLETED'),
+                keptOldBackend('azure-location-2', 'FAILED'),
+                newBackend,
+            ]),
         },
     ].forEach(params => {
         it(`should trigger replication ${params.description}`, done => {
@@ -372,7 +257,6 @@ describe('ReplicationStatusUpdater', () => {
                 cb(null, { Body: JSON.stringify(objectMd) });
             });
             crr.siteName = 'aws-location';
-            crr.storageType = 'aws_s3';
             crr.replicationStatusToProcess = params.replicationStatusToProcess;
             crr.run(err => {
                 assert.ifError(err);
@@ -398,12 +282,8 @@ describe('ReplicationStatusUpdater', () => {
                 
                 expect(crr.cloudserverclient.getMetadata).toHaveBeenCalledTimes(1);
                 expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
-                expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        Body: expect.stringContaining(JSON.stringify(params.expectedReplicationInfo)),
-                    }),
-                    expect.any(Function),
-                );
+                const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+                expect(replicationInfo).toEqual(params.expectedReplicationInfo);
 
                 assert.strictEqual(crr._nProcessed, 1);
                 assert.strictEqual(crr._nSkipped, 0);
@@ -585,58 +465,93 @@ describe('ReplicationStatusUpdater with specifics', () => {
     });
 });
 
-describe('ReplicationStatusUpdater with forceUsingConfiguration', () => {
-    it('should overwrite replication destination and role when forceUsingConfiguration is true', done => {
-        // Deep copy objectMd from utils to avoid affecting the original
-        const objectMdWithOldReplication = JSON.parse(JSON.stringify(objectMd));
-        
-        // Only modify the replicationInfo part
-        objectMdWithOldReplication.replicationInfo = {
+describe('ReplicationStatusUpdater top-level role', () => {
+    function initCrr(params, replicationInfo) {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            ...params,
+        }, logger);
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = replicationInfo;
+            cb(null, { Body: JSON.stringify(md) });
+        });
+        return crr;
+    }
+
+    it('should take the source role from the bucket config', done => {
+        // Cloudserver wrote this object when the bucket had another source role.
+        const crr = initCrr({ replicationStatusToProcess: ['COMPLETED'] }, {
             status: 'COMPLETED',
-            backends: [
-                {
-                    site: 'sf',
-                    status: 'COMPLETED',
-                    dataStoreVersionId: '',
-                },
-            ],
+            role: 'arn:aws:iam::root:role/old-source-role',
+            backends: [{ ...newBackend, status: 'COMPLETED' }],
+            content: ['DATA', 'METADATA'],
+            isNFS: null,
+        });
+        crr.run(err => {
+            assert.ifError(err);
+            const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            expect(replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
+            expect(replicationInfo.backends).toEqual([newBackend]);
+            done();
+        });
+    });
+
+    it('should rewrite a backend written by S3C 9.5 with the top-level bucket and role', done => {
+        // Site sf is an S3C 9.5 backend that no rule names: we keep it, in the S3C 10.1
+        // format. Its bucket and role come from the top level of the object, which we don't
+        // write anymore. The source role comes from the bucket config.
+        const crr = initCrr({}, {
+            status: 'COMPLETED',
+            backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }],
             content: ['DATA', 'METADATA'],
             destination: 'arn:aws:s3:::destination2',
             storageClass: 'sf',
             role: 'arn:aws:iam::123456789012:role/src-resource,arn:aws:iam::123456789012:role/dest-resource',
             storageType: '',
             dataStoreVersionId: '',
-        };
-
-        const crr = initializeCrrWithMocks({
-            buckets: ['bucket0'],
-            workers: 10,
-            replicationStatusToProcess: ['NEW'],
-            forceUsingConfiguration: true,
-        }, logger);
-
-        // Override getMetadata to return object with old replication info
-        crr.cloudserverclient.getMetadata = jest.fn((params, cb) => cb(null, {
-            Body: JSON.stringify(objectMdWithOldReplication),
-        }));
-
+        });
         crr.run(err => {
             assert.ifError(err);
+            const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            expect(replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
+            expect(replicationInfo.destination).toBeUndefined();
+            expect(replicationInfo.backends).toEqual([
+                {
+                    site: 'sf', status: 'COMPLETED', dataStoreVersionId: '',
+                    destination: 'arn:aws:s3:::destination2',
+                    role: 'arn:aws:iam::123456789012:role/dest-resource',
+                },
+                newBackend,
+            ]);
+            done();
+        });
+    });
 
-            expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
-            
-            // Verify that putMetadata was called with updated destination and role from bucket config
-            const putMetadataCall = crr.cloudserverclient.putMetadata.mock.calls[0][0];
-            const updatedMetadata = JSON.parse(putMetadataCall.Body);
-            
-            // Check that replicationInfo contains the bucket configuration values
-            expect(updatedMetadata.replicationInfo.destination).toBe('arn:aws:s3:::destination');
-            expect(updatedMetadata.replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
-            
-            assert.strictEqual(crr._nProcessed, 1);
-            assert.strictEqual(crr._nSkipped, 0);
-            assert.strictEqual(crr._nUpdated, 1);
-            assert.strictEqual(crr._nErrors, 0);
+    it('should copy only the bucket when the S3C 9.5 object role has no destination role', done => {
+        // A public cloud site in S3C 9.5 has a single role: there is no destination role to
+        // copy. The backend gets the bucket only, and backbeat uses the top-level role, the
+        // source role we write.
+        const crr = initCrr({}, {
+            status: 'COMPLETED',
+            backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }],
+            content: ['DATA', 'METADATA'],
+            destination: 'arn:aws:s3:::destination2',
+            storageClass: 'sf',
+            role: 'arn:aws:iam::123456789012:role/src-resource',
+            storageType: '',
+            dataStoreVersionId: '',
+        });
+        crr.run(err => {
+            assert.ifError(err);
+            const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
+            expect(replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
+            expect(replicationInfo.destination).toBeUndefined();
+            expect(replicationInfo.backends[0]).toEqual({
+                site: 'sf', status: 'COMPLETED', dataStoreVersionId: '', destination: 'arn:aws:s3:::destination2',
+            });
             done();
         });
     });
@@ -984,8 +899,8 @@ describe('ReplicationStatusUpdater V2 format', () => {
                 dataStoreVersionId: '',
             });
 
-            // All pending → top-level PROCESSING
-            expect(repInfo.status).toBe('PROCESSING');
+            // The backbeat queue populator only queues PENDING objects.
+            expect(repInfo.status).toBe('PENDING');
 
             assert.strictEqual(crr._nProcessed, 1);
             assert.strictEqual(crr._nUpdated, 1);
@@ -1176,7 +1091,7 @@ describe('ReplicationStatusUpdater V2 format', () => {
         });
     });
 
-    it('should compute PROCESSING top-level status for docs key with mixed backend statuses in V2', done => {
+    it('should set top-level status PENDING for docs key with mixed backend statuses in V2', done => {
         const listVersionDocsKey = {
             IsTruncated: false,
             Versions: [{
@@ -1223,8 +1138,8 @@ describe('ReplicationStatusUpdater V2 format', () => {
             const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
             const repInfo = body.replicationInfo;
 
-            // dest-A COMPLETED, dest-B PENDING → PROCESSING
-            expect(repInfo.status).toBe('PROCESSING');
+            // dest-A is COMPLETED and dest-B is PENDING: we write PENDING so backbeat queues dest-B.
+            expect(repInfo.status).toBe('PENDING');
             expect(repInfo.backends).toHaveLength(2);
             const destA = repInfo.backends.find(b => b.site === 'dest-A');
             const destB = repInfo.backends.find(b => b.site === 'dest-B');
@@ -1234,10 +1149,10 @@ describe('ReplicationStatusUpdater V2 format', () => {
         });
     });
 
-    it('should upgrade V1-format skipped backends to V2 shape when processing mixed status', done => {
-        // dest-A is COMPLETED in V1 format (no per-backend destination/role) — skipped by NEW filter
-        // dest-B is NEW and matches 'docs/' prefix — should be set to PENDING
-        // After processing, dest-A must have V2-shaped destination/role and its COMPLETED status preserved
+    it('should keep the status of an S3C 9.5 backend that this run does not select', done => {
+        // dest-A is COMPLETED in the S3C 9.5 format (no bucket, no role): NEW doesn't pick it.
+        // dest-B has no backend and matches the 'docs/' prefix: NEW picks it.
+        // dest-A keeps its status: it only gets its bucket, from the top-level destination.
         const listVersionDocsKey = {
             IsTruncated: false,
             Versions: [{
@@ -1288,11 +1203,12 @@ describe('ReplicationStatusUpdater V2 format', () => {
             const destA = repInfo.backends.find(b => b.site === 'dest-A');
             const destB = repInfo.backends.find(b => b.site === 'dest-B');
 
-            // dest-A: status preserved, V2 fields populated from config
-            expect(destA.status).toBe('COMPLETED');
-            expect(destA.dataStoreVersionId).toBe('v1-stored-id');
-            expect(destA.destination).toBe('arn:aws:s3:::bucket-a');
-            expect(destA.role).toBe('arn:aws:iam::222222222222:role/repRule');
+            // We keep dest-A as it was, with its bucket copied from the top-level destination.
+            expect(destA).toEqual({
+                site: 'dest-A', status: 'COMPLETED', dataStoreVersionId: 'v1-stored-id',
+                destination: 'arn:aws:s3:::bucket-a',
+            });
+            expect(repInfo.destination).toBeUndefined();
 
             // dest-B: newly queued
             expect(destB.status).toBe('PENDING');
@@ -1300,30 +1216,30 @@ describe('ReplicationStatusUpdater V2 format', () => {
         });
     });
 
-    it('should update per-backend destination and role when forceUsingConfiguration is true in V2', done => {
-        // Use COMPLETED filter so the object (dest-A COMPLETED) is re-processed with forceUsingConfiguration
+    it('should copy to the new bucket of a rule with NEW, and keep the old backend', done => {
+        // The object was sent to old-bucket, and the rule for dest-A now uses bucket-a. The
+        // object is not on bucket-a yet, so NEW picks it.
         const crr = initializeCrrWithMocks({
             buckets: ['bucket0'],
             workers: 10,
-            replicationStatusToProcess: ['COMPLETED'],
-            forceUsingConfiguration: true,
+            replicationStatusToProcess: ['NEW'],
         }, logger, {
             GetBucketReplicationCommand: getBucketReplicationV2Res,
         });
 
-        // Object has dest-A with stale top-level role and stale backend destination/role
+        const oldBackend = {
+            site: 'dest-A',
+            status: 'COMPLETED',
+            destination: 'arn:aws:s3:::old-bucket',
+            role: 'arn:aws:iam::999999999999:role/oldRole',
+            dataStoreVersionId: '',
+        };
         crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
             const md = JSON.parse(getMetadataRes.Body);
             md.replicationInfo = {
                 status: 'COMPLETED',
                 role: 'arn:aws:iam::OLD:role/staleSourceRole',
-                backends: [{
-                    site: 'dest-A',
-                    status: 'COMPLETED',
-                    destination: 'arn:aws:s3:::old-bucket',
-                    role: 'arn:aws:iam::999999999999:role/oldRole',
-                    dataStoreVersionId: '',
-                }],
+                backends: [oldBackend],
                 content: ['METADATA', 'DATA'],
             };
             cb(null, { Body: JSON.stringify(md) });
@@ -1336,10 +1252,49 @@ describe('ReplicationStatusUpdater V2 format', () => {
             const body = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
             const repInfo = body.replicationInfo;
 
+            // The source role comes from the bucket config, not from the object.
             expect(repInfo.role).toBe('arn:aws:iam::8765432:role/sourceRole');
-            const destA = repInfo.backends.find(b => b.site === 'dest-A');
-            expect(destA.destination).toBe('arn:aws:s3:::bucket-a');
-            expect(destA.role).toBe('arn:aws:iam::222222222222:role/repRule');
+            expect(repInfo.backends).toEqual([
+                oldBackend,
+                {
+                    site: 'dest-A',
+                    status: 'PENDING',
+                    dataStoreVersionId: '',
+                    destination: 'arn:aws:s3:::bucket-a',
+                    role: 'arn:aws:iam::222222222222:role/repRule',
+                },
+            ]);
+            done();
+        });
+    });
+
+    it('should not move objects to the new bucket of a rule with COMPLETED', done => {
+        // Same object: bucket-a has no backend yet, so COMPLETED doesn't pick it, and no rule
+        // uses old-bucket anymore. We write nothing.
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['COMPLETED'],
+        }, logger, {
+            GetBucketReplicationCommand: getBucketReplicationV2Res,
+        });
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = {
+                status: 'COMPLETED',
+                role: 'arn:aws:iam::8765432:role/sourceRole',
+                backends: [{
+                    site: 'dest-A', status: 'COMPLETED', dataStoreVersionId: '',
+                    destination: 'arn:aws:s3:::old-bucket', role: 'arn:aws:iam::999999999999:role/oldRole',
+                }],
+                content: ['METADATA', 'DATA'],
+            };
+            cb(null, { Body: JSON.stringify(md) });
+        });
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nSkipped, 1);
             done();
         });
     });
@@ -1449,14 +1404,16 @@ describe('ReplicationStatusUpdater site validation', () => {
         return crr;
     }
 
-    it('should stop the run when every rule names its site and SITE_NAME is not one of them', done => {
-        // default fixture: rule with StorageClass=aws-location, object never replicated
-        const crr = initCrr({ siteName: 'foo' });
+    it('should not stop a FAILED run on an object that has nothing to retry', done => {
+        // The rule has no StorageClass, so it gets site foo, which the object doesn't know.
+        // But FAILED picks nothing on this object: we write nothing, so we don't stop.
+        const crr = initCrr({ siteName: 'foo', replicationStatusToProcess: ['FAILED'] },
+            defaultEndpointReplicationRes, replicatedReplicationInfo);
         crr.run(err => {
-            assert(err);
+            assert.ifError(err);
             expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
-            assert.strictEqual(crr._nUpdated, 0);
-            assert.strictEqual(crr._unknownSite.bucket, 'bucket0');
+            assert.strictEqual(crr._nSkipped, 1);
+            assert.strictEqual(crr._unknownSite, null);
             done();
         });
     });
@@ -1641,8 +1598,284 @@ describe('ReplicationStatusUpdater site validation', () => {
             assert.ifError(err);
             expect(crr.cloudserverclient.putMetadata).toHaveBeenCalledTimes(1);
             const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
-            assert.strictEqual(replicationInfo.storageClass, 'destination,foo');
+            expect(replicationInfo.backends.map(b => b.site)).toEqual(['destination', 'foo']);
             assert.strictEqual(crr._nUpdated, 1);
+            done();
+        });
+    });
+});
+
+describe('ReplicationStatusUpdater writes the multi-destination format for every rule format', () => {
+    const srcRole = 'arn:aws:iam::123456789012:role/src';
+    const dstRole = 'arn:aws:iam::123456789012:role/dst';
+    // A V1 rule (Prefix, no Filter). Without storageClass, it uses the S3C default site.
+    function v1Rule(destination, storageClass, prefix = '') {
+        const rule = {
+            ID: `r-${destination}`,
+            Prefix: prefix,
+            Status: 'Enabled',
+            Destination: { Bucket: `arn:aws:s3:::${destination}` },
+        };
+        if (storageClass) {
+            rule.Destination.StorageClass = storageClass;
+        }
+        return rule;
+    }
+    const replication = (...rules) => ({ ReplicationConfiguration: { Role: `${srcRole},${dstRole}`, Rules: rules } });
+
+    function initCrr(params, replicationRes, replicationInfo) {
+        const crr = initializeCrrWithMocks({
+            buckets: ['bucket0'],
+            workers: 10,
+            replicationStatusToProcess: ['NEW'],
+            ...params,
+        }, logger, { GetBucketReplicationCommand: replicationRes });
+        if (replicationInfo) {
+            crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+                const md = JSON.parse(getMetadataRes.Body);
+                md.replicationInfo = replicationInfo;
+                cb(null, { Body: JSON.stringify(md) });
+            });
+        }
+        return crr;
+    }
+    const written = crr => JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body).replicationInfo;
+
+    // An object that cloudserver 9.4+ wrote for site us-east-2.
+    const cloudserverReplicationInfo = {
+        status: 'PENDING',
+        backends: [{
+            site: 'us-east-2', status: 'PENDING', dataStoreVersionId: '',
+            destination: 'arn:aws:s3:::dst-1', role: dstRole,
+        }],
+        content: ['DATA', 'METADATA'],
+        role: srcRole,
+        isNFS: null,
+    };
+
+    it('should add a site with its bucket and role on a V1 rule (S3C-11599)', done => {
+        const crr = initCrr({ siteName: 'sf' }, replication(v1Rule('dst-1', 'sf')), cloudserverReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr)).toEqual({
+                status: 'PENDING',
+                role: srcRole,
+                backends: [
+                    cloudserverReplicationInfo.backends[0],
+                    { site: 'sf', status: 'PENDING', dataStoreVersionId: '', destination: 'arn:aws:s3:::dst-1', role: dstRole },
+                ],
+                content: ['DATA', 'METADATA'],
+                isNFS: null,
+            });
+            done();
+        });
+    });
+
+    it('should fail without SITE_NAME when a rule has no StorageClass', done => {
+        const rule = { ...v1Rule('dst-1'), Filter: { Prefix: '' } };
+        delete rule.Prefix;
+        const crr = initCrr({}, replication(rule));
+        crr.run(err => {
+            assert(err);
+            expect(err.message).toMatch(/missing SITE_NAME/);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            done();
+        });
+    });
+
+    it('should not use SITE_NAME for a rule without StorageClass when another rule names it', done => {
+        // r1 has no StorageClass (bucket dr-bucket), r2 uses site sf, bucket sf-bucket.
+        // r2 names SITE_NAME=sf, so r1 must not get site sf.
+        const crr = initCrr({ siteName: 'sf' }, replication(v1Rule('dr-bucket'), v1Rule('sf-bucket', 'sf')));
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr).backends.map(b => [b.site, b.destination])).toEqual([
+                ['sf', 'arn:aws:s3:::sf-bucket'],
+            ]);
+            done();
+        });
+    });
+
+    it('should use SITE_NAME for a rule without StorageClass when no rule names it', done => {
+        // Same rules, with SITE_NAME=dr: no rule names dr, so r1 gets site dr. We don't
+        // requeue r2 (site sf).
+        const crr = initCrr({ siteName: 'dr', allowNewSite: true },
+            replication(v1Rule('dr-bucket'), v1Rule('sf-bucket', 'sf')));
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr).backends).toEqual([{
+                site: 'dr', status: 'PENDING', dataStoreVersionId: '', destination: 'arn:aws:s3:::dr-bucket', role: dstRole,
+            }]);
+            done();
+        });
+    });
+
+    it('should mark every rule site when SITE_NAME is not set', done => {
+        const crr = initCrr({}, replication(v1Rule('dst-1', 'sf'), v1Rule('dst-2', 'dr2', 'key')));
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr).backends.map(b => [b.site, b.destination])).toEqual([
+                ['sf', 'arn:aws:s3:::dst-1'],
+                ['dr2', 'arn:aws:s3:::dst-2'],
+            ]);
+            done();
+        });
+    });
+
+    it('should skip a key that no rule prefix matches', done => {
+        const crr = initCrr({ siteName: 'sf' }, replication(v1Rule('dst-1', 'sf', 'other/')));
+        crr.run(err => {
+            assert.ifError(err);
+            expect(crr.cloudserverclient.getMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nSkipped, 1);
+            done();
+        });
+    });
+
+    it('should not add a rule site that TARGET_REPLICATION_STATUS does not select', done => {
+        const replicationInfo = {
+            ...cloudserverReplicationInfo,
+            status: 'COMPLETED',
+            backends: [{ ...cloudserverReplicationInfo.backends[0], site: 'sf', status: 'COMPLETED' }],
+        };
+        const crr = initCrr({ replicationStatusToProcess: ['COMPLETED'] },
+            replication(v1Rule('dst-1', 'sf'), v1Rule('dst-2', 'dr2')), replicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr).backends.map(b => [b.site, b.status])).toEqual([['sf', 'PENDING']]);
+            done();
+        });
+    });
+
+    describe('one site with two buckets (one rule per bucket)', () => {
+        const twoDestinations = replication(v1Rule('d1', 'sf'), v1Rule('d2', 'sf'));
+        const backend = (destination, status) => ({
+            site: 'sf', status, dataStoreVersionId: '', destination: `arn:aws:s3:::${destination}`, role: dstRole,
+        });
+        const withBackends = backends => ({ ...cloudserverReplicationInfo, status: 'FAILED', backends });
+
+        [
+            [backend('d1', 'COMPLETED'), backend('d2', 'FAILED')],
+            [backend('d2', 'FAILED'), backend('d1', 'COMPLETED')],
+        ].forEach(backends => {
+            it(`should retry only the FAILED bucket (object backends ${backends.map(b => b.destination.slice(13))})`,
+                done => {
+                    const crr = initCrr({ replicationStatusToProcess: ['FAILED'] }, twoDestinations,
+                        withBackends(backends));
+                    crr.run(err => {
+                        assert.ifError(err);
+                        const statuses = Object.fromEntries(
+                            written(crr).backends.map(b => [b.destination.slice(13), b.status]));
+                        expect(statuses).toEqual({ d1: 'COMPLETED', d2: 'PENDING' });
+                        done();
+                    });
+                });
+        });
+    });
+
+    it('should warn once per bucket when SITE_NAME is not a site of the rules', done => {
+        // The rules only name sf, and the object only replicates to us-east-2: we requeue nothing.
+        const crr = initCrr({ siteName: 'dr9', allowNewSite: true },
+            replication(v1Rule('dst-1', 'sf')), cloudserverReplicationInfo);
+        const warnSpy = jest.spyOn(crr.log, 'warn');
+        crr.run(err => {
+            assert.ifError(err);
+            const siteWarnings = warnSpy.mock.calls.filter(c => c[0].startsWith('SITE_NAME is not a site'));
+            expect(siteWarnings).toHaveLength(1);
+            expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+            assert.strictEqual(crr._nSkipped, 1);
+            assert.strictEqual(crr._unknownSite, null);
+            warnSpy.mockRestore();
+            done();
+        });
+    });
+
+    describe('object written by S3C 9.5, two buckets on its site', () => {
+        // The object was replicated to site sf, bucket d1. Its backend has no bucket: the
+        // bucket is the top-level destination. The rules now use site sf with bucket d1,
+        // and site sf with bucket d2.
+        const oldFormat = {
+            status: 'COMPLETED',
+            backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }],
+            content: ['DATA', 'METADATA'],
+            destination: 'arn:aws:s3:::d1',
+            storageClass: 'sf',
+            role: `${srcRole},${dstRole}`,
+            storageType: '',
+            dataStoreVersionId: '',
+        };
+        // The same backend in the S3C 10.1 format (see _upgradeBackends).
+        const upgradedBackend = { ...oldFormat.backends[0], destination: 'arn:aws:s3:::d1', role: dstRole };
+        const sites = backends => backends.map(b => `${b.site}|${(b.destination || '-').split(':::').pop()}|${b.status}`);
+
+        it('should send the object to the new bucket with NEW, and keep the old backend first, upgraded', done => {
+            const crr = initCrr({},
+                replication(v1Rule('d1', 'sf'), v1Rule('d2', 'sf'), v1Rule('x', 'dr2')), oldFormat);
+            crr.run(err => {
+                assert.ifError(err);
+                // The old backend is the one for bucket d1. Bucket d2 and site dr2 have none, so
+                // NEW picks them. We write the old backend once, with its bucket and role.
+                expect(sites(written(crr).backends)).toEqual(['sf|d1|COMPLETED', 'sf|d2|PENDING', 'dr2|x|PENDING']);
+                expect(written(crr).backends[0]).toEqual(upgradedBackend);
+                expect(written(crr).destination).toBeUndefined();
+                done();
+            });
+        });
+
+        it('should requeue only the old bucket with COMPLETED, in place', done => {
+            const crr = initCrr({ replicationStatusToProcess: ['COMPLETED'] },
+                replication(v1Rule('d1', 'sf'), v1Rule('d2', 'sf')), oldFormat);
+            crr.run(err => {
+                assert.ifError(err);
+                expect(sites(written(crr).backends)).toEqual(['sf|d1|PENDING']);
+                done();
+            });
+        });
+    });
+
+    describe('the destination role changed after the object was sent', () => {
+        // The object was sent to site sf, bucket d1, with a destination role that the bucket
+        // Role no longer gives. Backbeat refused it (BadRole), so the backend stayed PENDING.
+        const typoRole = 'arn:aws:iam::123456789012:role/typo';
+        const backend = (role, status) => ({
+            site: 'sf', status, dataStoreVersionId: '', destination: 'arn:aws:s3:::d1', role,
+        });
+        const withBackends = backends => ({ ...cloudserverReplicationInfo, backends });
+
+        it('should requeue the backend in place with the new role', done => {
+            const crr = initCrr({ replicationStatusToProcess: ['PENDING'] },
+                replication(v1Rule('d1', 'sf')), withBackends([backend(typoRole, 'PENDING')]));
+            crr.run(err => {
+                assert.ifError(err);
+                expect(written(crr).backends).toEqual([backend(dstRole, 'PENDING')]);
+                done();
+            });
+        });
+
+        it('should not add a second backend with NEW', done => {
+            const crr = initCrr({}, replication(v1Rule('d1', 'sf')),
+                withBackends([backend(typoRole, 'PENDING')]));
+            crr.run(err => {
+                assert.ifError(err);
+                expect(crr.cloudserverclient.putMetadata).not.toHaveBeenCalled();
+                assert.strictEqual(crr._nSkipped, 1);
+                done();
+            });
+        });
+    });
+
+    it('should keep isReplica on a replica that replicates further (cascading)', done => {
+        const replicationInfo = {
+            ...cloudserverReplicationInfo,
+            status: 'COMPLETED',
+            backends: [{ ...cloudserverReplicationInfo.backends[0], site: 'sf', status: 'COMPLETED' }],
+            isReplica: true,
+        };
+        const crr = initCrr({ siteName: 'sf', replicationStatusToProcess: ['COMPLETED'] },
+            replication(v1Rule('dst-1', 'sf')), replicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr)).toEqual(expect.objectContaining({ status: 'PENDING', isReplica: true }));
             done();
         });
     });
