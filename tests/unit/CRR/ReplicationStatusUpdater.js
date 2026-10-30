@@ -158,14 +158,17 @@ describe('ReplicationStatusUpdater', () => {
         content: ['METADATA', 'DATA'],
         isNFS: null,
     };
-    // What we write when we keep an S3C 9.5 backend: we keep the top-level destination.
+    // What we write when we keep an S3C 9.5 backend: it gets the top-level destination of
+    // the object (see _upgradeBackends), and we don't write the top-level destination.
     const fromOldFormat = backends => ({
         status: 'PENDING',
         role: 'arn:aws:iam::root:role/s3-replication-role',
         backends,
         content: ['METADATA', 'DATA'],
         isNFS: null,
-        destination: 'arn:aws:s3:::destination',
+    });
+    const keptOldBackend = (site, status) => ({
+        site, status, dataStoreVersionId: '', destination: 'arn:aws:s3:::destination',
     });
     [
         {
@@ -221,7 +224,7 @@ describe('ReplicationStatusUpdater', () => {
             replicationStatusToProcess: ['FAILED'],
             // The backends keep their order: we replace aws-location in place.
             expectedReplicationInfo: fromOldFormat([
-                { site: 'azure-location', status: 'COMPLETED', dataStoreVersionId: '' },
+                keptOldBackend('azure-location', 'COMPLETED'),
                 newBackend,
             ]),
         }, {
@@ -233,8 +236,8 @@ describe('ReplicationStatusUpdater', () => {
             replicationStatusToProcess: ['NEW'],
             // The backends keep their order: we add the new one at the end.
             expectedReplicationInfo: fromOldFormat([
-                { site: 'azure-location', status: 'COMPLETED', dataStoreVersionId: '' },
-                { site: 'azure-location-2', status: 'FAILED', dataStoreVersionId: '' },
+                keptOldBackend('azure-location', 'COMPLETED'),
+                keptOldBackend('azure-location-2', 'FAILED'),
                 newBackend,
             ]),
         },
@@ -496,10 +499,10 @@ describe('ReplicationStatusUpdater top-level role', () => {
         });
     });
 
-    it('should keep the destination and destination role while a backend written by S3C 9.5 is kept', done => {
-        // Site sf is an S3C 9.5 backend that no rule names: we keep it, so we keep the
-        // top-level destination and destination role it needs. The source role comes from
-        // the bucket config: backbeat uses it for the new backend too.
+    it('should rewrite a backend written by S3C 9.5 with the top-level bucket and role', done => {
+        // Site sf is an S3C 9.5 backend that no rule names: we keep it, in the S3C 10.1
+        // format. Its bucket and role come from the top level of the object, which we don't
+        // write anymore. The source role comes from the bucket config.
         const crr = initCrr({}, {
             status: 'COMPLETED',
             backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }],
@@ -513,20 +516,24 @@ describe('ReplicationStatusUpdater top-level role', () => {
         crr.run(err => {
             assert.ifError(err);
             const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
-            expect(replicationInfo.role).toBe(
-                'arn:aws:iam::root:role/s3-replication-role,arn:aws:iam::123456789012:role/dest-resource');
-            expect(replicationInfo.destination).toBe('arn:aws:s3:::destination2');
+            expect(replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
+            expect(replicationInfo.destination).toBeUndefined();
             expect(replicationInfo.backends).toEqual([
-                { site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' },
+                {
+                    site: 'sf', status: 'COMPLETED', dataStoreVersionId: '',
+                    destination: 'arn:aws:s3:::destination2',
+                    role: 'arn:aws:iam::123456789012:role/dest-resource',
+                },
                 newBackend,
             ]);
             done();
         });
     });
 
-    it('should write only the source role when the S3C 9.5 object role has no destination role', done => {
+    it('should copy only the bucket when the S3C 9.5 object role has no destination role', done => {
         // A public cloud site in S3C 9.5 has a single role: there is no destination role to
-        // keep, so we write the source role alone.
+        // copy. The backend gets the bucket only, and backbeat uses the top-level role, the
+        // source role we write.
         const crr = initCrr({}, {
             status: 'COMPLETED',
             backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }],
@@ -541,7 +548,10 @@ describe('ReplicationStatusUpdater top-level role', () => {
             assert.ifError(err);
             const { replicationInfo } = JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body);
             expect(replicationInfo.role).toBe('arn:aws:iam::root:role/s3-replication-role');
-            expect(replicationInfo.destination).toBe('arn:aws:s3:::destination2');
+            expect(replicationInfo.destination).toBeUndefined();
+            expect(replicationInfo.backends[0]).toEqual({
+                site: 'sf', status: 'COMPLETED', dataStoreVersionId: '', destination: 'arn:aws:s3:::destination2',
+            });
             done();
         });
     });
@@ -1139,10 +1149,10 @@ describe('ReplicationStatusUpdater V2 format', () => {
         });
     });
 
-    it('should keep a V1-format backend unchanged when this run does not select it', done => {
-        // dest-A is COMPLETED in V1 format (no per-backend destination/role) — skipped by NEW filter
-        // dest-B is NEW and matches 'docs/' prefix — should be set to PENDING
-        // We leave dest-A as it is: this run doesn't pick it.
+    it('should keep the status of an S3C 9.5 backend that this run does not select', done => {
+        // dest-A is COMPLETED in the S3C 9.5 format (no bucket, no role): NEW doesn't pick it.
+        // dest-B has no backend and matches the 'docs/' prefix: NEW picks it.
+        // dest-A keeps its status: it only gets its bucket, from the top-level destination.
         const listVersionDocsKey = {
             IsTruncated: false,
             Versions: [{
@@ -1193,9 +1203,12 @@ describe('ReplicationStatusUpdater V2 format', () => {
             const destA = repInfo.backends.find(b => b.site === 'dest-A');
             const destB = repInfo.backends.find(b => b.site === 'dest-B');
 
-            // We keep dest-A, so we keep its bucket: the top-level destination.
-            expect(destA).toEqual({ site: 'dest-A', status: 'COMPLETED', dataStoreVersionId: 'v1-stored-id' });
-            expect(repInfo.destination).toBe('arn:aws:s3:::bucket-a');
+            // We keep dest-A as it was, with its bucket copied from the top-level destination.
+            expect(destA).toEqual({
+                site: 'dest-A', status: 'COMPLETED', dataStoreVersionId: 'v1-stored-id',
+                destination: 'arn:aws:s3:::bucket-a',
+            });
+            expect(repInfo.destination).toBeUndefined();
 
             // dest-B: newly queued
             expect(destB.status).toBe('PENDING');
@@ -1791,18 +1804,20 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
             storageType: '',
             dataStoreVersionId: '',
         };
-        const oldBackend = oldFormat.backends[0];
+        // The same backend in the S3C 10.1 format (see _upgradeBackends).
+        const upgradedBackend = { ...oldFormat.backends[0], destination: 'arn:aws:s3:::d1', role: dstRole };
         const sites = backends => backends.map(b => `${b.site}|${(b.destination || '-').split(':::').pop()}|${b.status}`);
 
-        it('should send the object to the new bucket with NEW, and keep the old backend first', done => {
+        it('should send the object to the new bucket with NEW, and keep the old backend first, upgraded', done => {
             const crr = initCrr({},
                 replication(v1Rule('d1', 'sf'), v1Rule('d2', 'sf'), v1Rule('x', 'dr2')), oldFormat);
             crr.run(err => {
                 assert.ifError(err);
                 // The old backend is the one for bucket d1. Bucket d2 and site dr2 have none, so
-                // NEW picks them. We write the old backend once.
-                expect(sites(written(crr).backends)).toEqual(['sf|-|COMPLETED', 'sf|d2|PENDING', 'dr2|x|PENDING']);
-                expect(written(crr).backends[0]).toEqual(oldBackend);
+                // NEW picks them. We write the old backend once, with its bucket and role.
+                expect(sites(written(crr).backends)).toEqual(['sf|d1|COMPLETED', 'sf|d2|PENDING', 'dr2|x|PENDING']);
+                expect(written(crr).backends[0]).toEqual(upgradedBackend);
+                expect(written(crr).destination).toBeUndefined();
                 done();
             });
         });

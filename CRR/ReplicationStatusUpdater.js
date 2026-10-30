@@ -140,44 +140,21 @@ class ReplicationStatusUpdater {
 
     /**
      * Tells if an object backend and a candidate are the same: same site and same bucket.
-     * The site is not enough: since S3C 10.1, two bucket replication rules can send to the
-     * same site with two buckets. Example: site sf, bucket d1, and site sf, bucket d2.
-     * A backend written by S3C 9.5 has no bucket: its bucket is the top-level destination
-     * of the object. A backend of a public cloud site has no bucket, and the object has no
-     * top-level destination: there, the site is enough.
-     * We don't compare the role. A bucket has one owner on a site, so we don't need the
-     * role to tell two backends apart. And we need a backend to match after the role
-     * changed: then we send the object again with the new role, because backbeat keeps
-     * refusing the old one (BadRole).
-     * Example: the bucket Role had a typo, and the customer fixed it. The object backend is
-     * site sf, bucket d1, role typo-role. The rule now gives role replication-role. We
-     * still find the backend.
+     * Since S3C 10.1, one site can have two buckets. A backend with no bucket is a cloud
+     * site written by S3C 10.1: the site is enough (backends written by S3C 9.5 got their
+     * bucket in _upgradeBackends).
+     * We don't compare the role: a bucket has one owner on a site, and a backend must
+     * still match after the bucket Role changed, so we send it again with the new role.
+     * Example: the object backend is site sf, bucket d1, role typo-role. The rule now gives
+     * role replication-role. We still find the backend.
      * @private
      * @param {Object} existing - Backend of the object.
      * @param {Object} candidate - Backend built from the bucket rules.
-     * @param {Object} [replicationInfo] - Replication info of the object.
      * @returns {boolean} True if both are the same.
      */
-    _isSameBackend(existing, candidate, replicationInfo) {
-        // When no rule sends the key to SITE_NAME anymore, step 3 of _markObjectPending
-        // takes the candidates from the object backends themselves. Then the candidate is
-        // the object backend, the same JavaScript object, and it is the same backend.
-        // We need this check for a backend written by S3C 9.5: it has no bucket, so the
-        // checks below would compare the top-level destination with nothing, and fail.
-        // Example: the object has destination backup-sf and the backend [site sf, no
-        // bucket]. The rules now only name dr3. With SITE_NAME=sf, step 3 takes that
-        // backend as the candidate, and we find it here.
-        if (existing === candidate) {
-            return true;
-        }
-        if (existing.site !== candidate.site) {
-            return false;
-        }
-        if (existing.destination) {
-            return existing.destination === candidate.destination;
-        }
-        return !replicationInfo?.destination
-            || candidate.destination === replicationInfo.destination;
+    _isSameBackend(existing, candidate) {
+        return existing.site === candidate.site
+            && (!existing.destination || existing.destination === candidate.destination);
     }
 
     /**
@@ -220,21 +197,13 @@ class ReplicationStatusUpdater {
 
     /**
      * Checks that the site is a known replication destination.
-     * An unknown site creates a backend no replication processor handles -> the
-     * object stays PENDING forever.
-     * When the object already replicates, the site must be one of its sites or one of
-     * the rule sites. Otherwise we accept it: a rule without StorageClass uses the S3C
-     * default site from the federation config (env_replication_endpoints), and this
-     * script can't read it.
-     * We don't need a check for "every rule names its site": then we only write a site
-     * that a rule names (_markObjectPending, step 2), or a site the object already has
-     * (step 3). Both are known.
-     *
-     * "names X": a rule has StorageClass=X.
-     *
-     * We only check the objects we write (_markObjectPending, step 6). The table below
-     * is for TARGET_REPLICATION_STATUS=NEW. With FAILED, COMPLETED or PENDING, we only
-     * write an object that already has a backend for SITE_NAME, so the check passes.
+     * A site that no backbeat process handles leaves the object PENDING forever.
+     * When the object already replicates, the site must be one of its sites or a rule
+     * site. Otherwise we accept it: a rule without StorageClass uses the S3C default
+     * site, and we can't read it.
+     * We only check the objects we write. The table is for TARGET_REPLICATION_STATUS=NEW:
+     * with the other statuses, we only write objects that already have a backend for
+     * SITE_NAME. "names X" means a rule has StorageClass=X.
      *
      * | Rules                  | Object sites     | SITE_NAME | Result                                 |
      * |------------------------|------------------|-----------|----------------------------------------|
@@ -252,9 +221,8 @@ class ReplicationStatusUpdater {
      * | no StorageClass        | none             | unset     | error "missing SITE_NAME" (_markPending) |
      * | no StorageClass        | 9.5 replica (dr) | primary   | run stopped: needs ALLOW_NEW_SITE=true |
      *
-     * ALLOW_NEW_SITE=true skips the check. It's needed when the object must get a
-     * site it doesn't know and that is the S3C default site: DR failback with
-     * replicas written by S3C 9.5, or a renamed default DR site.
+     * ALLOW_NEW_SITE=true skips the check, for a DR failback of replicas written by
+     * S3C 9.5, or a renamed default DR site.
      * @private
      * @param {ObjectMD} objMD - Object metadata.
      * @param {string} site - Destination site name.
@@ -334,26 +302,21 @@ class ReplicationStatusUpdater {
     }
 
     /**
-     * Adapts AWS SDK replication config to arsenal's ReplicationConfigurationMetadata shape.
-     * A bucket replication rule without StorageClass sends the objects to the S3C default
-     * site. That site is in the federation config (env_replication_endpoints), and we
-     * can't read it from here. So we use SITE_NAME as the site of these rules. Without a
-     * site, resolveBackends ignores the rule.
+     * Adapts the AWS SDK replication config to the shape arsenal expects.
+     * A rule without StorageClass goes to the S3C default site, set in the federation
+     * config (env_replication_endpoints), and we can't read it. So we give it SITE_NAME as
+     * site. Without a site, resolveBackends ignores the rule.
      * @private
      * @param {Object} repConfig - The full replication configuration.
      * @returns {Object}
      */
     _buildArsenalConfig(repConfig) {
         const { Role, Rules } = repConfig;
-        // When a rule names SITE_NAME in its StorageClass, we assume the default site is
-        // another site, and the rules without StorageClass get no site. Otherwise we would
-        // send their objects to the wrong site.
-        // Example: r1 has no StorageClass (bucket dr-bucket, default site dr), r2 uses site
-        // sf, bucket sf-bucket. With SITE_NAME=sf, r1 is left out: we only requeue site sf,
-        // bucket sf-bucket. With SITE_NAME=dr, r1 gets site dr.
-        // If the default site is SITE_NAME too, we get it wrong: r1 is left out without a
-        // word. Workaround: set StorageClass sf on r1 for the run, then put the bucket
-        // replication config back.
+        // When another rule names SITE_NAME, we assume the default site is another site, and
+        // the rules without StorageClass get no site. If the default site is SITE_NAME too,
+        // they are left out (workaround in the README, SITE_NAME).
+        // Example: r1 has no StorageClass, r2 names sf. With SITE_NAME=sf, r1 is left out.
+        // With SITE_NAME=dr, r1 gets site dr.
         const isRuleSite = this._getConfiguredSites(Rules).includes(this.siteName);
         const defaultSite = isRuleSite ? undefined : this.siteName;
         return {
@@ -436,31 +399,169 @@ class ReplicationStatusUpdater {
     }
 
     /**
+     * Rewrites the backends written by S3C 9.5 in the S3C 10.1 format, so the object has
+     * one format. A backend written by S3C 9.5 has no bucket and no role: backbeat takes
+     * them from the top-level destination and role of the object (getReplicationTargetBucket
+     * and getReplicationRoles in arsenal). We copy them on the backend, so backbeat uses
+     * the same bucket and role, and we never write the top-level destination again.
+     * When the object role has no destination role (a public cloud site in S3C 9.5), we
+     * copy only the bucket: backbeat then uses the top-level role, as before.
+     * A cloud site written by S3C 10.1 has no bucket, and the object has no top-level
+     * destination: we leave it as it is.
+     * Example: { destination: 'arn:aws:s3:::backup-sf', role: '...old-src,...old-dst',
+     *            backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }] }
+     *   gives [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '',
+     *            destination: 'arn:aws:s3:::backup-sf', role: '...old-dst' }]
+     * @private
+     * @param {Object} [prev] - The current replication info of the object.
+     * @returns {Array<Object>} The object backends, in their order.
+     */
+    _upgradeBackends(prev) {
+        const backends = prev?.backends || [];
+        if (!prev?.destination) {
+            return backends;
+        }
+        const destinationRole = prev.role?.split(',')[1];
+        return backends.map(b => {
+            if (b.destination) {
+                return b;
+            }
+            const upgraded = { ...b, destination: prev.destination };
+            if (!b.role && destinationRole) {
+                upgraded.role = destinationRole;
+            }
+            return upgraded;
+        });
+    }
+
+    /**
+     * Builds the plan for one object: where the bucket replication rules send this key
+     * today, which object backend matches each destination, and which ones
+     * TARGET_REPLICATION_STATUS picks.
+     * Example (see _markObjectPending): for 'docs/a.pdf', we get
+     *   [site sf,  bucket backup-sf,  object backend COMPLETED, not picked by NEW]
+     *   [site dr2, bucket backup-dr2, no object backend,        picked by NEW]
+     * @private
+     * @param {string} key - The object key.
+     * @param {Array<Object>} existingBackends - The object backends, from _upgradeBackends.
+     * @param {Object} repConfig - The bucket replication configuration.
+     * @returns {Array<Object>} One object target per destination: { candidate, existing,
+     * selected }. existing is the matching object backend, if any.
+     */
+    _buildPlan(key, existingBackends, repConfig) {
+
+        // 1. We take the destinations from the rules, like cloudserver on a PUT: site,
+        //    bucket and role. We use them for every status, not only NEW: a requeue must
+        //    use the current bucket and role (S3UTILS-208). resolveBackends sets them all
+        //    PENDING: step 4 decides which ones we really send.
+        let candidates = ReplicationConfiguration.resolveBackends(
+            this._buildArsenalConfig(repConfig), key, () => false, existingBackends,
+        );
+
+        // 2. When SITE_NAME is set, we keep only that site, to requeue it without touching
+        //    the others. When no rule sends the key to SITE_NAME anymore, we take the object
+        //    backend for it as it is, to retry an old replication (S3UTILS-250).
+        //    Example: SITE_NAME=dr2 keeps [site dr2, bucket backup-dr2].
+        if (this.siteName) {
+            candidates = candidates.filter(b => b.site === this.siteName);
+            if (candidates.length === 0) {
+                candidates = existingBackends.filter(b => b.site === this.siteName);
+            }
+        }
+
+        // 3. For each destination, we find the object backend for the same site and bucket
+        //    (see _isSameBackend). No backend means the object was never sent there.
+        // 4. TARGET_REPLICATION_STATUS picks on the status of that backend.
+        //    Example: NEW picks dr2, which has no backend. COMPLETED would pick sf.
+        return candidates.map(candidate => {
+            const existing = existingBackends.find(e => this._isSameBackend(e, candidate));
+            const selected = this._statusShouldBeProcessed(existing?.status);
+            return { candidate, existing, selected };
+        });
+    }
+
+    /**
+     * Builds the replication info to write from the plan. Only what the plan picks
+     * changes: this run must not touch the rest of the object (see the table in
+     * _markObjectPending).
+     * @private
+     * @param {Object} [prev] - The current replication info of the object.
+     * @param {Array<Object>} existingBackends - The object backends, from _upgradeBackends.
+     * @param {Array<Object>} plan - The object targets from _buildPlan.
+     * @param {Object} repConfig - The bucket replication configuration.
+     * @param {ObjectMD} objMD - Object metadata.
+     * @returns {Object} The replication info to write.
+     */
+    _buildReplicationInfo(prev, existingBackends, plan, repConfig, objMD) {
+        // We keep the object backends in their order, and add the new ones at the end.
+        // Example: [site sf, bucket backup-sf, COMPLETED (as it was);
+        //           site dr2, bucket backup-dr2, PENDING]
+        const backends = existingBackends.map(existing => {
+            const target = plan.find(t => t.existing === existing);
+            return target?.selected ? { ...target.candidate, status: 'PENDING' } : existing;
+        });
+        for (const { candidate, existing, selected } of plan) {
+            if (selected && !existing) {
+                backends.push({ ...candidate, status: 'PENDING' });
+            }
+        }
+
+        // Backbeat sends a backend with '<source role>,<backend role>', so we write only the
+        // source role, from the bucket config, like cloudserver on a PUT.
+        const replicationInfo = {
+            // Backbeat only queues objects that are PENDING. It sets PROCESSING itself.
+            status: 'PENDING',
+            role: ReplicationConfiguration.resolveSourceRole(repConfig.Role),
+            backends,
+            content: this._getReplicationContent(prev, objMD),
+            isNFS: prev?.isNFS ?? null,
+        };
+        // A replica that we send further (cascading) is still a replica.
+        if (prev?.isReplica) {
+            replicationInfo.isReplica = true;
+        }
+        return replicationInfo;
+    }
+
+    /**
      * Marks an object as pending for replication.
      *
-     * We write the same format as cloudserver since S3C 10.1: each backend has its own
-     * destination bucket and role. Cloudserver does this for every bucket, V1 rules
-     * (Prefix) or V2 rules (Filter), so we do the same.
+     * We write the format of S3C 10.1 (and Zenko 2.16), like cloudserver on a PUT: each
+     * backend has its own destination bucket and role, whatever the rule format (V1 Prefix
+     * or V2 Filter). _markPending only calls this for keys that match a rule prefix.
      *
-     * "The rules" in the comments below means the replication rules of the bucket
-     * (GetBucketReplication).
+     * 1. _upgradeBackends: the object backends, in the S3C 10.1 format when we can.
+     * 2. _buildPlan: where the rules send the key, and what TARGET_REPLICATION_STATUS picks.
+     * 3. Nothing picked: we write nothing.
+     * 4. _stopOnUnknownSite: we stop the run on a SITE_NAME we don't know.
+     * 5. _buildReplicationInfo: what we write.
      *
-     * _markPending only calls this for keys that match a rule prefix. If a rule has no
-     * StorageClass, it also checks that SITE_NAME is set.
+     * What happens to each object backend:
      *
-     * Example used in the comments below:
+     * | Object backend               | Matched on              | Picked               | Not picked          |
+     * |------------------------------|-------------------------|----------------------|---------------------|
+     * | none for this destination    | -                       | added at the end     | -                   |
+     * | S3C 10.1: site, bucket, role | site + bucket (the role | rewritten in place   | kept as it is       |
+     * |                              | may have changed)       | with the bucket and  |                     |
+     * |                              |                         | role of the rule,    |                     |
+     * |                              |                         | PENDING              |                     |
+     * | S3C 9.5: site only           | site + bucket, copied   | same                 | rewritten with the  |
+     * |                              | from the top level      |                      | top-level bucket    |
+     * |                              | (_upgradeBackends)      |                      | and role            |
+     * | cloud, S3C 10.1: site only   | site                    | same                 | kept as it is       |
+     * | no rule for it anymore       | itself (SITE_NAME only) | PENDING in place     | kept as it is       |
+     *
+     * Top level: status PENDING, source role from the bucket config, content computed when
+     * empty (object put before the rule), isReplica kept.
+     *
+     * Example used in the comments:
      *   bucket Role: '...:role/crr-src,...:role/crr-dst'
      *   bucket rules (V1 or V2, same result):
      *     r1  Prefix ''       Destination { Bucket: 'arn:aws:s3:::backup-sf',  StorageClass: 'sf' }
      *     r2  Prefix 'docs/'  Destination { Bucket: 'arn:aws:s3:::backup-dr2', StorageClass: 'dr2' }
      *   TARGET_REPLICATION_STATUS=NEW, SITE_NAME not set
-     *   object 'docs/a.pdf', already replicated to sf:
-     *     replicationInfo: { status: 'COMPLETED', role: '...:role/crr-src',
-     *       content: ['DATA', 'METADATA'], isNFS: null,
-     *       backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '',
-     *                    destination: 'arn:aws:s3:::backup-sf', role: '...:role/crr-dst' }] }
-     *   result: we leave sf as it is and add dr2 as PENDING. Backbeat copies the object
-     *   to site dr2, bucket backup-dr2, and nowhere else.
+     *   object 'docs/a.pdf', replicated to site sf, bucket backup-sf, COMPLETED
+     *   result: we leave sf as it is and add site dr2, bucket backup-dr2, PENDING.
      *
      * @private
      * @param {string} bucket - The bucket name.
@@ -472,143 +573,21 @@ class ReplicationStatusUpdater {
      */
     _markObjectPending(bucket, key, versionId, repConfig, cb) {
         this._updateObjectMD(bucket, key, versionId, objMD => {
-            // 1. We read the object backends: where the object was already sent, and how it
-            //    went. We need them because TARGET_REPLICATION_STATUS is about the object: what
-            //    already happened to it for each site and bucket. The bucket replication rules
-            //    don't know that.
-            //    Example: [site sf, bucket backup-sf, COMPLETED]
             const prev = objMD.getReplicationInfo();
-            const existingBackends = prev?.backends || [];
-
-            // 2. We build the candidates: where the bucket replication rules send this key
-            //    today (site, bucket and role). We use resolveBackends, like cloudserver on a
-            //    PUT. We need them for every status, not only NEW: a requeue must also use the
-            //    current bucket and role, not the ones the object was sent with (S3UTILS-208).
-            //    The role of a candidate is the destination role of the bucket Role, with the
-            //    account of Destination.Account when the rule has one.
-            //    resolveBackends sets every candidate to PENDING: that's not a decision yet,
-            //    step 5 picks the ones we really send again.
-            //    Example: two candidates, one per rule that matches the key:
-            //      site sf,  bucket backup-sf,  role ...crr-dst
-            //      site dr2, bucket backup-dr2, role ...crr-dst
-            const arsenalConfig = this._buildArsenalConfig(repConfig);
-            let candidateBackends = ReplicationConfiguration.resolveBackends(
-                arsenalConfig, key, () => false, existingBackends,
-            );
-
-            // 3. When SITE_NAME is set, we keep only the candidates for that site. We need it
-            //    to requeue one site without touching the others. Example: resend everything
-            //    to dr2 after dr2 lost its data.
-            //    Example: SITE_NAME=dr2 keeps [site dr2, bucket backup-dr2].
-            if (this.siteName) {
-                candidateBackends = candidateBackends.filter(b => b.site === this.siteName);
-                if (candidateBackends.length === 0) {
-                    // No rule sends this key to SITE_NAME anymore, but the object may still
-                    // have a backend for it. We need this to retry old replications to a site
-                    // the rules moved away from: we take that backend as it is, with its own
-                    // bucket and role.
-                    // Example: the rules now only name dr3. With SITE_NAME=sf, we take the
-                    // object backend for site sf.
-                    candidateBackends = existingBackends.filter(b => b.site === this.siteName);
-                }
-            }
-
-            // 4. For each candidate, we find the object backend for the same site and bucket
-            //    (see _isSameBackend), and so its status. We need it to apply
-            //    TARGET_REPLICATION_STATUS.
-            //    No backend means the object was never sent to this site and bucket: NEW picks
-            //    it. That's also the case when a rule moved to another bucket on the same site.
-            //    Example: site sf, bucket backup-sf has an object backend, COMPLETED. Site dr2,
-            //    bucket backup-dr2 has no backend.
-            //
-            // 5. TARGET_REPLICATION_STATUS picks the candidates to send again. Each object
-            //    target holds the candidate, the object backend we found for it, and whether
-            //    we pick it.
-            //    Example: NEW picks dr2. COMPLETED would pick sf.
-            const objectTargets = candidateBackends.map(candidate => {
-                const existing = existingBackends.find(e => this._isSameBackend(e, candidate, prev));
-                const selected = this._statusShouldBeProcessed(existing?.status);
-                return { candidate, existing, selected };
-            });
-
-            // Nothing picked: we write nothing, and the object counts as skipped.
-            if (!objectTargets.some(t => t.selected)) {
+            const existingBackends = this._upgradeBackends(prev);
+            const plan = this._buildPlan(key, existingBackends, repConfig);
+            if (!plan.some(t => t.selected)) {
                 return { skip: true };
             }
-
-            // 6. A SITE_NAME that is in neither the bucket replication rules nor the object is
-            //    probably a typo. We stop before writing anything: a backend for a site that
-            //    no backbeat process handles stays PENDING forever (S3UTILS-250).
-            //    We check only the objects we write: an object we skip gets no backend, so a
-            //    wrong SITE_NAME can't hurt it. Otherwise a FAILED retry run would stop on an
-            //    object that has nothing to retry.
-            //    Example: SITE_NAME is not set, so there is nothing to check.
-            //    Example: say r1 has no StorageClass, and SITE_NAME=sff. r1 gets site sff
-            //    (see _buildArsenalConfig), and NEW picks site sff, bucket backup-sf. The
-            //    object only knows site sf: we stop the run.
+            // We check only the objects we write: an object we skip gets no backend, so a
+            // wrong SITE_NAME can't hurt it.
             if (this._stopOnUnknownSite(objMD, bucket, key, versionId, repConfig.Rules)) {
                 return { skip: true };
             }
-
-            // 7. We build the backends to write. Only what we picked changes: this run must not
-            //    touch the rest of the object.
-            //    We keep the object backends in their order and add the new ones at the end.
-            //    Backbeat finds a backend written by S3C 9.5 by its site only, so it takes the
-            //    first backend of that site: it must stay before a new one for the same site.
-            //    Example: [site sf, bucket backup-sf, COMPLETED (as it was);
-            //              site dr2, bucket backup-dr2, PENDING]
-            const allBackends = existingBackends.map(existing => {
-                const target = objectTargets.find(t => t.existing === existing);
-                // Picked: send it again, to the site and bucket of the rule, with the role
-                // of the rule. Not picked, or no rule for it: leave it as it is.
-                return target?.selected ? { ...target.candidate, status: 'PENDING' } : existing;
-            });
-            for (const { candidate, existing, selected } of objectTargets) {
-                // Picked and not on the object yet: add it at the end.
-                if (selected && !existing) {
-                    allBackends.push({ ...candidate, status: 'PENDING' });
-                }
-            }
-
-            // 8. We build the replication info to write.
-            //    Role: backbeat sends a backend with '<source role of this role>,<backend role>'.
-            //    So we only write the source role, from the bucket config, like cloudserver on
-            //    a PUT.
-            //    But a backend written by S3C 9.5 has no bucket and no role: backbeat takes
-            //    them from the top-level destination and role. While we keep such a backend, we
-            //    keep the destination and the destination role of the object. S3C 9.5 allowed
-            //    one bucket and one Role per bucket config, so all these backends share them.
-            //    The source role still comes from the bucket config: backbeat uses it for the
-            //    new backends too, and an old one would make them fail (BadRole).
-            //    Example: { status: 'PENDING', role: '...crr-src', backends: [sf, dr2],
-            //               content: ['DATA', 'METADATA'], isNFS: null }
-            //    Example: say sf is a backend written by S3C 9.5, and the object role is
-            //    '...old-src,...old-dst'. We write role '...crr-src,...old-dst'.
-            const keepsOldBackend = allBackends.some(b => !b.role);
-            const sourceRole = ReplicationConfiguration.resolveSourceRole(repConfig.Role);
-            // Undefined when the object role has no destination role. Example: a public
-            // cloud site in S3C 9.5 has a single role. Then we write the source role alone.
-            const oldDestinationRole = keepsOldBackend ? prev?.role?.split(',')[1] : undefined;
-            const replicationInfo = {
-                // PENDING: backbeat only picks up objects that are PENDING. Backbeat sets
-                // PROCESSING itself later, when one site is done and others aren't.
-                status: 'PENDING',
-                role: oldDestinationRole ? `${sourceRole},${oldDestinationRole}` : sourceRole,
-                backends: allBackends,
-                content: this._getReplicationContent(prev, objMD),
-                isNFS: prev?.isNFS ?? null,
-            };
-            if (keepsOldBackend && prev?.destination) {
-                replicationInfo.destination = prev.destination;
-            }
-            // A replica that we send further (cascading) is still a replica.
-            if (prev?.isReplica) {
-                replicationInfo.isReplica = true;
-            }
-
-            // 9. We save it. _updateObjectMD gives the object a new microVersionId: we need it so
-            //    the destination accepts this update as newer than what it has.
-            objMD.setReplicationInfo(replicationInfo);
+            // _updateObjectMD then gives the object a new microVersionId, so the destination
+            // accepts this update as newer than what it has.
+            objMD.setReplicationInfo(
+                this._buildReplicationInfo(prev, existingBackends, plan, repConfig, objMD));
             return { skip: false };
         }, cb);
     }
@@ -656,9 +635,8 @@ class ReplicationStatusUpdater {
             (repConfig, next) => {
                 const { Rules } = repConfig;
 
-                // A bucket replication rule without StorageClass sends the objects to the S3C
-                // default site, which we can't read from here: SITE_NAME must give it (see
-                // _buildArsenalConfig). Without it, we stop with "missing SITE_NAME".
+                // A rule without StorageClass needs SITE_NAME as its site (see
+                // _buildArsenalConfig).
                 const hasRuleWithoutSite = Rules.some(r =>
                     r.Status === 'Enabled' && !r.Destination.StorageClass
                 );
@@ -668,11 +646,9 @@ class ReplicationStatusUpdater {
                     this.log.error(errMsg);
                     return next(new Error(errMsg));
                 }
-                // We warn when no rule sends objects to SITE_NAME: no rule names it, and no rule
-                // uses the default site. Then we only requeue the objects that already have a
-                // backend for SITE_NAME, and skip the others. The warning tells the user why few
-                // or no objects are updated. We say it once per bucket: _markPending runs for
-                // each listing page.
+                // When no rule sends objects to SITE_NAME, we only requeue the objects that
+                // already have a backend for it. We warn once per bucket, so the user knows why
+                // few objects are updated.
                 // Example: the rules name sf and dr2, and SITE_NAME=dr3.
                 const ruleSites = this._getConfiguredSites(Rules);
                 if (this.siteName && !hasRuleWithoutSite && !ruleSites.includes(this.siteName)

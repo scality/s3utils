@@ -261,7 +261,10 @@ Example:
 * s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16
   and later, only. They write the object metadata like S3C 10.1 does: each
   backend has its own destination bucket and role, whatever the bucket
-  rule format (`Prefix` or `Filter`). On S3C 9.5, use s3utils 1.18.
+  rule format (`Prefix` or `Filter`). When they update an object that
+  still has backends written by S3C 9.5, they rewrite these backends in
+  this format too, with the bucket and role of the object. On S3C 9.5, use
+  s3utils 1.18.
 * S3C 10.1: requeueing objects that already exist at the destination can
   leave them PENDING, because of the microVersionId format written by
   s3utils 1.18 (S3C-11591).
