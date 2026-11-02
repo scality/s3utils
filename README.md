@@ -76,31 +76,63 @@ Example:
 
 Only scan keys beginning with "foo/"
 
+Keys that match no enabled bucket replication rule prefix are skipped:
+Backbeat refuses them anyway ("replication disabled for object").
+
+#### SITE_NAME
+
+Replication site to requeue. The script only touches the backends of the
+object for this site, and leaves the other sites as they are.
+
+Examples, with these bucket rules:
+
+* r1: no prefix, `StorageClass` sf, bucket D1
+* r2: prefix `docs/`, `StorageClass` dr2, bucket D2
+
+`SITE_NAME=dr2`
+
+Requeue site dr2 only. Keys under `docs/` go to bucket D2. The other keys
+are skipped: no rule sends them to dr2. The sf backends stay as they are.
+
+`SITE_NAME` not set
+
+Requeue every site of the rules that match the key. `docs/a.pdf` goes to
+sf (D1) and dr2 (D2), `a.pdf` goes to sf (D1).
+
+`SITE_NAME=dr3`
+
+No rule sends objects to dr3. The script logs the warning "SITE_NAME is
+not a site of the bucket rules", once per bucket. It skips the objects
+with no backend for dr3. With `TARGET_REPLICATION_STATUS` having the value `FAILED`,
+`COMPLETED` or `PENDING`, it still requeues the objects that have a dr3
+backend with that status, to their own bucket. The run doesn't stop.
+
+A rule without `StorageClass` sends the objects to the S3C default site,
+set in the federation config (`env_replication_endpoints`). The script
+can't read it, so it uses `SITE_NAME` as that site:
+
+* `SITE_NAME` is required. Without it, the script fails with "missing
+  SITE_NAME environment variable".
+* Except when another rule names `SITE_NAME` in its `StorageClass`: then
+  the script assumes the default site is another site, and skips the rule
+  without `StorageClass`.
+
+Example: the default site is sf, rule r1 has no `StorageClass` (bucket
+D1), rule r2 has `StorageClass` sf (bucket D2). With `SITE_NAME=sf`, the
+objects of r1 on site sf, bucket D1 are skipped. To requeue them, add
+`StorageClass` sf to r1, run the script, then put the bucket replication
+config back.
+
+#### FORCE_USING_CONFIGURATION
+
+Ignored since S3C 10.1: the script always uses the current bucket
+replication configuration (destination bucket and roles), like cloudserver
+does on a PUT.
 
 #### STORAGE_TYPE
 
-Comma-separated list of the destination storage location types. This is used
-only if a replication destination is a public cloud.
-
-The recognized statuses are:
-
-* **aws_s3**: The destination storage location type is Amazon S3.
-
-* **azure**: The destination storage location type is Microsoft Azure Blob
-   Storage.
-
-* **gcp**: The destination storage location type is Google Cloud Storage.
-
-Examples:
-
-`STORAGE_TYPE=aws_s3`
-
-The destination storage location type is AWS.
-
-`STORAGE_TYPE=aws_s3,azure,gcp`
-
-The destination storage type is a one-to-many configuration replicating to AWS,
-Azure, and GCP destination storage locations.
+Ignored since S3C 10.1: the object metadata no longer stores the location
+type, Backbeat reads it from the location config of the site.
 
 #### WORKERS
 
@@ -167,18 +199,25 @@ Example:
 #### ALLOW_NEW_SITE
 
 A backend for a site that no replication processor handles leaves the
-object PENDING forever. So the script checks `SITE_NAME` when it has
-something reliable to compare against:
+object PENDING forever. So before it writes an object, the script checks
+`SITE_NAME` when it has something reliable to compare against. Objects it
+skips are not checked: they get no backend. So only
+`TARGET_REPLICATION_STATUS=NEW` can stop on an unknown site: with
+`TARGET_REPLICATION_STATUS` having the value `FAILED`, `COMPLETED` or
+`PENDING`, the script only writes objects that already have a backend for
+`SITE_NAME`.
 
-* the object already replicates: `SITE_NAME` must be one of its sites
-  (backend sites, or `storageClass` on older objects), or a site named in
-  the `StorageClass` of the bucket replication rules
-* the object was never replicated and every bucket rule names its site in
-  `StorageClass`: `SITE_NAME` must be one of those sites
+The script checks objects that already replicate: `SITE_NAME` must be one
+of the sites of the object (backend sites, or `storageClass` on older
+objects), or a site named in the `StorageClass` of the bucket replication
+rules. It accepts an object that was never replicated: a rule without
+`StorageClass` uses the S3C default replication site, set in the
+federation config (`env_replication_endpoints`), which the script can't
+read.
 
-Otherwise the object is accepted: a rule without `StorageClass` uses the
-S3C default replication site, set in the federation config
-(`env_replication_endpoints`), which the script can't read.
+When every bucket rule names its site in `StorageClass` and `SITE_NAME` is
+none of them, the script doesn't stop: no rule gives the object a backend
+for `SITE_NAME`, so the object is skipped (see [SITE_NAME](#site_name)).
 
 At the first object with an unknown site, the script writes nothing for
 it, stops, logs the object and the sites it compared against, logs the
@@ -219,10 +258,13 @@ Example:
 
 #### Notes on S3C versions
 
-* S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
-  Re-triggering one site with `SITE_NAME` also re-sends the objects under
-  the `sourceCheckIfSizeGreaterThanMB` limit of the Backbeat config
-  (100 MB by default) to the other sites of the object.
+* s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16
+  and later, only. They write the object metadata like S3C 10.1 does: each
+  backend has its own destination bucket and role, whatever the bucket
+  rule format (`Prefix` or `Filter`). When they update an object that
+  still has backends written by S3C 9.5, they rewrite these backends in
+  this format too, with the bucket and role of the object. On S3C 9.5, use
+  s3utils 1.18.
 * S3C 10.1: requeueing objects that already exist at the destination can
   leave them PENDING, because of the microVersionId format written by
   s3utils 1.18 (S3C-11591).
@@ -289,6 +331,22 @@ don't set it in `StorageClass`, also set:
 ```
 export ALLOW_NEW_SITE=true
 ```
+
+#### Replicate existing objects to the new bucket of a rule
+
+When a rule now sends its objects to another bucket on the same site, the
+objects already replicated have a backend for the old bucket only.
+`TARGET_REPLICATION_STATUS=NEW` picks the new bucket and keeps the backend
+of the old one:
+
+```
+export TARGET_REPLICATION_STATUS=NEW
+export MAX_UPDATES=10000
+```
+
+Note: `TARGET_REPLICATION_STATUS=COMPLETED` doesn't send them to the new
+bucket: it only requeues the buckets the objects were already sent to, and
+that a rule still uses.
 
 #### Re-sync a DR site back to the primary site
 

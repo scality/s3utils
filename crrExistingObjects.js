@@ -12,10 +12,8 @@ const log = new werelogs.Logger('s3utils::crrExistingObjects');
 
 const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const { SITE_NAME } = process.env;
-let { STORAGE_TYPE } = process.env;
 let { TARGET_REPLICATION_STATUS } = process.env;
 const { TARGET_PREFIX } = process.env;
-const FORCE_USING_CONFIGURATION = process.env.FORCE_USING_CONFIGURATION === 'true' || process.env.FORCE_USING_CONFIGURATION === '1' || false;
 const WORKERS = (process.env.WORKERS
     && Number.parseInt(process.env.WORKERS, 10)) || 10;
 const MAX_UPDATES = (process.env.MAX_UPDATES
@@ -53,9 +51,6 @@ if (!SECRET_KEY) {
     log.fatal('SECRET_KEY not defined');
     process.exit(1);
 }
-if (!STORAGE_TYPE) {
-    STORAGE_TYPE = '';
-}
 if (!TARGET_REPLICATION_STATUS) {
     TARGET_REPLICATION_STATUS = 'NEW';
 }
@@ -78,6 +73,16 @@ log.info('Objects with replication status '
     + `${replicationStatusToProcess.join(' or ')} `
     + 'will be reset to PENDING to trigger CRR');
 
+// FORCE_USING_CONFIGURATION was only on with 'true' or '1': we warn in these cases only.
+if (['true', '1'].includes(process.env.FORCE_USING_CONFIGURATION)) {
+    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket '
+        + 'replication configuration');
+}
+if (process.env.STORAGE_TYPE) {
+    log.warn('STORAGE_TYPE is ignored: backbeat reads the location type from the location '
+        + 'config of the site');
+}
+
 const replicationStatusUpdater = new ReplicationStatusUpdater({
     buckets: BUCKETS,
     replicationStatusToProcess,
@@ -86,7 +91,6 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     secretKey: SECRET_KEY,
     endpoint: ENDPOINT,
     siteName: SITE_NAME,
-    storageType: STORAGE_TYPE,
     targetPrefix: TARGET_PREFIX,
     listingLimit: LISTING_LIMIT,
     maxUpdates: MAX_UPDATES,
@@ -94,7 +98,6 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     keyMarker: KEY_MARKER,
     versionIdMarker: VERSION_ID_MARKER,
     currentVersionOnly: CURRENT_VERSION_ONLY,
-    forceUsingConfiguration: FORCE_USING_CONFIGURATION,
     allowNewSite: ALLOW_NEW_SITE,
 }, log);
 
