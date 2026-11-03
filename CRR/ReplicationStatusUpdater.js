@@ -310,14 +310,15 @@ class ReplicationStatusUpdater {
                 let replicationInfo = objMD.getReplicationInfo();
                 const { Rules, Role } = repConfig;
                 const destination = Rules[0].Destination.Bucket;
-                
+                // Tells backbeat what to send: the metadata, and the data if the object has some.
+                const content = objMD.getContentLength() === 0 ? ['METADATA']
+                    : ['METADATA', 'DATA'];
+
                 if (!replicationInfo || !replicationInfo.status) {
                     // set replication properties
-                    const ops = objMD.getContentLength() === 0 ? ['METADATA']
-                        : ['METADATA', 'DATA'];
                     replicationInfo = {
                         status: 'PENDING',
-                        content: ops,
+                        content,
                         backends: [],
                         destination,
                         storageClass: '',
@@ -356,6 +357,16 @@ class ReplicationStatusUpdater {
                     objMD.setReplicationBackends(backends);
                 }
 
+                // We always ask backbeat for a full copy. The object has one content for all
+                // its sites, and it only describes the last change (S3UTILS-258). After a PUT
+                // tagging, it has no DATA, so backbeat would send only the metadata to the
+                // site we set PENDING, and that site may not have the data.
+                // Example: 'docs/a.pdf' is COMPLETED on site sf, then gets a PUT tagging, so
+                // its content is ['METADATA', 'PUT_TAGGING']. We add site dr2 and write
+                // ['METADATA', 'DATA'], so backbeat sends the data to site dr2 too.
+                // We set content in place: setReplicationInfo would drop the fields it
+                // doesn't know.
+                objMD.getReplicationInfo().content = content;
                 objMD.setReplicationSiteStatus(storageClass, 'PENDING');
                 objMD.setReplicationStatus('PENDING');
                 objMD.updateMicroVersionId();

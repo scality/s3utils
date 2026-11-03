@@ -1,7 +1,7 @@
 const { promisify } = require('util');
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
-const { HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { HeadObjectCommand, PutObjectTaggingCommand } = require('@aws-sdk/client-s3');
 const ReplicationStatusUpdater = require('../../CRR/ReplicationStatusUpdater');
 
 const {
@@ -171,5 +171,38 @@ describe('crrExistingObjects', () => {
         expect(updater._unknownSite).toEqual(expect.objectContaining({ key: 'obj-1' }));
         const repInfo = await getReplicationInfo(accountSource, 'obj-1', versionId);
         expect(repInfo.backends.map(b => b.site)).toEqual([DEFAULT_SITE]);
+    }, 60000);
+
+    it('should ask for a full copy when adding a site after a PUT tagging (S3UTILS-258)', async () => {
+        const versionId = await putObject(accountSource, 'obj-1');
+        await accountSource.s3Client.send(new PutObjectTaggingCommand({
+            Bucket: accountSource.bucketName,
+            Key: 'obj-1',
+            VersionId: versionId,
+            Tagging: { TagSet: [{ Key: 'k', Value: 'v' }] },
+        }));
+        // cloudserver only asks to send the tags: the default site already has the data
+        const taggedRepInfo = await getReplicationInfo(accountSource, 'obj-1', versionId);
+        expect(taggedRepInfo.content).toEqual(['METADATA', 'PUT_TAGGING']);
+
+        const updater = new ReplicationStatusUpdater({
+            buckets: [accountSource.bucketName],
+            replicationStatusToProcess: ['NEW'],
+            workers: 10,
+            accessKey: accountSource.accountAccessKey,
+            secretKey: accountSource.accountSecretKey,
+            endpoint,
+            siteName: SITE_NAME,
+            // SITE_NAME is not the bucket's default replication site
+            allowNewSite: true,
+        }, log);
+        await promisify(updater.run.bind(updater))();
+
+        expect(updater._nUpdated).toBe(1);
+        const repInfo = await getReplicationInfo(accountSource, 'obj-1', versionId);
+        expect(repInfo.content).toEqual(['METADATA', 'DATA']);
+        expect(repInfo.backends).toEqual(expect.arrayContaining([
+            expect.objectContaining({ site: SITE_NAME, status: 'PENDING' }),
+        ]));
     }, 60000);
 });

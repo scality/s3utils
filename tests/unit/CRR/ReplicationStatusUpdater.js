@@ -1144,4 +1144,67 @@ describe('ReplicationStatusUpdater site validation', () => {
             done();
         });
     });
+
+    // S3UTILS-258: the object is COMPLETED on site destination, then gets a PUT tagging
+    const taggedReplicationInfo = {
+        ...replicatedReplicationInfo,
+        content: ['METADATA', 'PUT_TAGGING'],
+    };
+
+    function getWrittenReplicationInfo(crr) {
+        return JSON.parse(crr.cloudserverclient.putMetadata.mock.calls[0][0].Body).replicationInfo;
+    }
+
+    it('should ask for a full copy when adding a site after a metadata-only change', done => {
+        // the rule names aws-location, so NEW adds site aws-location
+        const crr = initCrr({ siteName: 'aws-location' }, null, taggedReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            const replicationInfo = getWrittenReplicationInfo(crr);
+            assert.deepStrictEqual(replicationInfo.content, ['METADATA', 'DATA']);
+            assert.deepStrictEqual(replicationInfo.backends.map(b => [b.site, b.status]), [
+                ['destination', 'COMPLETED'],
+                ['aws-location', 'PENDING'],
+            ]);
+            done();
+        });
+    });
+
+    it('should ask for a full copy when requeuing a site after a metadata-only change', done => {
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            null, taggedReplicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            const replicationInfo = getWrittenReplicationInfo(crr);
+            assert.deepStrictEqual(replicationInfo.content, ['METADATA', 'DATA']);
+            assert.strictEqual(replicationInfo.backends[0].status, 'PENDING');
+            done();
+        });
+    });
+
+    it('should ask for the metadata only when the object is empty', done => {
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            null, taggedReplicationInfo);
+        crr.cloudserverclient.getMetadata = jest.fn((p, cb) => {
+            const md = JSON.parse(getMetadataRes.Body);
+            md.replicationInfo = taggedReplicationInfo;
+            md['content-length'] = 0;
+            cb(null, { Body: JSON.stringify(md) });
+        });
+        crr.run(err => {
+            assert.ifError(err);
+            assert.deepStrictEqual(getWrittenReplicationInfo(crr).content, ['METADATA']);
+            done();
+        });
+    });
+
+    it('should keep the replication info fields setReplicationInfo does not know', done => {
+        const crr = initCrr({ siteName: 'destination', replicationStatusToProcess: ['COMPLETED'] },
+            null, { ...taggedReplicationInfo, isReplica: false });
+        crr.run(err => {
+            assert.ifError(err);
+            assert.strictEqual(getWrittenReplicationInfo(crr).isReplica, false);
+            done();
+        });
+    });
 });
