@@ -1880,4 +1880,26 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
             done();
         });
     });
+
+    it('should keep a replica written without the isReplica flag a replica (cascading)', done => {
+        // A replica written before the isReplica flag: only its
+        // status says it is a replica.
+        const replicationInfo = {
+            status: 'REPLICA',
+            backends: [{ site: 'us-east-2', status: 'REPLICA', dataStoreVersionId: '' }],
+            content: ['DATA', 'METADATA'],
+            destination: 'arn:aws:s3:::dst-1',
+            storageClass: 'us-east-2',
+            role: `${srcRole},${dstRole}`,
+            storageType: '',
+            dataStoreVersionId: '',
+            isNFS: null,
+        };
+        const crr = initCrr({ siteName: 'sf' }, replication(v1Rule('dst-2', 'sf')), replicationInfo);
+        crr.run(err => {
+            assert.ifError(err);
+            expect(written(crr)).toEqual(expect.objectContaining({ status: 'PENDING', isReplica: true }));
+            done();
+        });
+    });
 });

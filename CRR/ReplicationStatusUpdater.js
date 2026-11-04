@@ -517,7 +517,7 @@ class ReplicationStatusUpdater {
             isNFS: prev?.isNFS ?? null,
         };
         // A replica that we send further (cascading) is still a replica.
-        if (prev?.isReplica) {
+        if (objMD.getReplicationIsReplica()) {
             replicationInfo.isReplica = true;
         }
         return replicationInfo;
