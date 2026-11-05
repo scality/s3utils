@@ -19,6 +19,27 @@ const consolidationDuration = cluster.isMaster ? new promClient.Histogram({
     buckets: [0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10],
 }) : null;
 
+// Veeam SOSAPI repositories: capacity set in the bucket CapacityInfo, and the
+// bytes counted for that bucket by this run.
+const veeamRepositoryCapacity = cluster.isMaster ? new promClient.Gauge({
+    name: 's3_countitems_veeam_repository_capacity_bytes',
+    help: 'Veeam SOSAPI repository capacity configured on the bucket',
+    labelNames: ['bucket', 'account'],
+}) : null;
+
+const veeamRepositoryUsed = cluster.isMaster ? new promClient.Gauge({
+    name: 's3_countitems_veeam_repository_used_bytes',
+    help: 'Bytes used by the Veeam SOSAPI repository bucket',
+    labelNames: ['bucket', 'account'],
+}) : null;
+
+// Stays at 0 until the run has exported the gauges above, so alerts can pick
+// the latest completed run.
+const veeamRepositoryReportTimestamp = cluster.isMaster ? new promClient.Gauge({
+    name: 's3_countitems_veeam_repository_report_timestamp_seconds',
+    help: 'Time at which this run exported the Veeam repository metrics',
+}) : null;
+
 const bucketsCount = new promClient.Counter({
     name: 's3_countitems_total_buckets_count',
     help: 'Total number of buckets processed',
@@ -81,6 +102,9 @@ module.exports = {
     metricsHandler,
     bucketProcessingDuration,
     consolidationDuration,
+    veeamRepositoryCapacity,
+    veeamRepositoryUsed,
+    veeamRepositoryReportTimestamp,
     bucketsCount,
     objectsCount,
 };

@@ -49,6 +49,10 @@ class CountMaster {
                 return next();
             }),
             next => this.manager.start(next),
+            next => {
+                this.manager.exportVeeamRepositoryMetrics();
+                return next();
+            },
             next => this.client.updateStorageConsumptionMetrics(this.manager.store, this.manager.dataMetrics, this.log, next),
         ], err => {
             if (err) {

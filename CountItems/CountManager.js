@@ -3,6 +3,10 @@ const { once } = require('arsenal').jsutil;
 const { validStorageMetricLevels } = require('./utils/constants');
 const { consolidateDataMetrics } = require('./utils/utils');
 const monitoring = require('../utils/monitoring');
+const {
+    isSOSCapacityInfoEnabled,
+    isValidCapacityValue,
+} = require('../DataReport/collectBucketMetricsAndUpdateBucketCapacityInfo');
 
 class CountManager {
     constructor(params) {
@@ -29,6 +33,7 @@ class CountManager {
             location: {},
             account: {},
         };
+        this.veeamRepositories = [];
         this.workerList = [];
         this._setupQueue();
     }
@@ -131,6 +136,33 @@ class CountManager {
         monitoring.consolidationDuration.observe(consolidationDurationInS);
     }
 
+    /**
+     * Exports the capacity and used bytes of each Veeam SOSAPI bucket counted
+     * by this run, so that an alert can fire when a repository is full.
+     * @return {undefined}
+     */
+    exportVeeamRepositoryMetrics() {
+        const usedByBucket = {};
+        const bucketMetrics = (this.dataMetrics && this.dataMetrics.bucket) || {};
+        Object.keys(bucketMetrics).forEach(resourceName => {
+            // resourceName is `${bucketName}_${creationDate}`
+            const bucketName = resourceName.slice(0, resourceName.lastIndexOf('_'));
+            const { usedCapacity } = bucketMetrics[resourceName];
+            if (usedCapacity) {
+                usedByBucket[bucketName] = BigInt(usedCapacity.current) + BigInt(usedCapacity.nonCurrent);
+            }
+        });
+        this.veeamRepositories.forEach(({ name, account, capacity }) => {
+            if (!isValidCapacityValue(capacity) || usedByBucket[name] === undefined) {
+                return;
+            }
+            const labels = { bucket: name, account };
+            monitoring.veeamRepositoryCapacity.set(labels, Number(capacity));
+            monitoring.veeamRepositoryUsed.set(labels, Number(usedByBucket[name]));
+        });
+        monitoring.veeamRepositoryReportTimestamp.setToCurrentTime();
+    }
+
     setup(callback) {
         async.series([
             next => async.forEach(
@@ -178,6 +210,11 @@ class CountManager {
         }));
         this.store.buckets += bucketCount;
         this.store.bucketList = this.store.bucketList.concat(transformedInfos);
+        bucketInfos.filter(isSOSCapacityInfoEnabled).forEach(bucket => this.veeamRepositories.push({
+            name: bucket.getName(),
+            account: bucket.getOwnerDisplayName(),
+            capacity: bucket.getCapabilities().VeeamSOSApi.CapacityInfo.Capacity,
+        }));
         bucketInfos.forEach(bucketInfo => {
             this.q.push(bucketInfo);
         });
