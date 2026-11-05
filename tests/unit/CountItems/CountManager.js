@@ -1,6 +1,7 @@
 const { BucketInfo } = require('arsenal').models;
 
 const CountManager = require('../../../CountItems/CountManager');
+const monitoring = require('../../../utils/monitoring');
 
 const DummyLogger = require('../../mocks/DummyLogger');
 const CountWorkerObj = require('../../mocks/CountWorkerObj');
@@ -1072,4 +1073,42 @@ describe('CountItems::CountManager', () => {
             }, 100);
         },
     );
+    test('should export Veeam repository capacity and used bytes', async () => {
+        const m = new CountManager({
+            log: new DummyLogger(),
+            workers: createWorkers(1),
+            maxConcurrent: 1,
+        });
+        const veeamBucketMD = {
+            ...internalTestBucketMD,
+            name: 'veeam-bucket',
+            ownerDisplayName: 'veeam-account',
+            capabilities: {
+                VeeamSOSApi: {
+                    SystemInfo: { ProtocolCapabilities: { CapacityInfo: true } },
+                    CapacityInfo: { Capacity: 1024, Available: 0, Used: 0 },
+                },
+            },
+        };
+        m.addWork({
+            bucketCount: 2,
+            bucketInfos: [
+                BucketInfo.deSerialize(stringifiedBucketMD),
+                BucketInfo.deSerialize(JSON.stringify(veeamBucketMD)),
+            ],
+        });
+        m.dataMetrics.bucket = {
+            'test-bucket_1678284808000': { usedCapacity: { current: 10n, nonCurrent: 0n } },
+            'veeam-bucket_1678284808000': { usedCapacity: { current: 1000n, nonCurrent: 536n } },
+        };
+        m.exportVeeamRepositoryMetrics();
+
+        const labels = { bucket: 'veeam-bucket', account: 'veeam-account' };
+        const capacity = await monitoring.veeamRepositoryCapacity.get();
+        const used = await monitoring.veeamRepositoryUsed.get();
+        expect(capacity.values).toEqual([{ labels, value: 1024 }]);
+        expect(used.values).toEqual([{ labels, value: 1536 }]);
+        const reportTimestamp = await monitoring.veeamRepositoryReportTimestamp.get();
+        expect(reportTimestamp.values[0].value).toBeGreaterThan(0);
+    });
 });
