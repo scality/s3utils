@@ -1,5 +1,6 @@
 const werelogs = require('werelogs');
 const ReplicationStatusUpdater = require('./CRR/ReplicationStatusUpdater');
+const getLocationConfig = require('./utils/locationConfig');
 
 const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
     ? 'debug' : 'info';
@@ -24,6 +25,7 @@ const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
 const CURRENT_VERSION_ONLY = process.env.CURRENT_VERSION_ONLY === 'true' || process.env.CURRENT_VERSION_ONLY === '1' || false;
 const ALLOW_NEW_SITE = process.env.ALLOW_NEW_SITE === 'true' || process.env.ALLOW_NEW_SITE === '1' || false;
+const { LOCATION_CONFIG_FILE } = process.env;
 
 const {
     ACCESS_KEY,
@@ -83,6 +85,22 @@ if (process.env.STORAGE_TYPE) {
         + 'config of the site');
 }
 
+// Optional: tells which sites are public clouds, which get no bucket and no role on their
+// backend. We only read the file when it is set, so a default file in the image changes
+// nothing.
+let locationConfig;
+if (LOCATION_CONFIG_FILE) {
+    locationConfig = getLocationConfig(log, LOCATION_CONFIG_FILE);
+    if (!locationConfig) {
+        log.fatal('LOCATION_CONFIG_FILE is missing or is not valid JSON', { file: LOCATION_CONFIG_FILE });
+        process.exit(1);
+    } else {
+        log.info('location config loaded', { file: LOCATION_CONFIG_FILE, sites: Object.keys(locationConfig) });
+    }
+} else {
+    log.info('LOCATION_CONFIG_FILE is not set: every site is handled as a CRR site');
+}
+
 const replicationStatusUpdater = new ReplicationStatusUpdater({
     buckets: BUCKETS,
     replicationStatusToProcess,
@@ -99,6 +117,7 @@ const replicationStatusUpdater = new ReplicationStatusUpdater({
     versionIdMarker: VERSION_ID_MARKER,
     currentVersionOnly: CURRENT_VERSION_ONLY,
     allowNewSite: ALLOW_NEW_SITE,
+    locationConfig,
 }, log);
 
 replicationStatusUpdater.run(err => {

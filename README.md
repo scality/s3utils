@@ -256,6 +256,22 @@ Example:
 
 `ALLOW_NEW_SITE=true`
 
+#### LOCATION_CONFIG_FILE
+
+Path to the location config of cloudserver (`locationConfig.json`). The
+script reads the type of each site from it: like cloudserver, it writes no
+destination bucket and no role on the backend of a public cloud site
+(`aws_s3`, `azure`, `gcp`), the location gives them.
+
+Without it, every site is handled as a CRR site: cloud backends also get
+the bucket and role of the rule. Backbeat ignores them, so replication
+works the same. The script fails if the variable is set and the file
+can't be read.
+
+Example:
+
+`LOCATION_CONFIG_FILE=/conf/locationConfig.json`
+
 #### Notes on S3C versions
 
 * s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16

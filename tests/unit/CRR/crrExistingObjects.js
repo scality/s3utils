@@ -1,3 +1,4 @@
+const fs = require('fs');
 const werelogs = require('werelogs');
 // Mock the entire werelogs module
 const mockFatal = jest.fn();
@@ -33,6 +34,8 @@ describe('crrExistingObjects', () => {
     beforeEach(() => {
         // Save the original process.env
         originalEnv = { ...process.env };
+        // yarn test:unit sets it for the mongo tests: each test sets it when it needs it
+        delete process.env.LOCATION_CONFIG_FILE;
 
         // Reset the argv array to its default state
         process.argv = ['node', 'crrExistingObjects.js'];
@@ -151,6 +154,37 @@ describe('crrExistingObjects', () => {
         expect(mockError).not.toHaveBeenCalled();
         expect(process.exit).not.toHaveBeenCalled();
         expect(mockCrrRun).toHaveBeenCalled();
+    });
+
+    test('should pass the location config when LOCATION_CONFIG_FILE is set', () => {
+        process.argv[2] = 'bucket1';
+        process.env.ACCESS_KEY = 'testAccessKey';
+        process.env.SECRET_KEY = 'testSecretKey';
+        process.env.ENDPOINT = 'http://fake.endpoint';
+        process.env.LOCATION_CONFIG_FILE = 'tests/conf/locationConfig.json';
+
+        require('../../../crrExistingObjects');
+
+        const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
+        const expected = JSON.parse(fs.readFileSync('tests/conf/locationConfig.json'));
+        expect(ReplicationStatusUpdater).toHaveBeenCalledWith(
+            expect.objectContaining({ locationConfig: expected }), expect.anything());
+        expect(mockFatal).not.toHaveBeenCalled();
+        expect(process.exit).not.toHaveBeenCalled();
+    });
+
+    test('should exit if LOCATION_CONFIG_FILE cannot be read', () => {
+        process.argv[2] = 'bucket1';
+        process.env.ACCESS_KEY = 'testAccessKey';
+        process.env.SECRET_KEY = 'testSecretKey';
+        process.env.ENDPOINT = 'http://fake.endpoint';
+        process.env.LOCATION_CONFIG_FILE = 'tests/conf/missing.json';
+
+        require('../../../crrExistingObjects');
+
+        expect(mockFatal).toHaveBeenCalledWith('LOCATION_CONFIG_FILE is missing or is not valid JSON',
+            { file: 'tests/conf/missing.json' });
+        expect(process.exit).toHaveBeenCalledWith(1);
     });
 
     test('should exit if no bucket is provided', () => {

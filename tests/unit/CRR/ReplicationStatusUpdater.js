@@ -1902,4 +1902,82 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
             done();
         });
     });
+    describe('with a location config (LOCATION_CONFIG_FILE)', () => {
+        const locationConfig = {
+            aws1: { type: 'aws_s3', details: {} },
+            sf: { type: 'scality', details: {} },
+        };
+
+        it('should write no bucket and no role on a new cloud backend', done => {
+            const crr = initCrr({ siteName: 'aws1', locationConfig },
+                replication(v1Rule('dst-1', 'aws1')), cloudserverReplicationInfo);
+            crr.run(err => {
+                assert.ifError(err);
+                expect(written(crr).backends).toEqual([
+                    cloudserverReplicationInfo.backends[0],
+                    { site: 'aws1', status: 'PENDING', dataStoreVersionId: '' },
+                ]);
+                done();
+            });
+        });
+
+        it('should still write the bucket and role on a CRR backend', done => {
+            const crr = initCrr({ siteName: 'sf', locationConfig },
+                replication(v1Rule('dst-1', 'sf')), cloudserverReplicationInfo);
+            crr.run(err => {
+                assert.ifError(err);
+                expect(written(crr).backends[1]).toEqual({
+                    site: 'sf', status: 'PENDING', dataStoreVersionId: '', destination: 'arn:aws:s3:::dst-1', role: dstRole,
+                });
+                done();
+            });
+        });
+
+        it('should not copy the top-level bucket and role of an S3C 9.5 object on a cloud backend', done => {
+            const replicationInfo = {
+                status: 'FAILED',
+                backends: [{ site: 'aws1', status: 'FAILED', dataStoreVersionId: '' }],
+                content: ['DATA', 'METADATA'],
+                destination: 'arn:aws:s3:::src-bucket',
+                storageClass: 'aws1',
+                role: srcRole,
+                storageType: 'aws_s3',
+                dataStoreVersionId: '',
+                isNFS: null,
+            };
+            const crr = initCrr({ replicationStatusToProcess: ['FAILED'], locationConfig },
+                replication(v1Rule('src-bucket', 'aws1')), replicationInfo);
+            crr.run(err => {
+                assert.ifError(err);
+                expect(written(crr)).toEqual({
+                    status: 'PENDING',
+                    role: srcRole,
+                    backends: [{ site: 'aws1', status: 'PENDING', dataStoreVersionId: '' }],
+                    content: ['DATA', 'METADATA'],
+                    isNFS: null,
+                });
+                done();
+            });
+        });
+
+        it('should match a cloud backend that has a bucket on the site only', done => {
+            // Written by a previous run without location config: a cloud backend with the
+            // bucket of the rule. It is the same backend, not a second one.
+            const replicationInfo = {
+                ...cloudserverReplicationInfo,
+                status: 'FAILED',
+                backends: [{
+                    site: 'aws1', status: 'FAILED', dataStoreVersionId: '',
+                    destination: 'arn:aws:s3:::old-bucket', role: dstRole,
+                }],
+            };
+            const crr = initCrr({ replicationStatusToProcess: ['FAILED'], locationConfig },
+                replication(v1Rule('dst-1', 'aws1')), replicationInfo);
+            crr.run(err => {
+                assert.ifError(err);
+                expect(written(crr).backends.map(b => [b.site, b.status])).toEqual([['aws1', 'PENDING']]);
+                done();
+            });
+        });
+    });
 });

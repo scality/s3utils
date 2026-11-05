@@ -3,6 +3,7 @@ const {
     doWhilst, eachSeries, eachLimit, waterfall,
 } = require('async');
 const { ObjectMD, ReplicationConfiguration } = require('@scality/arsenal').models;
+const { replicationBackends } = require('@scality/arsenal').constants;
 const { 
     ListObjectVersionsCommand, 
     GetBucketReplicationCommand 
@@ -33,6 +34,9 @@ class ReplicationStatusUpdater {
      * @param {boolean} [params.currentVersionOnly] - (Optional) Whether to process only the current version of objects.
      * @param {boolean} [params.allowNewSite] - (Optional) Accept a site that is not in the bucket
      * replication rules and not in the object replication info.
+     * @param {Object} [params.locationConfig] - (Optional) Location config of cloudserver
+     * (locationConfig.json), to know which sites are public clouds. Without it, every site is
+     * handled as a CRR site, and cloud backends get the bucket and role of the rule.
      */
     constructor(params, log) {
         const {
@@ -51,6 +55,7 @@ class ReplicationStatusUpdater {
             versionIdMarker,
             currentVersionOnly,
             allowNewSite,
+            locationConfig,
         } = params;
 
         // inputs
@@ -69,6 +74,7 @@ class ReplicationStatusUpdater {
         this.inputVersionIdMarker = versionIdMarker;
         this.currentVersionOnly = currentVersionOnly;
         this.allowNewSite = allowNewSite;
+        this.locationConfig = locationConfig;
         this.log = log;
 
         // Random replicationGroupId (7 chars) and instanceId (6 chars) for
@@ -154,7 +160,20 @@ class ReplicationStatusUpdater {
      */
     _isSameBackend(existing, candidate) {
         return existing.site === candidate.site
-            && (!existing.destination || existing.destination === candidate.destination);
+            && (!existing.destination || this._isCloud(existing.site)
+                || existing.destination === candidate.destination);
+    }
+
+    /**
+     * Tells if a site is a public cloud (AWS, Azure, GCP), from its type in the location
+     * config, like cloudserver. A cloud site has one bucket, set in its location: its
+     * backend has no bucket and no role. Without location config, no site is a cloud.
+     * @private
+     * @param {string} site - Site name.
+     * @returns {boolean} True if the site is a public cloud.
+     */
+    _isCloud(site) {
+        return !!replicationBackends[this.locationConfig?.[site]?.type];
     }
 
     /**
@@ -407,7 +426,9 @@ class ReplicationStatusUpdater {
      * When the object role has no destination role (a public cloud site in S3C 9.5), we
      * copy only the bucket: backbeat then uses the top-level role, as before.
      * A cloud site written by S3C 10.1 has no bucket, and the object has no top-level
-     * destination: we leave it as it is.
+     * destination: we leave it as it is. A cloud site written by S3C 9.5 (known from the
+     * location config) gets nothing either: like cloudserver, we write no bucket and no
+     * role on a cloud backend, the location gives them.
      * Example: { destination: 'arn:aws:s3:::backup-sf', role: '...old-src,...old-dst',
      *            backends: [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '' }] }
      *   gives [{ site: 'sf', status: 'COMPLETED', dataStoreVersionId: '',
@@ -423,7 +444,7 @@ class ReplicationStatusUpdater {
         }
         const destinationRole = prev.role?.split(',')[1];
         return backends.map(b => {
-            if (b.destination) {
+            if (b.destination || this._isCloud(b.site)) {
                 return b;
             }
             const upgraded = { ...b, destination: prev.destination };
@@ -455,7 +476,7 @@ class ReplicationStatusUpdater {
         //    use the current bucket and role (S3UTILS-208). resolveBackends sets them all
         //    PENDING: step 4 decides which ones we really send.
         let candidates = ReplicationConfiguration.resolveBackends(
-            this._buildArsenalConfig(repConfig), key, () => false, existingBackends,
+            this._buildArsenalConfig(repConfig), key, site => this._isCloud(site), existingBackends,
         );
 
         // 2. When SITE_NAME is set, we keep only that site, to requeue it without touching
