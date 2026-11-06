@@ -1,4 +1,4 @@
-ARG NODE_VERSION=22.15.0-bookworm-slim
+ARG NODE_VERSION=22.23.4-bookworm-slim
 
 # Use separate builder to retrieve & build node modules
 FROM node:${NODE_VERSION} AS builder
