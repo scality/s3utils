@@ -692,14 +692,14 @@ describe('listVersions', () => {
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2`
-                        + '?versionId=vid2',
+                    url: objectUrl('key2', 'vid2'),
                     status: 503,
                 },
             ]);
 
             await expect(collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET)))
                 .rejects.toThrow('returned status 503');
+            mock.assertAllConsumed();
         });
     });
 });
