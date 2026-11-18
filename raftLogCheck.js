@@ -170,17 +170,14 @@ function compareWithLeaderLog(leaderLog, connected, seq, cb) {
 async.waterfall(
     [
         next => {
-            getUrl(
-                `${protocol}://${bucketdHost}:${bucketdPort}/_/raft_sessions/${raftSession}/info`,
-                (err, info) => {
-                    if (err) {
-                        log.error('fetching info', { error: err.message });
-                        return next(err);
-                    }
-                    log.debug('info:', { info });
-                    return next(null, info.leader.host, info.leader.adminPort, info.connected);
-                },
-            );
+            getUrl(`${protocol}://${bucketdHost}:${bucketdPort}/_/raft_sessions/${raftSession}/info`, (err, info) => {
+                if (err) {
+                    log.error('fetching info', { error: err.message });
+                    return next(err);
+                }
+                log.debug('info:', { info });
+                return next(null, info.leader.host, info.leader.adminPort, info.connected);
+            });
         },
         (leaderHost, leaderPort, connected, next) => {
             getUrl(`${protocol}://${leaderHost}:${leaderPort}/_/raft/state`, (err, state) => {

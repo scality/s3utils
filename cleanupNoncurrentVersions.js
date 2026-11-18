@@ -535,9 +535,7 @@ function triggerDeletesOnBucket(bucketName, cb) {
         MARKER_BUCKET = undefined;
         MARKER_KEY = undefined;
         MARKER_VERSION_ID = undefined;
-        log.info(
-            `resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} VersionIdMarker=${NextVersionIdMarker}`,
-        );
+        log.info(`resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} VersionIdMarker=${NextVersionIdMarker}`);
     }
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
