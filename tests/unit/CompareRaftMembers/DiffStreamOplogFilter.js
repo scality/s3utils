@@ -195,7 +195,7 @@ describe('DiffStreamOplogFilter', () => {
                 done();
             })
             .on('error', err => {
-                fail(`an error occurred during filtering: ${err}`);
+                done(new Error(`an error occurred during filtering: ${err}`));
             });
     });
 
@@ -208,14 +208,14 @@ describe('DiffStreamOplogFilter', () => {
         });
         oplogFilter.end();
         oplogFilter
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('end', () => {
                 done();
             })
             .on('error', err => {
-                fail(`an error occurred during filtering: ${err}`);
+                done(new Error(`an error occurred during filtering: ${err}`));
             });
     });
 
@@ -239,8 +239,8 @@ describe('DiffStreamOplogFilter', () => {
         oplogFilter.write([{ key: 'bucket-with-error/key', value: 'foobar' }, null]);
         oplogFilter.end();
         oplogFilter
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('error', err => {
                 expect(err).toBeTruthy();

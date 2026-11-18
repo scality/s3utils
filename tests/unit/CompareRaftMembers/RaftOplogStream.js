@@ -151,10 +151,10 @@ describe('RaftOplogStream', () => {
                     return undefined;
                 })
                 .on('end', () => {
-                    fail('oplog stream should not emit "end" event');
+                    done(new Error('oplog stream should not emit "end" event'));
                 })
                 .on('error', err => {
-                    fail(`an error occurred: ${err}`);
+                    done(new Error(`an error occurred: ${err}`));
                 });
         });
     });
@@ -169,11 +169,11 @@ describe('RaftOplogStream', () => {
             maxRetryDelayMs: 100,
         });
         oplogStream
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('end', () => {
-                fail('oplog stream should not emit "end" event');
+                done(new Error('oplog stream should not emit "end" event'));
             })
             .on('error', err => {
                 expect(err).toBeTruthy();
