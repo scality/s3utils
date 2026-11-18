@@ -40,7 +40,6 @@ export default [...compat.extends('@scality/scality'),
             "max-classes-per-file": 'off',
             "prefer-spread": 'off',
             "no-constructor-return": 'off',
-            "new-cap": 'off',
             "no-redeclare":"off",
         }
     }

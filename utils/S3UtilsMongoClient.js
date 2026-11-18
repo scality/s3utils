@@ -13,7 +13,7 @@ const USERSBUCKET = '__usersbucket';
 const INFOSTORE_TMP = `${INFOSTORE}_tmp`;
 const __COUNT_ITEMS = 'countitems';
 
-const BigIntMax = (...args) => args.reduce((max, current) => {
+const bigIntMax = (...args) => args.reduce((max, current) => {
     const maxAsBigInt = BigInt(max);
     const currentAsBigInt = BigInt(current);
     return maxAsBigInt > currentAsBigInt ? maxAsBigInt : currentAsBigInt;
@@ -90,7 +90,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
                     // field is only stored when non-zero.
                     const preScan = BigInt(entry.usedCapacity._inflightsPreScan ?? 0);
                     const inflight = inflightDocument
-                        ? BigIntMax(0n, inflightDocument - preScan)
+                        ? bigIntMax(0n, inflightDocument - preScan)
                         : 0n;
                     if (inflight) {
                         // Inflights remaining after the scan are part of the "current" bytes,
@@ -695,10 +695,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored
                             += BigInt(versionDataRestored) - BigInt(masterDataRestored);
 
-                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0n);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold, 0n);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring, 0n);
-                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored = BigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent = bigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity.nonCurrent, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold = bigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentCold, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring = bigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestoring, 0n);
+                        dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored = bigIntMax(dataMetrics[metricLevel][resourceName].usedCapacity._nonCurrentRestored, 0n);
 
                         dataMetrics[metricLevel][resourceName].objectCount.nonCurrent
                             += BigInt(versionCount) - BigInt(masterCount) - BigInt(deleteMarkerCount);
@@ -709,10 +709,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored
                             += BigInt(versionCountRestored) - BigInt(masterCountRestored);
 
-                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0n);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold, 0n);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring, 0n);
-                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored = BigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount.nonCurrent = bigIntMax(dataMetrics[metricLevel][resourceName].objectCount.nonCurrent, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold = bigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentCold, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring = bigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestoring, 0n);
+                        dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored = bigIntMax(dataMetrics[metricLevel][resourceName].objectCount._nonCurrentRestored, 0n);
 
                         dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCount);
                         dataMetrics[metricLevel][resourceName].objectCount.deleteMarker += BigInt(deleteMarkerCountCold);
@@ -730,10 +730,10 @@ class S3UtilsMongoClient extends MongoClientInterface {
                         if (isVersioned) {
                             totalBytes.prev += BigInt(versionData) + BigInt(versionDataCold) + BigInt(versionDataRestoring) + BigInt(versionDataRestored);
                             totalBytes.prev -= BigInt(masterData) + BigInt(masterDataCold) + BigInt(masterDataRestoring) + BigInt(masterDataRestored);
-                            totalBytes.prev = BigIntMax(0n, totalBytes.prev);
+                            totalBytes.prev = bigIntMax(0n, totalBytes.prev);
                             locationBytes[resourceName].prev += BigInt(versionData) + BigInt(versionDataCold) + BigInt(versionDataRestoring) + BigInt(versionDataRestored);
                             locationBytes[resourceName].prev -= BigInt(masterData) + BigInt(masterDataCold) + BigInt(masterDataRestoring) + BigInt(masterDataRestored);
-                            locationBytes[resourceName].prev = BigIntMax(0n, locationBytes[resourceName].prev);
+                            locationBytes[resourceName].prev = bigIntMax(0n, locationBytes[resourceName].prev);
                         }
                     }
                     if (metricLevel === 'bucket') { // count objects up of all buckets
