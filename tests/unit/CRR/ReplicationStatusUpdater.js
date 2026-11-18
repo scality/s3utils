@@ -2072,7 +2072,7 @@ describe('ReplicationStatusUpdater writes the multi-destination format for every
             [backend('d1', 'COMPLETED'), backend('d2', 'FAILED')],
             [backend('d2', 'FAILED'), backend('d1', 'COMPLETED')],
         ].forEach(backends => {
-            it(`should retry only the FAILED bucket (object backends ${backends.map(b => b.destination.slice(13))})`, done => {
+            it(`should retry only the FAILED bucket (backends ${backends.map(b => b.destination.slice(13))})`, done => {
                 const crr = initCrr(
                     { replicationStatusToProcess: ['FAILED'] },
                     twoDestinations,

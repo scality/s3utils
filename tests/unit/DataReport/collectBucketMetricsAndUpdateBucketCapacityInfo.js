@@ -42,7 +42,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(enabled).toBeFalsy();
         });
 
-        test("should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities property doesn't exist in bucket", () => {
+        test("should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities doesn't exist", () => {
             const enabled = isSOSCapacityInfoEnabled(
                 BucketInfo.fromObj({
                     ...testBucketMD,
@@ -56,7 +56,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(enabled).toBeFalsy();
         });
 
-        test("should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property doesn't exist in bucket", () => {
+        test("should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo doesn't exist", () => {
             const enabled = isSOSCapacityInfoEnabled(
                 BucketInfo.fromObj({
                     ...testBucketMD,
@@ -72,7 +72,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is not boolean', () => {
+        test('should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is not boolean', () => {
             const enabled = isSOSCapacityInfoEnabled(
                 BucketInfo.fromObj({
                     ...testBucketMD,
@@ -90,7 +90,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is false', () => {
+        test('should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is false', () => {
             const enabled = isSOSCapacityInfoEnabled(
                 BucketInfo.fromObj({
                     ...testBucketMD,
@@ -109,8 +109,8 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test(
-            'should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is true ' +
-                "and _capacities.VeeamSOSApi.CapacityInfo doesn't exist",
+            'should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is true ' +
+                "and VeeamSOSApi.CapacityInfo doesn't exist",
             () => {
                 const enabled = isSOSCapacityInfoEnabled(
                     BucketInfo.fromObj({
@@ -131,8 +131,8 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         );
 
         test(
-            'should return true if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is true ' +
-                'and _capacities.VeeamSOSApi.CapacityInfo exists',
+            'should return true if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is true ' +
+                'and VeeamSOSApi.CapacityInfo exists',
             () => {
                 const enabled = isSOSCapacityInfoEnabled(
                     BucketInfo.fromObj({

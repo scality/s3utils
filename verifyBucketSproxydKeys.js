@@ -91,14 +91,16 @@ Optional environment variables:
     WORKERS: concurrency value for sproxyd requests (default ${DEFAULT_WORKERS})
     FROM_URL: URL from which to resume scanning ("s3://bucket[/key]")
     VERBOSE: set to 1 for more verbose output (shows one line for every sproxyd key)
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
+    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines
+    (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     MPU_ONLY: only scan objects uploaded with multipart upload method
     NO_MISSING_KEY_CHECK: do not check for existence of sproxyd keys,
     for a performance benefit - other checks like duplicate keys and
     empty metadata are still done
     LISTING_DIGESTS_OUTPUT_DIR: output listing digests into the specified directory (in the LevelDB format)
-    LISTING_DIGESTS_BLOCK_SIZE: number of keys in each listing digest block (default ${DEFAULT_LISTING_DIGESTS_BLOCK_SIZE})
+    LISTING_DIGESTS_BLOCK_SIZE: number of keys in each listing digest block
+    (default ${DEFAULT_LISTING_DIGESTS_BLOCK_SIZE})
 `;
 
 if (!BUCKETS && !RAFT_SESSIONS && !KEYS_FROM_STDIN) {

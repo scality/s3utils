@@ -41,11 +41,14 @@ Mandatory environment variables:
 
 Optional environment variables:
     KEY_MARKER: key to continue listing from
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
+    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines
+    (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     VERBOSE: set to 1 for more verbose output (show last-modified dates and replication statuses of objects)
-    COMPARE_VERSION_ID: set to 1 to have additional check by comapring version ids (cannot be set with COMPARE_OBJECT_SIZE)
-    COMPARE_OBJECT_SIZE: set to 1 to have additional check by comparing object sizes (cannot be set with COMPARE_VERSION_ID)
+    COMPARE_VERSION_ID: set to 1 to have additional check by comparing version ids
+    (cannot be set with COMPARE_OBJECT_SIZE)
+    COMPARE_OBJECT_SIZE: set to 1 to have additional check by comparing object sizes
+    (cannot be set with COMPARE_VERSION_ID)
 `;
 
 if (!SRC_BUCKETD_HOSTPORT) {

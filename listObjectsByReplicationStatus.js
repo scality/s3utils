@@ -13,8 +13,12 @@ const ERR_NO_BUCKETS = 'No buckets given as input! Please provide a comma-separa
 const ERR_NO_ENDPOINT = 'ENDPOINT not defined!';
 const ERR_NO_ACCESS_KEY = 'ACCESS_KEY not defined';
 const ERR_NO_SECRET_KEY = 'SECRET_KEY not defined';
-const ERR_REPLICATION_STATUS_NOT_DEFINED = `REPLICATION_STATUS not defined! Please provide a comma-separated list of replication statuses: ${VALID_REPLICATION_STATUSES.join(',')}.`;
-const ERR_INVALID_REPLICATION_STATUS = `invalid REPLICATION_STATUS: must be a comma-separated list of replication statuses: ${VALID_REPLICATION_STATUSES.join(',')}.`;
+const ERR_REPLICATION_STATUS_NOT_DEFINED =
+    'REPLICATION_STATUS not defined! Please provide a comma-separated list of replication statuses: ' +
+    `${VALID_REPLICATION_STATUSES.join(',')}.`;
+const ERR_INVALID_REPLICATION_STATUS =
+    'invalid REPLICATION_STATUS: must be a comma-separated list of replication statuses: ' +
+    `${VALID_REPLICATION_STATUSES.join(',')}.`;
 
 /**
  * List object versions from a bucket

@@ -34,7 +34,8 @@ Mandatory environment variables:
 Optional environment variables:
     TARGET_PREFIX: only process a specific prefix in the bucket(s)
     WORKERS: concurrency value for listing / batch delete requests (default ${DEFAULT_WORKERS})
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
+    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines
+    (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     KEY_MARKER: resume processing from a specific key
     VERSION_ID_MARKER: resume processing from a specific version ID

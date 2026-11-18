@@ -2131,7 +2131,7 @@ describe('S3UtilsMongoClient, tests', () => {
             },
         ],
         [
-            'getObjectMDStats() should return correct results for versioned bucket with objects in cold storage, restoring and restored',
+            'getObjectMDStats() should return correct results for versioned cold, restoring and restored objects',
             {
                 bucketName: 'test-bucket',
                 isVersioned: true,

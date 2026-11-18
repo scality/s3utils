@@ -47,7 +47,8 @@ class MetricReport {
 }
 
 /**
- * @param {Array<Number>} sessionIds - raft session ids to retrieve metrics for (only contains info if scuba backend is enabled)
+ * @param {Array<Number>} sessionIds - raft session ids to retrieve metrics for (only contains info if scuba
+ *     backend is enabled)
  * @param {integer} timestamp - timestamp to retrieve metrics in microseconds
  * @param {object} bucket - bucket  to retrieve metrics for
  * @param {string} bucket.name - bucket name

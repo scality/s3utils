@@ -79,7 +79,8 @@ Optional environment variables:
     VERBOSE: set to 1 for more verbose output
     TRACE: set to 1 to trace every request to bucketd and sproxyd
     LISTING_PAGE_SIZE: number of keys to list per listing request (default ${DEFAULT_LISTING_PAGE_SIZE})
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
+    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines
+    (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
 
 Logs:
     Logs are output to stdout in JSON format using the standard

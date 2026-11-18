@@ -27,7 +27,7 @@ function isSOSCapacityInfoEnabled(bucketInfo) {
         bucketInfo.getCapabilities().VeeamSOSApi && // should exist
         bucketInfo.getCapabilities().VeeamSOSApi.SystemInfo && // should exist
         bucketInfo.getCapabilities().VeeamSOSApi.SystemInfo.ProtocolCapabilities && // should exist
-        bucketInfo.getCapabilities().VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo === true && // should be true
+        bucketInfo.getCapabilities().VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo === true &&
         bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo
     ); // should exist
 }

@@ -116,7 +116,7 @@ describe('RaftJournalReader', () => {
             });
         });
 
-        test('when begin is undefined and route returns a 200 OK HTTP status with invalid JSON in response body', done => {
+        test('when begin is undefined and route returns a 200 HTTP status with invalid JSON in response body', done => {
             reader._httpRequest = mockHttpRequest(null, {
                 statusCode: 200,
                 body: '{BADJSON}',
