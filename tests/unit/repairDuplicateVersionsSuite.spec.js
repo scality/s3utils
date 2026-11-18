@@ -16,7 +16,9 @@ describe('repairDuplicateVersionsSuite::httpRequest', () => {
                 headers: req.headers,
                 body: '',
             };
-            req.on('data', chunk => { lastRequest.body += chunk.toString('utf8'); });
+            req.on('data', chunk => {
+                lastRequest.body += chunk.toString('utf8');
+            });
             req.on('end', () => {
                 res.writeHead(200, { 'content-type': 'application/json' });
                 res.end(JSON.stringify({ ok: true }));
@@ -83,7 +85,9 @@ describe('repairDuplicateVersionsSuite::putObjectMetadata', () => {
                 headers: req.headers,
                 body: '',
             };
-            req.on('data', chunk => { lastRequest.body += chunk.toString('utf8'); });
+            req.on('data', chunk => {
+                lastRequest.body += chunk.toString('utf8');
+            });
             req.on('end', () => {
                 res.writeHead(responseStatus);
                 res.end();

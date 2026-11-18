@@ -43,18 +43,11 @@ function generateObjectMD(objectKey, lastModified, storageClasses) {
 
 function generateRequestObject(bucket, objectKey, storageClass) {
     const storageClassName = storageClass.split(':')[0];
-    return new StalledEntry(
-        bucket,
-        objectKey,
-        encode(testVersion),
-        storageClassName,
-        true,
-    );
+    return new StalledEntry(bucket, objectKey, encode(testVersion), storageClassName, true);
 }
 
 function generateRequestArray(bucket, objectKey, storageClasses) {
-    return storageClasses.split(',')
-        .map(i => generateRequestObject(bucket, objectKey, i));
+    return storageClasses.split(',').map(i => generateRequestObject(bucket, objectKey, i));
 }
 
 function generateModifiedDateString(date, delta) {

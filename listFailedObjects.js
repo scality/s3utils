@@ -21,11 +21,13 @@ if (require.main === module) {
         endpoint: ENDPOINT,
         replicationStatus: 'FAILED',
         logger: log,
-    }).then(() => {
-        log.info('Completed successfully');
-        process.exit(0);
-    }).catch(err => {
-        log.error('Failed with error', { error: err.message });
-        process.exit(1);
-    });
+    })
+        .then(() => {
+            log.info('Completed successfully');
+            process.exit(0);
+        })
+        .catch(err => {
+            log.error('Failed with error', { error: err.message });
+            process.exit(1);
+        });
 }

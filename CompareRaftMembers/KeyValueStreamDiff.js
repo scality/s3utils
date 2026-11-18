@@ -1,7 +1,4 @@
-const async = require('async');
 const stream = require('stream');
-
-const { jsutil } = require('@scality/arsenal');
 
 /**
  * Output differences between two streams, where each stream emits
@@ -76,9 +73,7 @@ class KeyValueStreamDiff extends stream.Readable {
         // bail out if:
         // - consumer not actively reading
         // - or at least one of the input streams is waiting for an item to read
-        if (!this._reading
-            || (!this._eof[0] && !this._lastItems[0])
-            || (!this._eof[1] && !this._lastItems[1])) {
+        if (!this._reading || (!this._eof[0] && !this._lastItems[0]) || (!this._eof[1] && !this._lastItems[1])) {
             return undefined;
         }
         // compute the difference between the last item read from each

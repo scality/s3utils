@@ -1,12 +1,8 @@
 const werelogs = require('werelogs');
 
-const {
-    StalledRequestHandler,
-} = require('../../../StalledRetry/StalledRequestHandler');
+const { StalledRequestHandler } = require('../../../StalledRetry/StalledRequestHandler');
 
-const {
-    generateRequestArray,
-} = require('../../utils');
+const { generateRequestArray } = require('../../utils');
 
 const loggerConfig = {
     level: 'debug',
@@ -25,7 +21,6 @@ const mockSource = {
     getBatch: jest.fn(),
     getInfo: jest.fn(),
 };
-
 
 const mockSourceGetBatchResponses = respList => {
     respList.forEach(resp => {
@@ -66,12 +61,15 @@ describe('StalledRequestHandler', () => {
         });
 
         test('error if source is missing the getBatch method', done => {
-            handler = new StalledRequestHandler({}, {
-                dryRun: false,
-                batchSize: 10,
-                concurrentRequests: 5,
-                log,
-            });
+            handler = new StalledRequestHandler(
+                {},
+                {
+                    dryRun: false,
+                    batchSize: 10,
+                    concurrentRequests: 5,
+                    log,
+                },
+            );
 
             handler.handleRequests({}, err => {
                 expect(err).toEqual(new Error('Invalid cursor source'));
@@ -90,8 +88,7 @@ describe('StalledRequestHandler', () => {
             handler.handleRequests(mockSource, err => {
                 expect(err).toEqual(new Error('test client error'));
                 expect(handler.killed).toEqual(true);
-                expect(handler.queueError)
-                    .toEqual(new Error('test client error'));
+                expect(handler.queueError).toEqual(new Error('test client error'));
                 done();
             });
         });
@@ -99,9 +96,7 @@ describe('StalledRequestHandler', () => {
         test('should wait until queue is completed', done => {
             mockClient.retryFailedObjects.mockImplementation((_, cb) => setTimeout(() => cb(), 500));
             mockSource.getInfo.mockImplementation(() => ({ stalled: 1 }));
-            mockSourceGetBatchResponses([
-                [null, generateRequestArray('bucket', 'key', 'loc-1')],
-            ]);
+            mockSourceGetBatchResponses([[null, generateRequestArray('bucket', 'key', 'loc-1')]]);
             mockSource.getBatch.mockImplementation((_, cb) => cb(null, null));
 
             handler.handleRequests(mockSource, err => {
@@ -119,9 +114,7 @@ describe('StalledRequestHandler', () => {
         test('should complete successfully', done => {
             mockClient.retryFailedObjects.mockImplementation((_, cb) => setTimeout(() => cb(), 500));
             mockSource.getInfo.mockImplementation(() => ({ stalled: 1 }));
-            mockSourceGetBatchResponses([
-                [null, generateRequestArray('bucket', 'key', 'loc-1')],
-            ]);
+            mockSourceGetBatchResponses([[null, generateRequestArray('bucket', 'key', 'loc-1')]]);
             mockSource.getBatch.mockImplementation((_, cb) => cb(null, null));
 
             handler.handleRequests(mockSource, err => {

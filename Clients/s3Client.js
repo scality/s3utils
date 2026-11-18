@@ -32,12 +32,12 @@ const createS3Client = ({ accessKey, secretKey, endpoint }, log) => {
         forcePathStyle: true,
         requestHandler: new NodeHttpHandler({
             httpAgent: new http.Agent({ keepAlive: true }),
-            httpsAgent: new https.Agent({ 
+            httpsAgent: new https.Agent({
                 keepAlive: true,
                 // With SDK v2, SSL was disabled. Here we added this
                 // to be able to run the script locally on a lab for testing,
                 // so https will work but there will be no security enforced
-                rejectUnauthorized: false
+                rejectUnauthorized: false,
             }),
             socketTimeout: 60000,
         }),
@@ -47,9 +47,9 @@ const createS3Client = ({ accessKey, secretKey, endpoint }, log) => {
                 log.error('aws sdk request error', { retryCount: attempt });
                 // The delay is not truly exponential; it resets to the minimum after every 10 calls,
                 // with a maximum delay of 15 seconds.
-                return AWS_SDK_REQUEST_DELAY_MS * (2 ** (attempt % 10));
-            }
-        )
+                return AWS_SDK_REQUEST_DELAY_MS * 2 ** (attempt % 10);
+            },
+        ),
     };
 
     return new S3Client(awsv3Config);

@@ -116,7 +116,7 @@ describe('RaftJournalReader', () => {
             });
         });
 
-        test('when begin is undefined and route returns a 200 OK HTTP status with invalid JSON in response body', done => {
+        test('when begin is undefined and route returns a 200 HTTP status with invalid JSON in response body', done => {
             reader._httpRequest = mockHttpRequest(null, {
                 statusCode: 200,
                 body: '{BADJSON}',
@@ -137,12 +137,7 @@ describe('RaftJournalReader', () => {
 
         const returnedError = (err, body) => {
             expect(reader._httpRequest).toHaveBeenCalled();
-            expect(reader._httpRequest).toHaveBeenCalledWith(
-                'GET',
-                expect.anything(),
-                null,
-                expect.anything(),
-            );
+            expect(reader._httpRequest).toHaveBeenCalledWith('GET', expect.anything(), null, expect.anything());
             expect(err).not.toBe(null);
             expect(body).toBe(undefined);
         };
@@ -151,12 +146,7 @@ describe('RaftJournalReader', () => {
             reader._httpRequest = mockHttpRequest(null, getMockResponse(200));
             reader.getBatch((err, body) => {
                 expect(reader._httpRequest).toHaveBeenCalled();
-                expect(reader._httpRequest).toHaveBeenCalledWith(
-                    'GET',
-                    expect.anything(),
-                    null,
-                    expect.anything(),
-                );
+                expect(reader._httpRequest).toHaveBeenCalledWith('GET', expect.anything(), null, expect.anything());
                 expect(err).toBe(null);
                 expect(body).not.toBe(null);
                 expect(body.log).not.toBe(null);
@@ -256,11 +246,7 @@ describe('RaftJournalReader', () => {
                     test('updates sproxydKeysMap with processed keys', () => {
                         expect(reader._httpRequest).toHaveBeenCalled();
                         expect(insert).toHaveBeenCalled();
-                        expect(insert).toHaveBeenCalledWith(
-                            expect.anything(),
-                            expect.anything(),
-                            'source-bucket',
-                        );
+                        expect(insert).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'source-bucket');
                     });
 
                     test('updates begin property in RaftJournalReader instance', () => {

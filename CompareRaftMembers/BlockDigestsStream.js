@@ -51,12 +51,8 @@ class BlockDigestsStream extends stream.Transform {
     constructor(params) {
         super({ objectMode: true });
 
-        const {
-            blockSize: userBlockSize,
-            hashAlgorithm: userHashAlgorithm,
-        } = params || {};
-        const blockSize = typeof userBlockSize === 'number'
-            ? userBlockSize : DEFAULT_BLOCK_SIZE;
+        const { blockSize: userBlockSize, hashAlgorithm: userHashAlgorithm } = params || {};
+        const blockSize = typeof userBlockSize === 'number' ? userBlockSize : DEFAULT_BLOCK_SIZE;
         if (blockSize > 0) {
             this._blockSize = blockSize;
         } else {

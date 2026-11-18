@@ -1,7 +1,6 @@
 const xml2js = require('xml2js');
 const { recoverListing } = require('../../../utils/safeList');
 
-
 describe('test safeListObjectVersions', () => {
     const testCases = [
         {
@@ -151,7 +150,6 @@ describe('test safeListObjectVersions', () => {
                     ],
                     CommonPrefix: [],
                 },
-
             },
             expectedData: {
                 Name: 'my-bucket',
@@ -272,7 +270,6 @@ describe('test safeListObjectVersions', () => {
             expectedError: new Error('im an original error'),
         },
     ];
-
 
     testCases.forEach(testCase => {
         it(testCase.description, done => {

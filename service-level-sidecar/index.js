@@ -14,12 +14,13 @@ if (process.env.SIDECAR_API_KEY) {
     log.info('using random API key', { key: env.apiKey });
 }
 
-
 function setupSignalHandlers(cleanUpFunc) {
-    ['SIGINT', 'SIGQUIT', 'SIGTERM'].forEach(signal => process.on(signal, () => {
-        log.info('received signal', { signal });
-        cleanUpFunc();
-    }));
+    ['SIGINT', 'SIGQUIT', 'SIGTERM'].forEach(signal =>
+        process.on(signal, () => {
+            log.info('received signal', { signal });
+            cleanUpFunc();
+        }),
+    );
 
     process.on('uncaughtException', error => {
         log.error('uncaught exception', { error, stack: error.stack.split(os.EOL) });

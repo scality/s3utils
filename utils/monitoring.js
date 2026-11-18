@@ -1,23 +1,26 @@
 const { errors } = require('@scality/arsenal');
 const promClient = require('prom-client');
-const { http } = require('httpagent');
 const cluster = require('cluster');
 
 const aggregatorRegistry = new promClient.AggregatorRegistry();
 const { collectDefaultMetrics } = promClient;
 
 // Histogram of the bucket processing duration, by the utilization service.
-const bucketProcessingDuration = cluster.isMaster ? new promClient.Histogram({
-    name: 's3_countitems_bucket_listing_duration_seconds',
-    help: 'Bucket processing duration',
-    buckets: [1, 10, 60, 600, 3600, 18000, 36000],
-}) : null;
+const bucketProcessingDuration = cluster.isMaster
+    ? new promClient.Histogram({
+          name: 's3_countitems_bucket_listing_duration_seconds',
+          help: 'Bucket processing duration',
+          buckets: [1, 10, 60, 600, 3600, 18000, 36000],
+      })
+    : null;
 
-const consolidationDuration = cluster.isMaster ? new promClient.Histogram({
-    name: 's3_countitems_bucket_merge_duration_seconds',
-    help: 'Duration of metrics consolidation in seconds',
-    buckets: [0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10],
-}) : null;
+const consolidationDuration = cluster.isMaster
+    ? new promClient.Histogram({
+          name: 's3_countitems_bucket_merge_duration_seconds',
+          help: 'Duration of metrics consolidation in seconds',
+          buckets: [0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10],
+      })
+    : null;
 
 const bucketsCount = new promClient.Counter({
     name: 's3_countitems_total_buckets_count',
@@ -62,10 +65,12 @@ async function metricsHandler(onScraped, req, res) {
         ]);
         const promMetrics = `${registerMetrics}\n${clusterMetrics}`;
         const contentLen = Buffer.byteLength(promMetrics, 'utf8');
-        return res.writeHead(200, {
-            'content-length': contentLen,
-            'content-type': promClient.register.contentType,
-        }).end(promMetrics);
+        return res
+            .writeHead(200, {
+                'content-length': contentLen,
+                'content-type': promClient.register.contentType,
+            })
+            .end(promMetrics);
     } catch (ex) {
         return _writeResponse(res, ex);
     } finally {

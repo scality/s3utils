@@ -1,13 +1,8 @@
 const { PassThrough } = require('stream');
 const werelogs = require('werelogs');
-const {
-    RateLimitingCursor,
-} = require('../../../StalledRetry/CursorWrapper');
+const { RateLimitingCursor } = require('../../../StalledRetry/CursorWrapper');
 
-const {
-    generateObjectMD,
-    generateModifiedDateString,
-} = require('../../utils');
+const { generateObjectMD, generateModifiedDateString } = require('../../utils');
 
 const loggerConfig = {
     level: 'debug',
@@ -41,27 +36,16 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should pause source stream if queue limit has been reached', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         writeItemsTo(mockCursor, [
-            ...generateObjectMD(
-                'testobject-0',
-                generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2',
-            ),
-            ...generateObjectMD(
-                'testobject-1',
-                generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2',
-            ),
+            ...generateObjectMD('testobject-0', generateModifiedDateString(cmpDate, -24), 'us-east-1,us-east-2'),
+            ...generateObjectMD('testobject-1', generateModifiedDateString(cmpDate, -24), 'us-east-1,us-east-2'),
         ]);
 
         setTimeout(() => {
@@ -76,22 +60,15 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should ignore non-stalled items', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1000,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1000,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         writeItemsTo(mockCursor, [
-            ...generateObjectMD(
-                'testobject-0',
-                generateModifiedDateString(cmpDate, +24),
-                'us-east-1,us-east-2',
-            ),
+            ...generateObjectMD('testobject-0', generateModifiedDateString(cmpDate, +24), 'us-east-1,us-east-2'),
         ]);
 
         setTimeout(() => {
@@ -106,22 +83,15 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should queue stalled items', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1000,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1000,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         writeItemsTo(mockCursor, [
-            ...generateObjectMD(
-                'testobject-0',
-                generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2',
-            ),
+            ...generateObjectMD('testobject-0', generateModifiedDateString(cmpDate, -24), 'us-east-1,us-east-2'),
         ]);
 
         setTimeout(() => {
@@ -136,15 +106,12 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should handle cursor error', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         mockCursor.emit('error', new Error('test error'));
 
@@ -157,22 +124,15 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should handle cursor end with items in queue', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1000,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1000,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         writeItemsTo(mockCursor, [
-            ...generateObjectMD(
-                'testobject-0',
-                generateModifiedDateString(cmpDate, -24),
-                'us-east-1,us-east-2',
-            ),
+            ...generateObjectMD('testobject-0', generateModifiedDateString(cmpDate, -24), 'us-east-1,us-east-2'),
         ]);
         mockCursor.end();
 
@@ -187,15 +147,12 @@ describe('RateLimitingCursor', () => {
     });
 
     test('should handle cursor end with 0 items in queue', done => {
-        const wrapper = new RateLimitingCursor(
-            mockCursor,
-            {
-                queueLimit: 1000,
-                bucketName: 'test-bucket',
-                cmpDate,
-                log,
-            },
-        );
+        const wrapper = new RateLimitingCursor(mockCursor, {
+            queueLimit: 1000,
+            bucketName: 'test-bucket',
+            cmpDate,
+            log,
+        });
 
         mockCursor.end();
 
@@ -209,15 +166,12 @@ describe('RateLimitingCursor', () => {
 
     describe('::getBatch', () => {
         test('should add getBatch request to queue', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             wrapper.getBatch(1, () => {});
 
@@ -228,15 +182,12 @@ describe('RateLimitingCursor', () => {
         });
 
         test('should call queued callback when size is met', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             wrapper.getBatch(5, (err, batch) => {
                 expect(err).toBeNull();
@@ -262,22 +213,15 @@ describe('RateLimitingCursor', () => {
         });
 
         test('should destroy source on completion', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             writeItemsTo(mockCursor, [
-                ...generateObjectMD(
-                    'testobject-0',
-                    generateModifiedDateString(cmpDate, -24),
-                    'us-east-1',
-                ),
+                ...generateObjectMD('testobject-0', generateModifiedDateString(cmpDate, -24), 'us-east-1'),
             ]);
             mockCursor.end();
 
@@ -293,15 +237,12 @@ describe('RateLimitingCursor', () => {
         });
 
         test('should return error', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             wrapper.getBatch(1, (err, batch) => {
                 expect(err).toEqual(new Error('test error'));
@@ -315,15 +256,12 @@ describe('RateLimitingCursor', () => {
         });
 
         test('should call queued getBatch requests on source end', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             writeItemsTo(mockCursor, [
                 ...generateObjectMD(
@@ -361,15 +299,12 @@ describe('RateLimitingCursor', () => {
         });
 
         test('should resume paused source', done => {
-            const wrapper = new RateLimitingCursor(
-                mockCursor,
-                {
-                    queueLimit: 1000,
-                    bucketName: 'test-bucket',
-                    cmpDate,
-                    log,
-                },
-            );
+            const wrapper = new RateLimitingCursor(mockCursor, {
+                queueLimit: 1000,
+                bucketName: 'test-bucket',
+                cmpDate,
+                log,
+            });
 
             mockCursor.pause();
             writeItemsTo(mockCursor, [

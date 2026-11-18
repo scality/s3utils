@@ -1,11 +1,8 @@
-
-
 const werelogs = require('werelogs');
 
 const httpRequest = require('../httpRequest');
 
 const log = new werelogs.Logger('s3utils:listVersions');
-
 
 /**
  * Fetch the complete metadata of an object version from bucketd.
@@ -30,8 +27,7 @@ const log = new werelogs.Logger('s3utils:listVersions');
  * @returns {Promise<object|null>} full metadata object, or null if not found/skipped
  */
 async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, listingParsedMd, retryParams) {
-    const baseUrl = `http://${bucketdHostport}/default/bucket/${bucket}/${
-        encodeURIComponent(key)}`;
+    const baseUrl = `http://${bucketdHostport}/default/bucket/${bucket}/${encodeURIComponent(key)}`;
 
     function parseResponse(url, res) {
         if (res.statusCode === 404) {
@@ -43,7 +39,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
         try {
             return JSON.parse(res.body);
         } catch (e) {
-            throw new Error(`failed to parse metadata from ${url}: ${e.message}`);
+            throw new Error(`failed to parse metadata from ${url}: ${e.message}`, { cause: e });
         }
     }
 
@@ -114,14 +110,18 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
  * @returns {AsyncGenerator<{key: string, versionId: string, value: object}>}
  *   async generator yielding one entry per version
  */
-async function* listVersions(bucketdHostport, bucket, {
-    pageSize = 1000,
-    maxItems,
-    prefix = '',
-    keyMarker: startKeyMarker = '',
-    versionIdMarker: startVersionIdMarker = '',
-    retry,
-} = {}) {
+async function* listVersions(
+    bucketdHostport,
+    bucket,
+    {
+        pageSize = 1000,
+        maxItems,
+        prefix = '',
+        keyMarker: startKeyMarker = '',
+        versionIdMarker: startVersionIdMarker = '',
+        retry,
+    } = {},
+) {
     let keyMarker = startKeyMarker;
     let versionIdMarker = startVersionIdMarker;
     let isTruncated = true;
@@ -129,24 +129,20 @@ async function* listVersions(bucketdHostport, bucket, {
 
     while (isTruncated && remaining > 0) {
         const maxKeys = Math.min(pageSize, remaining);
-        const url = `http://${bucketdHostport}/default/bucket/${bucket}`
-            + `?listingType=DelimiterVersions&maxKeys=${maxKeys}${
+        const url =
+            `http://${bucketdHostport}/default/bucket/${bucket}` +
+            `?listingType=DelimiterVersions&maxKeys=${maxKeys}${
                 prefix ? `&prefix=${encodeURIComponent(prefix)}` : ''
-            }&keyMarker=${encodeURIComponent(keyMarker)}`
-            + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
+            }&keyMarker=${encodeURIComponent(keyMarker)}` +
+            `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
 
         const res = await httpRequest('GET', url, retry);
         if (res.statusCode !== 200) {
             throw new Error(`GET ${url} returned status ${res.statusCode}`);
         }
-        const {
-            Versions,
-            IsTruncated,
-            NextKeyMarker,
-            NextVersionIdMarker,
-        } = JSON.parse(res.body);
+        const { Versions, IsTruncated, NextKeyMarker, NextVersionIdMarker } = JSON.parse(res.body);
 
-        for (const entry of (Versions || [])) {
+        for (const entry of Versions || []) {
             const { key, versionId } = entry;
             let parsedMd;
             try {
@@ -161,16 +157,17 @@ async function* listVersions(bucketdHostport, bucket, {
             }
             // Only fetch full metadata when the listing result has a pruned
             // location array: typically the field is absent for large MPUs
-            const needMdFetch = (
-                'content-length' in parsedMd
-                && parsedMd['content-length'] !== 0
-                && (parsedMd.location === undefined || parsedMd.location === null)
-            );
+            const needMdFetch =
+                'content-length' in parsedMd &&
+                parsedMd['content-length'] !== 0 &&
+                (parsedMd.location === undefined || parsedMd.location === null);
             if (needMdFetch) {
                 parsedMd = await fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, parsedMd, retry);
                 if (parsedMd === null) {
                     log.debug('full object metadata not found or skipped', {
-                        bucket, key, versionId,
+                        bucket,
+                        key,
+                        versionId,
                     });
                     continue;
                 }

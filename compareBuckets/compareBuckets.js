@@ -63,14 +63,7 @@ function compareObjectsReport(srcBucket, src, dstBucket, dst, options) {
 }
 
 function compareBuckets(params, log, cb) {
-    const {
-        bucketdSrcParams,
-        bucketdDstParams,
-        statusObj,
-        verbose,
-        compareVersionId,
-        compareObjectSize,
-    } = params;
+    const { bucketdSrcParams, bucketdDstParams, statusObj, verbose, compareVersionId, compareObjectSize } = params;
 
     statusObj.srcBucketInProgress = bucketdSrcParams.bucket;
     statusObj.dstBucketInProgress = bucketdDstParams.bucket;
@@ -82,14 +75,13 @@ function compareBuckets(params, log, cb) {
 
     async.doWhilst(
         done => {
-            async.parallel({
-                src: _done => {
-                    if (srcDone || srcContents.length > 0) {
-                        return process.nextTick(_done);
-                    }
-                    return listBucketMasterKeys(
-                        bucketdSrcParams,
-                        (err, isTruncated, marker, contents) => {
+            async.parallel(
+                {
+                    src: _done => {
+                        if (srcDone || srcContents.length > 0) {
+                            return process.nextTick(_done);
+                        }
+                        return listBucketMasterKeys(bucketdSrcParams, (err, isTruncated, marker, contents) => {
                             if (err) {
                                 log.error('Error fetching src bucket', { error: err });
                                 return _done(err);
@@ -99,17 +91,14 @@ function compareBuckets(params, log, cb) {
                             bucketdSrcParams.marker = marker;
                             statusObj.srcKeyMarker = marker;
                             return _done();
+                        });
+                    },
+                    dst: _done => {
+                        if (dstDone || dstContents.length > 0) {
+                            return process.nextTick(_done);
                         }
-                    );
-                },
-                dst: _done => {
-                    if (dstDone || dstContents.length > 0) {
-                        return process.nextTick(_done);
-                    }
 
-                    return listBucketMasterKeys(
-                        bucketdDstParams,
-                        (err, isTruncated, marker, contents) => {
+                        return listBucketMasterKeys(bucketdDstParams, (err, isTruncated, marker, contents) => {
                             if (err) {
                                 log.error('Error fetching dst bucket', { error: err });
                                 return _done(err);
@@ -119,113 +108,98 @@ function compareBuckets(params, log, cb) {
                             bucketdDstParams.marker = marker;
                             statusObj.dstKeyMarker = marker;
                             return _done();
-                        }
-                    );
+                        });
+                    },
                 },
-            }, err => {
-                if (err) {
-                    log.error('Parallel fetch error', { error: err });
-                    return done(err);
-                }
-
-                let srcIdx = 0;
-                let dstIdx = 0;
-
-                if (srcDone && srcContents.length === 0) {
-                    while (dstIdx < dstContents.length) {
-                        log.info(
-                            'missing object in source',
-                            getReportObject(
-                                bucketdSrcParams.bucket,
-                                dstContents[dstIdx],
-                                verbose
-                            )
-                        );
-                        ++statusObj.dstProcessedCount;
-                        ++statusObj.missingInSrcCount;
-                        ++dstIdx;
-                    }
-                }
-
-                if (dstDone && dstContents.length === 0) {
-                    while (srcIdx < srcContents.length) {
-                        log.info(
-                            'missing object in destination',
-                            getReportObject(
-                                bucketdDstParams.bucket,
-                                srcContents[srcIdx],
-                                verbose
-                            )
-                        );
-                        ++statusObj.srcProcessedCount;
-                        ++statusObj.missingInDstCount;
-                        ++srcIdx;
-                    }
-                }
-
-                while (srcIdx < srcContents.length && dstIdx < dstContents.length) {
-                    if (srcContents[srcIdx].key < dstContents[dstIdx].key) {
-                        log.info(
-                            'missing object in destination',
-                            getReportObject(
-                                bucketdDstParams.bucket,
-                                srcContents[srcIdx],
-                                verbose
-                            )
-                        );
-                        ++statusObj.srcProcessedCount;
-                        ++statusObj.missingInDstCount;
-                        ++srcIdx;
-                        continue;
+                err => {
+                    if (err) {
+                        log.error('Parallel fetch error', { error: err });
+                        return done(err);
                     }
 
-                    if (srcContents[srcIdx].key > dstContents[dstIdx].key) {
-                        log.info(
-                            'missing object in source',
-                            getReportObject(
-                                bucketdSrcParams.bucket,
-                                dstContents[dstIdx],
-                                verbose
-                            )
-                        );
-                        ++statusObj.dstProcessedCount;
-                        ++statusObj.missingInSrcCount;
-                        ++dstIdx;
-                        continue;
-                    }
+                    let srcIdx = 0;
+                    let dstIdx = 0;
 
-                    const report = compareObjectsReport(
-                        bucketdSrcParams.bucket,
-                        srcContents[srcIdx],
-                        bucketdDstParams.bucket,
-                        dstContents[dstIdx],
-                        {
-                            compareVersionId,
-                            compareObjectSize,
+                    if (srcDone && srcContents.length === 0) {
+                        while (dstIdx < dstContents.length) {
+                            log.info(
+                                'missing object in source',
+                                getReportObject(bucketdSrcParams.bucket, dstContents[dstIdx], verbose),
+                            );
+                            ++statusObj.dstProcessedCount;
+                            ++statusObj.missingInSrcCount;
+                            ++dstIdx;
                         }
-                    );
-
-                    if (report && report.error) {
-                        log.info('object mismatch found', report);
                     }
 
-                    ++statusObj.dstProcessedCount;
-                    ++statusObj.srcProcessedCount;
-                    ++dstIdx;
-                    ++srcIdx;
-                }
+                    if (dstDone && dstContents.length === 0) {
+                        while (srcIdx < srcContents.length) {
+                            log.info(
+                                'missing object in destination',
+                                getReportObject(bucketdDstParams.bucket, srcContents[srcIdx], verbose),
+                            );
+                            ++statusObj.srcProcessedCount;
+                            ++statusObj.missingInDstCount;
+                            ++srcIdx;
+                        }
+                    }
 
-                srcContents = srcContents.slice(srcIdx);
-                dstContents = dstContents.slice(dstIdx);
-                return process.nextTick(() => done(null));
-            });
+                    while (srcIdx < srcContents.length && dstIdx < dstContents.length) {
+                        if (srcContents[srcIdx].key < dstContents[dstIdx].key) {
+                            log.info(
+                                'missing object in destination',
+                                getReportObject(bucketdDstParams.bucket, srcContents[srcIdx], verbose),
+                            );
+                            ++statusObj.srcProcessedCount;
+                            ++statusObj.missingInDstCount;
+                            ++srcIdx;
+                            continue;
+                        }
+
+                        if (srcContents[srcIdx].key > dstContents[dstIdx].key) {
+                            log.info(
+                                'missing object in source',
+                                getReportObject(bucketdSrcParams.bucket, dstContents[dstIdx], verbose),
+                            );
+                            ++statusObj.dstProcessedCount;
+                            ++statusObj.missingInSrcCount;
+                            ++dstIdx;
+                            continue;
+                        }
+
+                        const report = compareObjectsReport(
+                            bucketdSrcParams.bucket,
+                            srcContents[srcIdx],
+                            bucketdDstParams.bucket,
+                            dstContents[dstIdx],
+                            {
+                                compareVersionId,
+                                compareObjectSize,
+                            },
+                        );
+
+                        if (report && report.error) {
+                            log.info('object mismatch found', report);
+                        }
+
+                        ++statusObj.dstProcessedCount;
+                        ++statusObj.srcProcessedCount;
+                        ++dstIdx;
+                        ++srcIdx;
+                    }
+
+                    srcContents = srcContents.slice(srcIdx);
+                    dstContents = dstContents.slice(dstIdx);
+                    return process.nextTick(() => done(null));
+                },
+            );
         },
-        async () => (!srcDone || !dstDone || srcContents.length > 0 || dstContents.length > 0),
+        async () => !srcDone || !dstDone || srcContents.length > 0 || dstContents.length > 0,
         err => {
             statusObj.dstBucketInProgress = null;
             statusObj.srcBucketInProgress = null;
             cb(err);
-        }
+        },
     );
 }
 module.exports = {

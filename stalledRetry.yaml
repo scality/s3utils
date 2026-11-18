@@ -4,7 +4,7 @@ kind: CronJob
 metadata:
   name: retry-stalled-objects
 spec:
-  schedule: "*/10 * * * *"
+  schedule: '*/10 * * * *'
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 0
   failedJobsHistoryLimit: 3
@@ -15,45 +15,45 @@ spec:
         spec:
           restartPolicy: OnFailure
           containers:
-          - name: utils
-            image: zenko/s3utils:0.2
-            imagePullPolicy: IfNotPresent
-            command: ["/bin/bash"]
-            args:
-            - -c
-            - node stalled.js
-            env:
-            - name: ENDPOINT
-              value: ""
-            - name: ACCESS_KEY
-              value: ""
-            - name: SECRET_KEY
-              value: ""
-            - name: MONGODB_REPLICASET
-              value: ""
-            - name: MONGODB_DATABASE
-              value: "metadata"
-            - name: DRY_RUN
-              value: "false"
-            - name: EXPIRED_BY_HOUR
-              value: "1"
-              # limits the number of retry resources per retry request
-            - name: REQUEST_BATCH_SIZE
-              value: "10"
-              # limits the number of retry resource entries in queue
-            - name: QUEUE_LIMIT
-              value: "1000"
-              # limits the number of parallel retry requests
-            - name: CONCURRENT_REQUESTS
-              value: "5"
-            - name: ENABLE_HEAP_PROFILER
-              value: "1"
-            - name: HEAP_PROFILER_INTERVAL_MS
-              value: "600000"
-              # path to write heap snapshots
-            - name: HEAP_PROFILER_PATH
-              value: "/path/to/write"
-              # https://www.mongodb.com/docs/v4.2/core/read-preference/index.html
-              # mongodb read preference - primary|secondary|primaryPreferred|secondaryPreferred|nearest
-            - name: MONGODB_READ_PREFERENCE
-              value: "secondaryPreferred"
+            - name: utils
+              image: zenko/s3utils:0.2
+              imagePullPolicy: IfNotPresent
+              command: ['/bin/bash']
+              args:
+                - -c
+                - node stalled.js
+              env:
+                - name: ENDPOINT
+                  value: ''
+                - name: ACCESS_KEY
+                  value: ''
+                - name: SECRET_KEY
+                  value: ''
+                - name: MONGODB_REPLICASET
+                  value: ''
+                - name: MONGODB_DATABASE
+                  value: 'metadata'
+                - name: DRY_RUN
+                  value: 'false'
+                - name: EXPIRED_BY_HOUR
+                  value: '1'
+                  # limits the number of retry resources per retry request
+                - name: REQUEST_BATCH_SIZE
+                  value: '10'
+                  # limits the number of retry resource entries in queue
+                - name: QUEUE_LIMIT
+                  value: '1000'
+                  # limits the number of parallel retry requests
+                - name: CONCURRENT_REQUESTS
+                  value: '5'
+                - name: ENABLE_HEAP_PROFILER
+                  value: '1'
+                - name: HEAP_PROFILER_INTERVAL_MS
+                  value: '600000'
+                  # path to write heap snapshots
+                - name: HEAP_PROFILER_PATH
+                  value: '/path/to/write'
+                  # https://www.mongodb.com/docs/v4.2/core/read-preference/index.html
+                  # mongodb read preference - primary|secondary|primaryPreferred|secondaryPreferred|nearest
+                - name: MONGODB_READ_PREFERENCE
+                  value: 'secondaryPreferred'

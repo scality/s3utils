@@ -21,9 +21,11 @@ const SHADOW_BUCKET = 'mpuShadowBuckettest-bucket';
 const RETRY_PARAMS = { times: 5, interval: 100 };
 
 function overviewUrl({ maxKeys = 1000, marker = '' } = {}) {
-    return `http://${BUCKETD_HOSTPORT}/default/bucket/${SHADOW_BUCKET}`
-        + `?prefix=${encodeURIComponent('overview..|..')}&maxKeys=${maxKeys}`
-        + `&marker=${encodeURIComponent(marker)}`;
+    return (
+        `http://${BUCKETD_HOSTPORT}/default/bucket/${SHADOW_BUCKET}` +
+        `?prefix=${encodeURIComponent('overview..|..')}&maxKeys=${maxKeys}` +
+        `&marker=${encodeURIComponent(marker)}`
+    );
 }
 
 // Build an overview key in the format: overview..|..<objectKey>..|..<uploadId>
@@ -66,10 +68,9 @@ describe('getUploadIdsWithOverview', () => {
     });
 
     test('populates uploadIds from a single page of overview keys', async () => {
-        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([
-            overviewKey('object1', 'uploadId1'),
-            overviewKey('object2', 'uploadId2'),
-        ])));
+        httpRequest.mockResolvedValueOnce(
+            fakeResponse(200, listingPage([overviewKey('object1', 'uploadId1'), overviewKey('object2', 'uploadId2')])),
+        );
 
         const uploadIds = new Set();
         await getUploadIdsWithOverview(BUCKETD_HOSTPORT, SHADOW_BUCKET, uploadIds);
@@ -82,13 +83,13 @@ describe('getUploadIdsWithOverview', () => {
     test('follows pagination and uses last key of each page as the next marker', async () => {
         const lastKeyPage1 = overviewKey('object1', 'uploadId1');
         httpRequest
-            .mockResolvedValueOnce(fakeResponse(200, {
-                Contents: [{ key: lastKeyPage1 }],
-                IsTruncated: true,
-            }))
-            .mockResolvedValueOnce(fakeResponse(200, listingPage([
-                overviewKey('object2', 'uploadId2'),
-            ])));
+            .mockResolvedValueOnce(
+                fakeResponse(200, {
+                    Contents: [{ key: lastKeyPage1 }],
+                    IsTruncated: true,
+                }),
+            )
+            .mockResolvedValueOnce(fakeResponse(200, listingPage([overviewKey('object2', 'uploadId2')])));
 
         const uploadIds = new Set();
         await getUploadIdsWithOverview(BUCKETD_HOSTPORT, SHADOW_BUCKET, uploadIds);
@@ -121,9 +122,9 @@ describe('getUploadIdsWithOverview', () => {
         // overview key format: overview..|..<objectKey>..|..<uploadId>
         // split('..|..') takes the LAST part as uploadId, so embedded
         // separators in the object key are handled correctly
-        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([
-            overviewKey('dir..|..subdir/object', 'uploadId1'),
-        ])));
+        httpRequest.mockResolvedValueOnce(
+            fakeResponse(200, listingPage([overviewKey('dir..|..subdir/object', 'uploadId1')])),
+        );
 
         const uploadIds = new Set();
         await getUploadIdsWithOverview(BUCKETD_HOSTPORT, SHADOW_BUCKET, uploadIds);
@@ -135,8 +136,9 @@ describe('getUploadIdsWithOverview', () => {
         httpRequest.mockResolvedValueOnce(fakeResponse(500));
 
         const uploadIds = new Set();
-        await expect(getUploadIdsWithOverview(BUCKETD_HOSTPORT, SHADOW_BUCKET, uploadIds))
-            .rejects.toThrow('returned status 500');
+        await expect(getUploadIdsWithOverview(BUCKETD_HOSTPORT, SHADOW_BUCKET, uploadIds)).rejects.toThrow(
+            'returned status 500',
+        );
     });
 });
 
@@ -145,8 +147,10 @@ describe('getUploadIdsWithOverview', () => {
 // ---------------------------------------------------------------------------
 
 function partsUrl({ maxKeys = 1000, marker = '' } = {}) {
-    return `http://${BUCKETD_HOSTPORT}/default/bucket/${SHADOW_BUCKET}`
-        + `?maxKeys=${maxKeys}&marker=${encodeURIComponent(marker)}`;
+    return (
+        `http://${BUCKETD_HOSTPORT}/default/bucket/${SHADOW_BUCKET}` +
+        `?maxKeys=${maxKeys}&marker=${encodeURIComponent(marker)}`
+    );
 }
 
 // Build a part listing entry: key = "<uploadId>..|..<5-digit-index>",
@@ -307,8 +311,9 @@ describe('collectOrphanParts', () => {
     test('throws when the listing returns a non-200 non-404 status', async () => {
         httpRequest.mockResolvedValueOnce(fakeResponse(500));
 
-        await expect(collectOrphanParts(BUCKETD_HOSTPORT, SHADOW_BUCKET, new Set()))
-            .rejects.toThrow('returned status 500');
+        await expect(collectOrphanParts(BUCKETD_HOSTPORT, SHADOW_BUCKET, new Set())).rejects.toThrow(
+            'returned status 500',
+        );
     });
 });
 
@@ -363,15 +368,11 @@ describe('buildOrphanMap', () => {
         const e1 = partEntry('uploadIdLive', 1, ['key-live']);
         const e2 = partEntry('uploadIdOrphan', 1, ['key-orphan']);
         // step 1: uploadIdLive already has an overview key
-        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([
-            overviewKey('some-object', 'uploadIdLive'),
-        ])));
+        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([overviewKey('some-object', 'uploadIdLive')])));
         // step 2: both IDs have parts; collectOrphanParts skips uploadIdLive
         httpRequest.mockResolvedValueOnce(fakeResponse(200, partsPage([e1, e2])));
         // step 3: uploadIdLive still has an overview key
-        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([
-            overviewKey('some-object', 'uploadIdLive'),
-        ])));
+        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([overviewKey('some-object', 'uploadIdLive')])));
 
         const result = await buildOrphanMap(BUCKETD_HOSTPORT, SHADOW_BUCKET);
 
@@ -385,9 +386,7 @@ describe('buildOrphanMap', () => {
         // step 2: uploadId1 appears as an orphan candidate
         httpRequest.mockResolvedValueOnce(fakeResponse(200, partsPage([entry])));
         // step 3: uploadId1 now has an overview key (MPU completed between step 1 and step 2)
-        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([
-            overviewKey('some-object', 'uploadId1'),
-        ])));
+        httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage([overviewKey('some-object', 'uploadId1')])));
 
         const result = await buildOrphanMap(BUCKETD_HOSTPORT, SHADOW_BUCKET);
 
@@ -424,8 +423,15 @@ describe('cleanupOrphanEntry', () => {
 
     test('does nothing when keysToDelete and partKeys are both empty', async () => {
         const reqLogger = makeReqLogger();
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: [] }, [], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: [] },
+            [],
+            undefined,
+        );
 
         expect(httpRequest).not.toHaveBeenCalled();
     });
@@ -436,8 +442,15 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: [] }, ['key-A', 'key-B'], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: [] },
+            ['key-A', 'key-B'],
+            undefined,
+        );
 
         expect(httpRequest).toHaveBeenCalledTimes(2);
         expect(httpRequest).toHaveBeenNthCalledWith(1, 'DELETE', sproxydDeleteUrl('key-A'), undefined);
@@ -450,8 +463,15 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: ['part-key-1', 'part-key-2'] }, [], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: ['part-key-1', 'part-key-2'] },
+            [],
+            undefined,
+        );
 
         expect(httpRequest).toHaveBeenCalledTimes(2);
         expect(httpRequest).toHaveBeenNthCalledWith(1, 'DELETE', partDeleteUrl('part-key-1'), undefined);
@@ -464,8 +484,15 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: ['part-key-1'] }, ['sproxyd-key-A'], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: ['part-key-1'] },
+            ['sproxyd-key-A'],
+            undefined,
+        );
 
         expect(httpRequest).toHaveBeenNthCalledWith(1, 'DELETE', sproxydDeleteUrl('sproxyd-key-A'), undefined);
         expect(httpRequest).toHaveBeenNthCalledWith(2, 'DELETE', partDeleteUrl('part-key-1'), undefined);
@@ -476,8 +503,15 @@ describe('cleanupOrphanEntry', () => {
         httpRequest.mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: [] }, ['key-A'], retry);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: [] },
+            ['key-A'],
+            retry,
+        );
 
         expect(httpRequest).toHaveBeenCalledWith('DELETE', sproxydDeleteUrl('key-A'), retry);
     });
@@ -488,12 +522,20 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: [] }, ['key-A', 'key-B'], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: [] },
+            ['key-A', 'key-B'],
+            undefined,
+        );
 
         expect(reqLogger.error).toHaveBeenCalledTimes(1);
         expect(reqLogger.error).toHaveBeenCalledWith(
-            'failed to delete orphaned sproxyd key', expect.objectContaining({ sproxydKey: 'key-A' }),
+            'failed to delete orphaned sproxyd key',
+            expect.objectContaining({ sproxydKey: 'key-A' }),
         );
         expect(httpRequest).toHaveBeenCalledTimes(2);
     });
@@ -504,12 +546,20 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: [] }, ['key-A', 'key-B'], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: [] },
+            ['key-A', 'key-B'],
+            undefined,
+        );
 
         expect(reqLogger.error).toHaveBeenCalledTimes(1);
         expect(reqLogger.error).toHaveBeenCalledWith(
-            'failed to delete orphaned sproxyd key', expect.objectContaining({ sproxydKey: 'key-A' }),
+            'failed to delete orphaned sproxyd key',
+            expect.objectContaining({ sproxydKey: 'key-A' }),
         );
         expect(httpRequest).toHaveBeenCalledTimes(2);
     });
@@ -518,8 +568,15 @@ describe('cleanupOrphanEntry', () => {
         httpRequest.mockResolvedValueOnce({ statusCode: 404, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: ['part-key-1'] }, [], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: ['part-key-1'] },
+            [],
+            undefined,
+        );
 
         expect(reqLogger.error).not.toHaveBeenCalled();
     });
@@ -530,12 +587,20 @@ describe('cleanupOrphanEntry', () => {
             .mockResolvedValueOnce({ statusCode: 200, body: '' });
         const reqLogger = makeReqLogger();
 
-        await cleanupOrphanEntry(reqLogger, BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, SHADOW_BUCKET,
-            { partKeys: ['part-key-1', 'part-key-2'] }, [], undefined);
+        await cleanupOrphanEntry(
+            reqLogger,
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            SHADOW_BUCKET,
+            { partKeys: ['part-key-1', 'part-key-2'] },
+            [],
+            undefined,
+        );
 
         expect(reqLogger.error).toHaveBeenCalledTimes(1);
         expect(reqLogger.error).toHaveBeenCalledWith(
-            'failed to delete orphaned part metadata', expect.objectContaining({ partKey: 'part-key-1' }),
+            'failed to delete orphaned part metadata',
+            expect.objectContaining({ partKey: 'part-key-1' }),
         );
         expect(httpRequest).toHaveBeenCalledTimes(2);
     });
@@ -576,11 +641,19 @@ describe('cleanupOrphans', () => {
         listVersions.mockImplementation(async function* () {});
         const retry = { times: 3, interval: 100 };
 
-        await cleanupOrphans(BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, 'test-bucket', SHADOW_BUCKET, {},
-            { pageSize: 42, retry });
+        await cleanupOrphans(
+            BUCKETD_HOSTPORT,
+            SPROXYD_HOSTPORT,
+            'test-bucket',
+            SHADOW_BUCKET,
+            {},
+            { pageSize: 42, retry },
+        );
 
         expect(listVersions).toHaveBeenCalledWith(
-            BUCKETD_HOSTPORT, 'test-bucket', expect.objectContaining({ pageSize: 42, retry }),
+            BUCKETD_HOSTPORT,
+            'test-bucket',
+            expect.objectContaining({ pageSize: 42, retry }),
         );
     });
 

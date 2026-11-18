@@ -15,125 +15,147 @@ const logger = new werelogs.Logger('collectBucketMetricsAndUpdateBucketCapacityI
 
 describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
     describe('isSOSCapacityInfoEnabled', () => {
-        test('should return false if _capacities property doesn\'t exist in bucket', () => {
+        test("should return false if _capacities property doesn't exist in bucket", () => {
             const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj(testBucketMD));
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi property doesn\'t exist in bucket', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {},
-            }));
+        test("should return false if _capacities.VeeamSOSApi property doesn't exist in bucket", () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {},
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo property doesn\'t exist in bucket', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {},
-                },
-            }));
-            expect(enabled).toBeFalsy();
-        });
-
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities property doesn\'t exist in bucket', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {},
+        test("should return false if _capacities.VeeamSOSApi.SystemInfo property doesn't exist in bucket", () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {
+                        VeeamSOSApi: {},
                     },
-                },
-            }));
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property doesn\'t exist in bucket', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {
-                            ProtocolCapabilities: {},
+        test("should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities doesn't exist", () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {
+                        VeeamSOSApi: {
+                            SystemInfo: {},
                         },
                     },
-                },
-            }));
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is not boolean', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {
-                            ProtocolCapabilities: {
-                                CapacityInfo: 'true',
+        test("should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo doesn't exist", () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {
+                        VeeamSOSApi: {
+                            SystemInfo: {
+                                ProtocolCapabilities: {},
                             },
                         },
                     },
-                },
-            }));
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is false', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {
-                            ProtocolCapabilities: {
-                                CapacityInfo: false,
+        test('should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is not boolean', () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {
+                        VeeamSOSApi: {
+                            SystemInfo: {
+                                ProtocolCapabilities: {
+                                    CapacityInfo: 'true',
+                                },
                             },
                         },
                     },
-                },
-            }));
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return false if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is true'
-            + 'and _capacities.VeeamSOSApi.CapacityInfo doesn\'t exist', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {
-                            ProtocolCapabilities: {
-                                CapacityInfo: false,
+        test('should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is false', () => {
+            const enabled = isSOSCapacityInfoEnabled(
+                BucketInfo.fromObj({
+                    ...testBucketMD,
+                    _capabilities: {
+                        VeeamSOSApi: {
+                            SystemInfo: {
+                                ProtocolCapabilities: {
+                                    CapacityInfo: false,
+                                },
                             },
                         },
                     },
-                },
-            }));
+                }),
+            );
             expect(enabled).toBeFalsy();
         });
 
-        test('should return true if _capacities.VeeamSOSApi.SystemInfo.SystemInfo.ProtocolCapabilities.CapacityInfo property is true'
-            + 'and _capacities.VeeamSOSApi.CapacityInfo exists', () => {
-            const enabled = isSOSCapacityInfoEnabled(BucketInfo.fromObj({
-                ...testBucketMD,
-                _capabilities: {
-                    VeeamSOSApi: {
-                        SystemInfo: {
-                            ProtocolCapabilities: {
-                                CapacityInfo: true,
+        test(
+            'should return false if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is true ' +
+                "and VeeamSOSApi.CapacityInfo doesn't exist",
+            () => {
+                const enabled = isSOSCapacityInfoEnabled(
+                    BucketInfo.fromObj({
+                        ...testBucketMD,
+                        _capabilities: {
+                            VeeamSOSApi: {
+                                SystemInfo: {
+                                    ProtocolCapabilities: {
+                                        CapacityInfo: false,
+                                    },
+                                },
                             },
                         },
-                        CapacityInfo: {
-                            Capacity: 0n,
-                            Available: 0n,
-                            Used: 0n,
+                    }),
+                );
+                expect(enabled).toBeFalsy();
+            },
+        );
+
+        test(
+            'should return true if VeeamSOSApi.SystemInfo.ProtocolCapabilities.CapacityInfo is true ' +
+                'and VeeamSOSApi.CapacityInfo exists',
+            () => {
+                const enabled = isSOSCapacityInfoEnabled(
+                    BucketInfo.fromObj({
+                        ...testBucketMD,
+                        _capabilities: {
+                            VeeamSOSApi: {
+                                SystemInfo: {
+                                    ProtocolCapabilities: {
+                                        CapacityInfo: true,
+                                    },
+                                },
+                                CapacityInfo: {
+                                    Capacity: 0n,
+                                    Available: 0n,
+                                    Used: 0n,
+                                },
+                            },
                         },
-                    },
-                },
-            }));
-            expect(enabled).toBeTruthy();
-        });
+                    }),
+                );
+                expect(enabled).toBeTruthy();
+            },
+        );
     });
 
     describe('isValidBucketStorageMetrics', () => {
@@ -142,19 +164,19 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(valid).toBeFalsy();
         });
 
-        test('should return false if usedCapacity property doesn\'t exist', () => {
+        test("should return false if usedCapacity property doesn't exist", () => {
             const valid = isValidBucketStorageMetrics({});
             expect(valid).toBeFalsy();
         });
 
-        test('should return false if usedCapacity.current property doesn\'t exist', () => {
+        test("should return false if usedCapacity.current property doesn't exist", () => {
             const valid = isValidBucketStorageMetrics({
                 usedCapacity: { nonCurrent: 0n },
             });
             expect(valid).toBeFalsy();
         });
 
-        test('should return false if usedCapacity.nonCurrent property doesn\'t exist', () => {
+        test("should return false if usedCapacity.nonCurrent property doesn't exist", () => {
             const valid = isValidBucketStorageMetrics({
                 usedCapacity: { current: 0n },
             });
@@ -213,7 +235,6 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
             expect(valid).toBeFalsy();
         });
 
-
         test('should return true if capacity is a valid integer', () => {
             const valid = isValidCapacityValue(1n);
             expect(valid).toBeTruthy();
@@ -236,8 +257,7 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         afterEach(() => jest.resetAllMocks());
 
         test('should not pass if mongo getBucketInfos() returns error', done => {
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(new Error('error getting bucket list')));
+            mongoClient.getBucketInfos.mockImplementation((log, cb) => cb(new Error('error getting bucket list')));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toEqual(new Error('error getting bucket list'));
                 done();
@@ -245,28 +265,32 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should not pass if mongo getUsersBucketCreationDate() returns error', done => {
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(null, {
-                    bucketInfos: [BucketInfo.fromObj({
-                        ...testBucketMD,
-                        _capabilities: {
-                            VeeamSOSApi: {
-                                SystemInfo: {
-                                    ProtocolCapabilities: {
-                                        CapacityInfo: true,
+            mongoClient.getBucketInfos.mockImplementation((log, cb) =>
+                cb(null, {
+                    bucketInfos: [
+                        BucketInfo.fromObj({
+                            ...testBucketMD,
+                            _capabilities: {
+                                VeeamSOSApi: {
+                                    SystemInfo: {
+                                        ProtocolCapabilities: {
+                                            CapacityInfo: true,
+                                        },
+                                    },
+                                    CapacityInfo: {
+                                        Capacity: 0n,
+                                        Available: 0n,
+                                        Used: 0n,
                                     },
                                 },
-                                CapacityInfo: {
-                                    Capacity: 0n,
-                                    Available: 0n,
-                                    Used: 0n,
-                                },
                             },
-                        },
-                    })],
-                }));
-            mongoClient.getUsersBucketCreationDate
-                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(new Error('error getting bucketCreationDate')));
+                        }),
+                    ],
+                }),
+            );
+            mongoClient.getUsersBucketCreationDate.mockImplementation((bucketOwner, bucketName, log, cb) =>
+                cb(new Error('error getting bucketCreationDate')),
+            );
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toEqual(new Error('error getting bucketCreationDate'));
                 done();
@@ -274,32 +298,36 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should not pass if mongo updateBucketCapacityInfo() returns error', done => {
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(null, {
-                    bucketInfos: [BucketInfo.fromObj({
-                        ...testBucketMD,
-                        _capabilities: {
-                            VeeamSOSApi: {
-                                SystemInfo: {
-                                    ProtocolCapabilities: {
-                                        CapacityInfo: true,
+            mongoClient.getBucketInfos.mockImplementation((log, cb) =>
+                cb(null, {
+                    bucketInfos: [
+                        BucketInfo.fromObj({
+                            ...testBucketMD,
+                            _capabilities: {
+                                VeeamSOSApi: {
+                                    SystemInfo: {
+                                        ProtocolCapabilities: {
+                                            CapacityInfo: true,
+                                        },
+                                    },
+                                    CapacityInfo: {
+                                        Capacity: 0n,
+                                        Available: 0n,
+                                        Used: 0n,
                                     },
                                 },
-                                CapacityInfo: {
-                                    Capacity: 0n,
-                                    Available: 0n,
-                                    Used: 0n,
-                                },
                             },
-                        },
-                    })],
-                }));
-            mongoClient.getUsersBucketCreationDate
-                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(null, new Date().toString()));
-            mongoClient.readStorageConsumptionMetrics
-                .mockImplementation((bucketName, log, cb) => cb(null, {}));
-            mongoClient.updateBucketCapacityInfo
-                .mockImplementation((bucketName, bucket, log, cb) => cb(new Error('an error occurred during put bucket CapacityInfo attributes')));
+                        }),
+                    ],
+                }),
+            );
+            mongoClient.getUsersBucketCreationDate.mockImplementation((bucketOwner, bucketName, log, cb) =>
+                cb(null, new Date().toString()),
+            );
+            mongoClient.readStorageConsumptionMetrics.mockImplementation((bucketName, log, cb) => cb(null, {}));
+            mongoClient.updateBucketCapacityInfo.mockImplementation((bucketName, bucket, log, cb) =>
+                cb(new Error('an error occurred during put bucket CapacityInfo attributes')),
+            );
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toEqual(new Error('an error occurred during put bucket CapacityInfo attributes'));
                 done();
@@ -307,10 +335,11 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with empty bucket', done => {
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(null, {
+            mongoClient.getBucketInfos.mockImplementation((log, cb) =>
+                cb(null, {
                     bucketInfos: [],
-                }));
+                }),
+            );
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toBeNull();
                 done();
@@ -318,17 +347,21 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with SOSAPI disabled buckets', done => {
-            mongoClient.readStorageConsumptionMetrics
-                .mockImplementation((bucketName, log, cb) => cb(null, {
+            mongoClient.readStorageConsumptionMetrics.mockImplementation((bucketName, log, cb) =>
+                cb(null, {
                     usedCapacity: { current: 0n, nonCurrent: 0n },
-                }));
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(null, {
-                    bucketInfos: [BucketInfo.fromObj({
-                        ...testBucketMD,
-                        _capabilities: {},
-                    })],
-                }));
+                }),
+            );
+            mongoClient.getBucketInfos.mockImplementation((log, cb) =>
+                cb(null, {
+                    bucketInfos: [
+                        BucketInfo.fromObj({
+                            ...testBucketMD,
+                            _capabilities: {},
+                        }),
+                    ],
+                }),
+            );
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toBeNull();
                 done();
@@ -336,34 +369,38 @@ describe('DataReport::collectBucketMetricsAndUpdateBucketCapacityInfo', () => {
         });
 
         test('should pass with SOSAPI enabled buckets and update bucket md', done => {
-            mongoClient.readStorageConsumptionMetrics
-                .mockImplementation((bucketName, log, cb) => cb(null, {
+            mongoClient.readStorageConsumptionMetrics.mockImplementation((bucketName, log, cb) =>
+                cb(null, {
                     usedCapacity: { current: 0n, nonCurrent: 0n },
-                }));
-            mongoClient.getBucketInfos
-                .mockImplementation((log, cb) => cb(null, {
-                    bucketInfos: [BucketInfo.fromObj({
-                        ...testBucketMD,
-                        _capabilities: {
-                            VeeamSOSApi: {
-                                SystemInfo: {
-                                    ProtocolCapabilities: {
-                                        CapacityInfo: true,
+                }),
+            );
+            mongoClient.getBucketInfos.mockImplementation((log, cb) =>
+                cb(null, {
+                    bucketInfos: [
+                        BucketInfo.fromObj({
+                            ...testBucketMD,
+                            _capabilities: {
+                                VeeamSOSApi: {
+                                    SystemInfo: {
+                                        ProtocolCapabilities: {
+                                            CapacityInfo: true,
+                                        },
+                                    },
+                                    CapacityInfo: {
+                                        Capacity: 0n,
+                                        Available: 0n,
+                                        Used: 0n,
                                     },
                                 },
-                                CapacityInfo: {
-                                    Capacity: 0n,
-                                    Available: 0n,
-                                    Used: 0n,
-                                },
                             },
-                        },
-                    })],
-                }));
-            mongoClient.getUsersBucketCreationDate
-                .mockImplementation((bucketOwner, bucketName, log, cb) => cb(null, new Date().toString()));
-            mongoClient.updateBucketCapacityInfo
-                .mockImplementation((bucketName, bucket, log, cb) => cb(null));
+                        }),
+                    ],
+                }),
+            );
+            mongoClient.getUsersBucketCreationDate.mockImplementation((bucketOwner, bucketName, log, cb) =>
+                cb(null, new Date().toString()),
+            );
+            mongoClient.updateBucketCapacityInfo.mockImplementation((bucketName, bucket, log, cb) => cb(null));
             return collectBucketMetricsAndUpdateBucketCapacityInfo(mongoClient, logger, err => {
                 expect(err).toBeNull();
                 expect(mongoClient.updateBucketCapacityInfo).toHaveBeenCalled();

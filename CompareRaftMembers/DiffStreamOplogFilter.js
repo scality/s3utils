@@ -62,11 +62,12 @@ class DiffStreamOplogFilter extends stream.Transform {
         const maxRetryDelayMs = userMaxRetryDelayMs || DEFAULT_MAX_RETRY_DELAY_MS;
         this.retryParams = {
             times: 20,
-            interval: retryCount => Math.min(
-                // the first retry comes as "retryCount=2", hence substract 2
-                retryDelayMs * (2 ** (retryCount - 2)),
-                maxRetryDelayMs,
-            ),
+            interval: retryCount =>
+                Math.min(
+                    // the first retry comes as "retryCount=2", hence substract 2
+                    retryDelayMs * 2 ** (retryCount - 2),
+                    maxRetryDelayMs,
+                ),
         };
         this.bucketNameToRaftSessionId = {};
         this._initRaftOplogStreams(params);
@@ -77,10 +78,7 @@ class DiffStreamOplogFilter extends stream.Transform {
     }
 
     _initRaftOplogStreams(params) {
-        const {
-            bucketdHost, bucketdPort,
-            excludeFromCseqs,
-        } = params;
+        const { bucketdHost, bucketdPort, excludeFromCseqs } = params;
 
         this.raftSessionStates = {};
         for (const rsId of Object.keys(excludeFromCseqs)) {
@@ -190,26 +188,29 @@ class DiffStreamOplogFilter extends stream.Transform {
     }
 
     _requestWrapper(reqParams, cb) {
-        const req = http.request({
-            hostname: this.bucketdHost,
-            port: this.bucketdPort,
-            agent: httpAgent,
-            ...reqParams,
-        }, res => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.once('end', () => {
-                if (res.statusCode === 404) {
-                    return cb();
-                }
-                const body = chunks.join('');
-                if (res.statusCode !== 200) {
-                    return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
-                }
-                return cb(null, { statusCode: 200, body });
-            });
-            res.once('error', err => cb(err));
-        });
+        const req = http.request(
+            {
+                hostname: this.bucketdHost,
+                port: this.bucketdPort,
+                agent: httpAgent,
+                ...reqParams,
+            },
+            res => {
+                const chunks = [];
+                res.on('data', chunk => chunks.push(chunk));
+                res.once('end', () => {
+                    if (res.statusCode === 404) {
+                        return cb();
+                    }
+                    const body = chunks.join('');
+                    if (res.statusCode !== 200) {
+                        return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
+                    }
+                    return cb(null, { statusCode: 200, body });
+                });
+                res.once('error', err => cb(err));
+            },
+        );
         req.once('error', err => cb(err));
         req.end();
     }
@@ -221,10 +222,14 @@ class DiffStreamOplogFilter extends stream.Transform {
         }
         return async.retry(
             this.retryParams,
-            done => this._requestWrapper({
-                method: 'GET',
-                path: `/_/buckets/${bucketName}/id`,
-            }, done),
+            done =>
+                this._requestWrapper(
+                    {
+                        method: 'GET',
+                        path: `/_/buckets/${bucketName}/id`,
+                    },
+                    done,
+                ),
             (err, response) => {
                 if (err) {
                     // error after retries

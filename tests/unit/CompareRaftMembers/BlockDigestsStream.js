@@ -12,12 +12,8 @@ describe('BlockDigestsStream', () => {
             {
                 desc: 'one item',
                 blockSize: 4,
-                input: [
-                    { key: 'key1', value: 'value1' },
-                ],
-                output: [
-                    { size: 1, lastKey: 'key1', digest: 'd4e3b2f94f165f3310fb12cf714146c4' },
-                ],
+                input: [{ key: 'key1', value: 'value1' }],
+                output: [{ size: 1, lastKey: 'key1', digest: 'd4e3b2f94f165f3310fb12cf714146c4' }],
             },
             {
                 desc: '4 items',
@@ -28,9 +24,7 @@ describe('BlockDigestsStream', () => {
                     { key: 'key3', value: 'value3' },
                     { key: 'key4', value: 'value4' },
                 ],
-                output: [
-                    { size: 4, lastKey: 'key4', digest: 'c082e6a395e8977b97cd5fa04dc18149' },
-                ],
+                output: [{ size: 4, lastKey: 'key4', digest: 'c082e6a395e8977b97cd5fa04dc18149' }],
             },
             {
                 desc: '5 items',
@@ -113,9 +107,7 @@ describe('BlockDigestsStream', () => {
                     }
                     return input;
                 },
-                output: [
-                    { size: 5000, lastKey: 'key4999', digest: 'b3c7724f5128a72483c5e6e2b1b27a0c' },
-                ],
+                output: [{ size: 5000, lastKey: 'key4999', digest: 'b3c7724f5128a72483c5e6e2b1b27a0c' }],
             },
         ].forEach(testCase => {
             let input;
@@ -124,31 +116,32 @@ describe('BlockDigestsStream', () => {
             } else {
                 input = testCase.input;
             }
-            test(`with input of ${testCase.desc} yielding ${testCase.output.length} `
-            + `blocks with blockSize=${testCase.blockSize}`, done => {
-                const output = [];
-                const rbs = new BlockDigestsStream({
-                    blockSize: testCase.blockSize,
-                    hashAlgorithm: 'md5',
-                });
-                rbs
-                    .on('data', data => {
+            test(
+                `with input of ${testCase.desc} yielding ${testCase.output.length} ` +
+                    `blocks with blockSize=${testCase.blockSize}`,
+                done => {
+                    const output = [];
+                    const rbs = new BlockDigestsStream({
+                        blockSize: testCase.blockSize,
+                        hashAlgorithm: 'md5',
+                    });
+                    rbs.on('data', data => {
                         output.push(data);
                     })
-                    .on('end', () => {
-                        expect(output).toEqual(testCase.output);
-                        done();
-                    })
-                    .on('error', done);
-                input.forEach(item => {
-                    rbs.write(item);
-                    if (testCase.flushAtKeys
-                        && testCase.flushAtKeys.includes(item.key)) {
-                        rbs.flush();
-                    }
-                });
-                rbs.end();
-            });
+                        .on('end', () => {
+                            expect(output).toEqual(testCase.output);
+                            done();
+                        })
+                        .on('error', done);
+                    input.forEach(item => {
+                        rbs.write(item);
+                        if (testCase.flushAtKeys && testCase.flushAtKeys.includes(item.key)) {
+                            rbs.flush();
+                        }
+                    });
+                    rbs.end();
+                },
+            );
         });
     });
 });

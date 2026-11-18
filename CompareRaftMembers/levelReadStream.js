@@ -11,21 +11,27 @@ class LevelReadStream extends Readable {
     }
 
     _read() {
-        this.dbIterator.next().then(entry => {
-            if (this.destroyed) {
-                return;
-            }
-            if (entry === undefined) {
-                this.push(null);
-            } else {
-                const [key, value] = entry;
-                this.push({ key, value });
-            }
-        }, err => this.destroy(err));
+        this.dbIterator.next().then(
+            entry => {
+                if (this.destroyed) {
+                    return;
+                }
+                if (entry === undefined) {
+                    this.push(null);
+                } else {
+                    const [key, value] = entry;
+                    this.push({ key, value });
+                }
+            },
+            err => this.destroy(err),
+        );
     }
 
     _destroy(err, callback) {
-        this.dbIterator.close().then(() => callback(err), closeErr => callback(err || closeErr));
+        this.dbIterator.close().then(
+            () => callback(err),
+            closeErr => callback(err || closeErr),
+        );
     }
 }
 

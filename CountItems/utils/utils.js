@@ -1,6 +1,6 @@
 function consolidateDataMetrics(target, source) {
     let resTarget = {};
-    if (target && (target instanceof Object)) {
+    if (target && target instanceof Object) {
         resTarget = {
             usedCapacity: target.usedCapacity,
             objectCount: target.objectCount,
@@ -69,15 +69,27 @@ function consolidateDataMetrics(target, source) {
     }
 
     resTarget.usedCapacity.current += usedCapacity
-        ? BigInt(usedCapacity._currentCold) + BigInt(usedCapacity._currentRestored) + BigInt(usedCapacity._currentRestoring)
-        + BigInt(usedCapacity._incompleteMPUParts) : 0n;
+        ? BigInt(usedCapacity._currentCold) +
+          BigInt(usedCapacity._currentRestored) +
+          BigInt(usedCapacity._currentRestoring) +
+          BigInt(usedCapacity._incompleteMPUParts)
+        : 0n;
     resTarget.usedCapacity.nonCurrent += usedCapacity
-        ? BigInt(usedCapacity._nonCurrentCold) + BigInt(usedCapacity._nonCurrentRestored) + BigInt(usedCapacity._nonCurrentRestoring) : 0n;
+        ? BigInt(usedCapacity._nonCurrentCold) +
+          BigInt(usedCapacity._nonCurrentRestored) +
+          BigInt(usedCapacity._nonCurrentRestoring)
+        : 0n;
     resTarget.objectCount.current += objectCount
-        ? BigInt(objectCount._currentCold) + BigInt(objectCount._currentRestored) + BigInt(objectCount._currentRestoring)
-        + BigInt(objectCount._incompleteMPUUploads) : 0n;
+        ? BigInt(objectCount._currentCold) +
+          BigInt(objectCount._currentRestored) +
+          BigInt(objectCount._currentRestoring) +
+          BigInt(objectCount._incompleteMPUUploads)
+        : 0n;
     resTarget.objectCount.nonCurrent += objectCount
-        ? BigInt(objectCount._nonCurrentCold) + BigInt(objectCount._nonCurrentRestored) + BigInt(objectCount._nonCurrentRestoring) : 0n;
+        ? BigInt(objectCount._nonCurrentCold) +
+          BigInt(objectCount._nonCurrentRestored) +
+          BigInt(objectCount._nonCurrentRestoring)
+        : 0n;
 
     return resTarget;
 }

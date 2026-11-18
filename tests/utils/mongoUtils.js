@@ -1,9 +1,6 @@
-
 const mongoMemoryServerParams = {
     debug: true,
-    instanceOpts: [
-        { port: 27018 },
-    ],
+    instanceOpts: [{ port: 27018 }],
     replSet: {
         name: 'customSetName',
         count: 1,
@@ -13,12 +10,9 @@ const mongoMemoryServerParams = {
 };
 
 function createMongoParamsFromMongoMemoryRepl(repl) {
-    const {
-        ip, port, dbName, replSet,
-    } = repl.servers[0].instanceInfo;
+    const { ip, port, dbName, replSet } = repl.servers[0].instanceInfo;
     return {
-        replicaSetHosts:
-            `${ip}:${port}`,
+        replicaSetHosts: `${ip}:${port}`,
         writeConcern: 'majority',
         replicaSet: replSet,
         readPreference: 'primary',

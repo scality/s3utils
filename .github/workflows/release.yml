@@ -8,7 +8,7 @@ on:
         description: 'Tag to be released'
         required: true
       prerelease:
-        description: "Is the release a prerelease? (true / false)"
+        description: 'Is the release a prerelease? (true / false)'
         default: 'false'
         required: false
 

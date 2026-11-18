@@ -3,6 +3,8 @@ const stream = require('stream');
 
 const { versioning } = require('@scality/arsenal');
 
+const { DbPrefixes } = versioning.VersioningConstants;
+
 const DBListStream = require('../../../CompareRaftMembers/DBListStream');
 
 class MockDBStream extends stream.Readable {
@@ -44,12 +46,8 @@ describe('DBListStream', () => {
             {
                 desc: 'single master version',
                 dbName: 'storeDb42',
-                dbEntries: [
-                    { key: 'bucket/object', value: '{"foo":"bar"}' },
-                ],
-                listEntries: [
-                    { key: 'bucket/object', value: '{"foo":"bar"}' },
-                ],
+                dbEntries: [{ key: 'bucket/object', value: '{"foo":"bar"}' }],
+                listEntries: [{ key: 'bucket/object', value: '{"foo":"bar"}' }],
             },
             {
                 desc: 'single versioned entry',
@@ -179,7 +177,7 @@ describe('DBListStream', () => {
                         value: '{"versionId":"98345767320611999999RG001  74.519.84"}',
                     },
                     {
-                        key: `bucket/${versioning.VersioningConstants.DbPrefixes.Replay}foobar`,
+                        key: `bucket/${DbPrefixes.Replay}foobar`,
                         value: '{}',
                     },
                     {
@@ -203,11 +201,11 @@ describe('DBListStream', () => {
                 dbName: 'storeDb42',
                 dbEntries: [
                     {
-                        key: `bucket/${versioning.VersioningConstants.DbPrefixes.Master}object`,
+                        key: `bucket/${DbPrefixes.Master}object`,
                         value: '{}',
                     },
                     {
-                        key: `bucket/${versioning.VersioningConstants.DbPrefixes.Version}object\u000098345767320931999999RG001  74.505.48`,
+                        key: `bucket/${DbPrefixes.Version}object\u000098345767320931999999RG001  74.505.48`,
                         value: '{"versionId":"98345767320931999999RG001  74.505.48"}',
                     },
                 ],
@@ -240,7 +238,7 @@ describe('DBListStream', () => {
                         value: '{"versionId":"98345767320611999999RG001  74.519.84"}',
                     },
                     {
-                        key: `${versioning.VersioningConstants.DbPrefixes.Replay}foobar`,
+                        key: `${DbPrefixes.Replay}foobar`,
                         value: '{}',
                     },
                 ],

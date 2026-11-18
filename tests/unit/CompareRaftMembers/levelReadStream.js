@@ -74,9 +74,10 @@ describe('levelReadStream', () => {
     test('should drop an entry read after being destroyed', async () => {
         let resolveNext;
         const iterator = {
-            next: () => new Promise(resolve => {
-                resolveNext = resolve;
-            }),
+            next: () =>
+                new Promise(resolve => {
+                    resolveNext = resolve;
+                }),
             close: jest.fn(async () => {}),
         };
         const readable = levelReadStream({ iterator: () => iterator });

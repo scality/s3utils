@@ -74,10 +74,10 @@ class AggregateLogger {
  */
 class ProxyLoggerCreator {
     /**
-    * @constructor
-    * @param {class} logger - an instance of werelogs.Logger
-    * @returns {class} - a proxy to the logger
-    */
+     * @constructor
+     * @param {class} logger - an instance of werelogs.Logger
+     * @returns {class} - a proxy to the logger
+     */
     constructor(logger) {
         this.logger = logger;
         this.aggregateLogger = new AggregateLogger(env.OBJECT_REPAIR_LOG_INTERVAL);

@@ -1,8 +1,6 @@
 const xml2js = require('xml2js');
 
-const recoverableErrors = new Set([
-    'TimestampParserError',
-]);
+const recoverableErrors = new Set(['TimestampParserError']);
 
 const NO_VALUE = Symbol('noValue');
 
@@ -191,7 +189,6 @@ const commonPrefixKeys = {
     Prefix: safeExtract,
 };
 
-
 /**
  * recoverListing - parse an xml listing response in a safe manner
  * @param {object} resp - response from complete event of listObjectVersions
@@ -218,11 +215,7 @@ function recoverListing(resp, cb) {
             return cb(error);
         }
 
-        const { value: versions, error: verErr } = safeExtractArray(
-            'Version',
-            data.ListVersionsResult,
-            versionKeys,
-        );
+        const { value: versions, error: verErr } = safeExtractArray('Version', data.ListVersionsResult, versionKeys);
         if (verErr) {
             return cb(verErr);
         }

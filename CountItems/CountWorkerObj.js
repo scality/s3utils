@@ -29,51 +29,51 @@ class CountWorkerObj {
                 return;
             }
             switch (data.type) {
-            case 'setup':
-                if (data.status === 'passed') {
-                    this.clientConnected = true;
-                    cb();
-                } else if (data.status === 'failed') {
-                    this.clientConnected = false;
-                    cb(new Error(data.error));
-                }
-                break;
-            case 'teardown':
-                if (data.status === 'passed') {
-                    this.clientConnected = false;
-                    cb();
-                } else if (data.status === 'failed') {
-                    cb(new Error(data.error));
-                }
-                break;
-            case 'count':
-                if (data.status === 'passed') {
-                    cb(null, data.results);
-                } else if (data.status === 'failed') {
-                    cb(new Error(data.error));
-                }
-                break;
-            default:
-                break;
+                case 'setup':
+                    if (data.status === 'passed') {
+                        this.clientConnected = true;
+                        cb();
+                    } else if (data.status === 'failed') {
+                        this.clientConnected = false;
+                        cb(new Error(data.error));
+                    }
+                    break;
+                case 'teardown':
+                    if (data.status === 'passed') {
+                        this.clientConnected = false;
+                        cb();
+                    } else if (data.status === 'failed') {
+                        cb(new Error(data.error));
+                    }
+                    break;
+                case 'count':
+                    if (data.status === 'passed') {
+                        cb(null, data.results);
+                    } else if (data.status === 'failed') {
+                        cb(new Error(data.error));
+                    }
+                    break;
+                default:
+                    break;
             }
         });
         this._worker.on('exit', (code, signal) => {
             this.clientConnected = false;
             this.callbacks.forEach(({ type, callback }) => {
                 switch (type) {
-                case 'readyCheck': // fallthrough
-                case 'setup': // fallthrough
-                case 'count': // fallthrough
-                    if ((code !== null && code !== 0) || signal !== null) {
-                        callback(new Error('unexpectedExit'));
-                    } else {
+                    case 'readyCheck': // fallthrough
+                    case 'setup': // fallthrough
+                    case 'count': // fallthrough
+                        if ((code !== null && code !== 0) || signal !== null) {
+                            callback(new Error('unexpectedExit'));
+                        } else {
+                            callback();
+                        }
+                        break;
+                    case 'teardown': // fallthrough
+                    default:
                         callback();
-                    }
-                    break;
-                case 'teardown': // fallthrough
-                default:
-                    callback();
-                    break;
+                        break;
                 }
             });
             this.callbacks.clear();
@@ -141,8 +141,7 @@ class CountWorkerObj {
     }
 
     kill() {
-        if (this._worker.process
-            && typeof this._worker.process.kill === 'function') {
+        if (this._worker.process && typeof this._worker.process.kill === 'function') {
             this._worker.process.kill();
             return;
         }

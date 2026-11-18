@@ -12,9 +12,7 @@ function fakeResponse(statusCode, body) {
 }
 
 // Build a listing page response body
-function listingPage({
-    versions = [], isTruncated = false, nextKeyMarker = '', nextVersionIdMarker = '',
-} = {}) {
+function listingPage({ versions = [], isTruncated = false, nextKeyMarker = '', nextVersionIdMarker = '' } = {}) {
     return {
         Versions: versions,
         IsTruncated: isTruncated,
@@ -64,9 +62,7 @@ function mockHttpExchanges(exchanges) {
     httpRequest.mockImplementation((method, url, retryParams) => {
         const exchange = exchanges[callIndex];
         if (!exchange) {
-            throw new Error(
-                `Unexpected httpRequest call #${callIndex + 1}: ${method} ${url}`,
-            );
+            throw new Error(`Unexpected httpRequest call #${callIndex + 1}: ${method} ${url}`);
         }
         expect(method).toBe('GET');
         expect(url).toBe(exchange.url);
@@ -87,14 +83,14 @@ function mockHttpExchanges(exchanges) {
 // readable without repeating the concatenation logic inline.
 // ---------------------------------------------------------------------------
 
-function listingUrl({
-    maxKeys = 1000, prefix = '', keyMarker = '', versionIdMarker = '',
-} = {}) {
-    return `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}`
-        + `?listingType=DelimiterVersions&maxKeys=${maxKeys}${
+function listingUrl({ maxKeys = 1000, prefix = '', keyMarker = '', versionIdMarker = '' } = {}) {
+    return (
+        `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}` +
+        `?listingType=DelimiterVersions&maxKeys=${maxKeys}${
             prefix ? `&prefix=${encodeURIComponent(prefix)}` : ''
-        }&keyMarker=${encodeURIComponent(keyMarker)}`
-        + `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`;
+        }&keyMarker=${encodeURIComponent(keyMarker)}` +
+        `&versionIdMarker=${encodeURIComponent(versionIdMarker)}`
+    );
 }
 
 function objectUrl(key, versionId) {
@@ -124,10 +120,7 @@ describe('listVersions', () => {
                     url: listingUrl(),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key1', 'vid1'),
-                            versionEntry('key2', 'vid2'),
-                        ],
+                        versions: [versionEntry('key1', 'vid1'), versionEntry('key2', 'vid2')],
                     }),
                 },
             ]);
@@ -153,9 +146,11 @@ describe('listVersions', () => {
                 },
             ]);
 
-            const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET, {
-                pageSize: 42,
-            }));
+            const items = await collectAll(
+                listVersions(BUCKETD_HOSTPORT, BUCKET, {
+                    pageSize: 42,
+                }),
+            );
             mock.assertAllConsumed();
 
             expect(items).toHaveLength(0);
@@ -172,9 +167,11 @@ describe('listVersions', () => {
                 },
             ]);
 
-            const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET, {
-                prefix: 'some/prefix/',
-            }));
+            const items = await collectAll(
+                listVersions(BUCKETD_HOSTPORT, BUCKET, {
+                    prefix: 'some/prefix/',
+                }),
+            );
             mock.assertAllConsumed();
 
             expect(items).toHaveLength(0);
@@ -192,10 +189,12 @@ describe('listVersions', () => {
                 },
             ]);
 
-            const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET, {
-                keyMarker: 'a/key',
-                versionIdMarker: 'a version',
-            }));
+            const items = await collectAll(
+                listVersions(BUCKETD_HOSTPORT, BUCKET, {
+                    keyMarker: 'a/key',
+                    versionIdMarker: 'a version',
+                }),
+            );
             mock.assertAllConsumed();
 
             expect(items).toHaveLength(0);
@@ -209,10 +208,7 @@ describe('listVersions', () => {
                     }),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key1', 'vid1'),
-                            versionEntry('key2', 'vid2'),
-                        ],
+                        versions: [versionEntry('key1', 'vid1'), versionEntry('key2', 'vid2')],
                         isTruncated: true,
                         nextKeyMarker: 'key2',
                         nextVersionIdMarker: 'vid2',
@@ -226,17 +222,17 @@ describe('listVersions', () => {
                     }),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key3', 'vid3'),
-                        ],
+                        versions: [versionEntry('key3', 'vid3')],
                     }),
                 },
             ]);
 
-            const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET, {
-                pageSize: 2,
-                maxItems: 3,
-            }));
+            const items = await collectAll(
+                listVersions(BUCKETD_HOSTPORT, BUCKET, {
+                    pageSize: 2,
+                    maxItems: 3,
+                }),
+            );
             mock.assertAllConsumed();
 
             expect(items).toHaveLength(3);
@@ -258,12 +254,14 @@ describe('listVersions', () => {
                 },
             ]);
 
-            const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET, {
-                retry: {
-                    times: 5,
-                    interval: 5000,
-                },
-            }));
+            const items = await collectAll(
+                listVersions(BUCKETD_HOSTPORT, BUCKET, {
+                    retry: {
+                        times: 5,
+                        interval: 5000,
+                    },
+                }),
+            );
             mock.assertAllConsumed();
 
             expect(items).toHaveLength(0);
@@ -277,23 +275,16 @@ describe('listVersions', () => {
                     url: listingUrl(),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key1', 'vid1'),
-                            versionEntry('key2', 'vid2', { location: undefined }),
-                        ],
+                        versions: [versionEntry('key1', 'vid1'), versionEntry('key2', 'vid2', { location: undefined })],
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2`
-                        + '?versionId=vid2',
+                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2?versionId=vid2`,
                     status: 200,
                     body: {
                         'content-length': 1024,
                         'versionId': 'vid2',
-                        'location': [
-                            { key: 'sproxyd-key-1' },
-                            { key: 'sproxyd-key-2' },
-                        ],
+                        'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                     },
                 },
             ]);
@@ -307,10 +298,7 @@ describe('listVersions', () => {
                 key: 'key2',
                 versionId: 'vid2',
                 value: {
-                    location: [
-                        { key: 'sproxyd-key-1' },
-                        { key: 'sproxyd-key-2' },
-                    ],
+                    location: [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                 },
             });
         });
@@ -321,15 +309,11 @@ describe('listVersions', () => {
                     url: listingUrl(),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key1', 'vid1'),
-                            versionEntry('key2', 'vid2', { location: undefined }),
-                        ],
+                        versions: [versionEntry('key1', 'vid1'), versionEntry('key2', 'vid2', { location: undefined })],
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2`
-                        + '?versionId=vid2',
+                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2?versionId=vid2`,
                     status: 404,
                 },
             ]);
@@ -390,10 +374,7 @@ describe('listVersions', () => {
                         status: 200,
                         body: {
                             'content-length': 1024,
-                            'location': [
-                                { key: 'sproxyd-key-1' },
-                                { key: 'sproxyd-key-2' },
-                            ],
+                            'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                         },
                     },
                 ]);
@@ -406,10 +387,7 @@ describe('listVersions', () => {
                     key: 'key1',
                     versionId: 'null',
                     value: {
-                        location: [
-                            { key: 'sproxyd-key-1' },
-                            { key: 'sproxyd-key-2' },
-                        ],
+                        location: [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                     },
                 });
             });
@@ -434,10 +412,7 @@ describe('listVersions', () => {
                         body: {
                             'content-length': 1024,
                             'versionId': 'newvid',
-                            'location': [
-                                { key: 'sproxyd-key-1' },
-                                { key: 'sproxyd-key-2' },
-                            ],
+                            'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                         },
                     },
                 ]);
@@ -466,17 +441,13 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 200,
                         body: {
                             'content-length': 1024,
                             'versionId': 'vid1',
                             'isNull': true,
-                            'location': [
-                                { key: 'sproxyd-key-1' },
-                                { key: 'sproxyd-key-2' },
-                            ],
+                            'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                         },
                     },
                 ]);
@@ -489,10 +460,7 @@ describe('listVersions', () => {
                     key: 'key1',
                     versionId: 'vid1',
                     value: {
-                        location: [
-                            { key: 'sproxyd-key-1' },
-                            { key: 'sproxyd-key-2' },
-                        ],
+                        location: [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                     },
                 });
             });
@@ -513,8 +481,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -524,10 +491,7 @@ describe('listVersions', () => {
                             'content-length': 1024,
                             'versionId': 'vid1',
                             'isNull': true,
-                            'location': [
-                                { key: 'sproxyd-key-1' },
-                                { key: 'sproxyd-key-2' },
-                            ],
+                            'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                         },
                     },
                 ]);
@@ -540,10 +504,7 @@ describe('listVersions', () => {
                     key: 'key1',
                     versionId: 'vid1',
                     value: {
-                        location: [
-                            { key: 'sproxyd-key-1' },
-                            { key: 'sproxyd-key-2' },
-                        ],
+                        location: [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                     },
                 });
             });
@@ -564,8 +525,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -578,17 +538,13 @@ describe('listVersions', () => {
                         },
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=null',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=null`,
                         status: 200,
                         body: {
                             'content-length': 1024,
                             'versionId': 'vid1',
                             'isNull': true,
-                            'location': [
-                                { key: 'sproxyd-key-1' },
-                                { key: 'sproxyd-key-2' },
-                            ],
+                            'location': [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                         },
                     },
                 ]);
@@ -601,10 +557,7 @@ describe('listVersions', () => {
                     key: 'key1',
                     versionId: 'vid1',
                     value: {
-                        location: [
-                            { key: 'sproxyd-key-1' },
-                            { key: 'sproxyd-key-2' },
-                        ],
+                        location: [{ key: 'sproxyd-key-1' }, { key: 'sproxyd-key-2' }],
                     },
                 });
             });
@@ -625,8 +578,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -634,8 +586,7 @@ describe('listVersions', () => {
                         status: 404,
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1`
-                            + '?versionId=null',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=null`,
                         status: 404,
                     },
                 ]);
@@ -652,21 +603,25 @@ describe('listVersions', () => {
         test('throws when listing page returns non-200 status', async () => {
             httpRequest.mockResolvedValueOnce(fakeResponse(500));
 
-            await expect(collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET)))
-                .rejects.toThrow('returned status 500');
+            await expect(collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET))).rejects.toThrow('returned status 500');
         });
 
         test('skips entries with malformed (non-JSON) metadata in listing response', async () => {
-            httpRequest.mockResolvedValueOnce(fakeResponse(200, listingPage({
-                versions: [
-                    versionEntry('key1', 'vid1'),
-                    {
-                        key: 'key2',
-                        versionId: 'vid2',
-                        value: '{NOTJSON}',
-                    },
-                ],
-            })));
+            httpRequest.mockResolvedValueOnce(
+                fakeResponse(
+                    200,
+                    listingPage({
+                        versions: [
+                            versionEntry('key1', 'vid1'),
+                            {
+                                key: 'key2',
+                                versionId: 'vid2',
+                                value: '{NOTJSON}',
+                            },
+                        ],
+                    }),
+                ),
+            );
 
             const items = await collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET));
             expect(items).toHaveLength(1);
@@ -685,21 +640,17 @@ describe('listVersions', () => {
                     url: listingUrl(),
                     status: 200,
                     body: listingPage({
-                        versions: [
-                            versionEntry('key1', 'vid1'),
-                            versionEntry('key2', 'vid2', { location: undefined }),
-                        ],
+                        versions: [versionEntry('key1', 'vid1'), versionEntry('key2', 'vid2', { location: undefined })],
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2`
-                        + '?versionId=vid2',
+                    url: objectUrl('key2', 'vid2'),
                     status: 503,
                 },
             ]);
 
-            await expect(collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET)))
-                .rejects.toThrow('returned status 503');
+            await expect(collectAll(listVersions(BUCKETD_HOSTPORT, BUCKET))).rejects.toThrow('returned status 503');
+            mock.assertAllConsumed();
         });
     });
 });

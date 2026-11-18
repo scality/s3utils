@@ -3,7 +3,6 @@ rule_files:
   - alerts.rendered.yaml
 
 tests:
-
   - name: Count Items CronJob Tests
     interval: 1m
     input_series:

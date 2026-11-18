@@ -17,25 +17,16 @@ const levelReadStream = require('./levelReadStream');
 const DEFAULT_PARALLEL_SCANS = 4;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
 
-const {
-    BUCKETD_HOSTPORT,
-    DATABASES,
-    DIFF_OUTPUT_FILE,
-    LISTING_DIGESTS_INPUT_DIR,
-} = process.env;
+const { BUCKETD_HOSTPORT, DATABASES, DIFF_OUTPUT_FILE, LISTING_DIGESTS_INPUT_DIR } = process.env;
 
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
+const LOG_PROGRESS_INTERVAL =
+    (process.env.LOG_PROGRESS_INTERVAL && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10)) ||
+    DEFAULT_LOG_PROGRESS_INTERVAL;
 
-const PARALLEL_SCANS = (
-    process.env.PARALLEL_SCANS
-        && Number.parseInt(process.env.PARALLEL_SCANS, 10))
-      || DEFAULT_PARALLEL_SCANS;
+const PARALLEL_SCANS =
+    (process.env.PARALLEL_SCANS && Number.parseInt(process.env.PARALLEL_SCANS, 10)) || DEFAULT_PARALLEL_SCANS;
 
-const EXCLUDE_FROM_CSEQS = process.env.EXCLUDE_FROM_CSEQS
-      && JSON.parse(process.env.EXCLUDE_FROM_CSEQS);
+const EXCLUDE_FROM_CSEQS = process.env.EXCLUDE_FROM_CSEQS && JSON.parse(process.env.EXCLUDE_FROM_CSEQS);
 
 const USAGE = `
 followerDiff.js
@@ -137,10 +128,7 @@ function logProgress(message) {
     log.info(message, status);
 }
 
-setInterval(
-    () => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000,
-);
+setInterval(() => logProgress('progress update'), LOG_PROGRESS_INTERVAL * 1000);
 
 // Output a byte stream of newline-separated JSON entries from input
 // streamed objects + update metrics
@@ -174,13 +162,10 @@ if (EXCLUDE_FROM_CSEQS) {
         bucketdPort: BUCKETD_PORT,
         excludeFromCseqs: EXCLUDE_FROM_CSEQS,
     });
-    diffStreamsSink
-        .pipe(new JSONLStream())
-        .pipe(DIFF_OUTPUT_STREAM);
+    diffStreamsSink.pipe(new JSONLStream()).pipe(DIFF_OUTPUT_STREAM);
 } else {
     diffStreamsSink = new JSONLStream();
-    diffStreamsSink
-        .pipe(DIFF_OUTPUT_STREAM);
+    diffStreamsSink.pipe(DIFF_OUTPUT_STREAM);
 }
 
 let digestsDb;
@@ -191,10 +176,13 @@ if (LISTING_DIGESTS_INPUT_DIR) {
 // classic-level opens lazily: open explicitly so that a missing database fails the scan
 function openDb(dbPath, cb) {
     const db = new ClassicLevel(dbPath, { createIfMissing: false });
-    db.open().then(() => cb(null, db), err => {
-        log.error('unable to open database', { dbPath, error: (err.cause || err).message });
-        cb(err);
-    });
+    db.open().then(
+        () => cb(null, db),
+        err => {
+            log.error('unable to open database', { dbPath, error: (err.cause || err).message });
+            cb(err);
+        },
+    );
 }
 
 function streamDbDiff(db, dbPath, cb) {
@@ -215,15 +203,10 @@ function streamDbDiff(db, dbPath, cb) {
         cb(err);
     });
 
-    dbRawStream
-        .on('error', done)
-        .pipe(dbListStream)
-        .on('error', done)
-        .pipe(diffStream);
-    dbListStream
-        .on('data', () => {
-            status.keysScanned += 1;
-        });
+    dbRawStream.on('error', done).pipe(dbListStream).on('error', done).pipe(diffStream);
+    dbListStream.on('data', () => {
+        status.keysScanned += 1;
+    });
     diffStream
         .on('data', data => {
             if (!diffStreamsSink.write(data)) {
@@ -243,52 +226,60 @@ function scanDb(dbPath, cb) {
         if (err) {
             return cb(err);
         }
-        return streamDbDiff(db, dbPath, streamErr => db.close().then(
-            () => cb(streamErr),
-            closeErr => cb(streamErr || closeErr),
-        ));
+        return streamDbDiff(db, dbPath, streamErr =>
+            db.close().then(
+                () => cb(streamErr),
+                closeErr => cb(streamErr || closeErr),
+            ),
+        );
     });
 }
 
 function main() {
     log.info('starting scan');
-    async.series([
-        // classic-level opens lazily: open explicitly to fail early on a missing digests database
-        done => {
-            if (!digestsDb) {
-                return done();
+    async.series(
+        [
+            // classic-level opens lazily: open explicitly to fail early on a missing digests database
+            done => {
+                if (!digestsDb) {
+                    return done();
+                }
+                return digestsDb.open().then(
+                    () => done(),
+                    err => {
+                        log.error('unable to open listing digests database', {
+                            path: LISTING_DIGESTS_INPUT_DIR,
+                            error: (err.cause || err).message,
+                        });
+                        done(err);
+                    },
+                );
+            },
+            done => async.eachLimit(DATABASES_LIST, PARALLEL_SCANS, scanDb, done),
+            done => {
+                if (digestsDb) {
+                    digestsDb.close().then(() => done(), done);
+                } else {
+                    done();
+                }
+            },
+            done => {
+                diffStreamsSink.end();
+                diffStreamsSink.on('finish', done);
+            },
+        ],
+        err => {
+            if (err) {
+                logProgress('error during scan');
+                process.exit(1);
             }
-            return digestsDb.open().then(() => done(), err => {
-                log.error('unable to open listing digests database', {
-                    path: LISTING_DIGESTS_INPUT_DIR,
-                    error: (err.cause || err).message,
-                });
-                done(err);
+            logProgress('completed scan');
+            DIFF_OUTPUT_STREAM.end();
+            DIFF_OUTPUT_STREAM.on('finish', () => {
+                process.exit(0);
             });
         },
-        done => async.eachLimit(DATABASES_LIST, PARALLEL_SCANS, scanDb, done),
-        done => {
-            if (digestsDb) {
-                digestsDb.close().then(() => done(), done);
-            } else {
-                done();
-            }
-        },
-        done => {
-            diffStreamsSink.end();
-            diffStreamsSink.on('finish', done);
-        },
-    ], err => {
-        if (err) {
-            logProgress('error during scan');
-            process.exit(1);
-        }
-        logProgress('completed scan');
-        DIFF_OUTPUT_STREAM.end();
-        DIFF_OUTPUT_STREAM.on('finish', () => {
-            process.exit(0);
-        });
-    });
+    );
 }
 
 main();

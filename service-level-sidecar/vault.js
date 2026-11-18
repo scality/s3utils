@@ -11,20 +11,14 @@ if (env.vaultTls) {
 const vault = new vaultclient.Client(...params);
 
 function _getAccountIdForCanonicalId(canonicalId, log, cb) {
-    vault.getAccounts(
-        null,
-        null,
-        [canonicalId],
-        { reqUid: log.getSerializedUids(), logger: log },
-        (error, res) => {
-            if (error) {
-                log.error('error during request to vault', { error });
-                cb(error);
-                return;
-            }
-            cb(null, res[0]);
-        },
-    );
+    vault.getAccounts(null, null, [canonicalId], { reqUid: log.getSerializedUids(), logger: log }, (error, res) => {
+        if (error) {
+            log.error('error during request to vault', { error });
+            cb(error);
+            return;
+        }
+        cb(null, res[0]);
+    });
 }
 
 const getAccountIdForCanonicalId = utils.retryable(_getAccountIdForCanonicalId);

@@ -26,8 +26,7 @@ class StalledEntry {
 }
 
 function objectToEntries(bucketName, cmpDate, data) {
-    if (!data || typeof data !== 'object'
-        || !data.value || typeof data.value !== 'object') {
+    if (!data || typeof data !== 'object' || !data.value || typeof data.value !== 'object') {
         return [];
     }
 
@@ -51,13 +50,7 @@ function objectToEntries(bucketName, cmpDate, data) {
     const storageClasses = data._id.storageClasses.split(',');
     return storageClasses.map(i => {
         const storageClass = i.split(':')[0];
-        return new StalledEntry(
-            bucketName,
-            data._id.key,
-            encode(data._id.versionId),
-            storageClass,
-            true,
-        );
+        return new StalledEntry(bucketName, data._id.key, encode(data._id.versionId), storageClass, true);
     });
 }
 
@@ -86,11 +79,7 @@ class RateLimitingCursor {
 
     _init() {
         this.cursor.on('data', data => {
-            const entries = objectToEntries(
-                this.bucketName,
-                this.cmpDate,
-                data,
-            ) || [];
+            const entries = objectToEntries(this.bucketName, this.cmpDate, data) || [];
 
             if (entries.length === 0) {
                 return;
@@ -119,10 +108,7 @@ class RateLimitingCursor {
                 error: err,
             });
 
-            if (
-                err instanceof MongoError
-                && err.errorLabels.includes('TransientTransactionError')
-            ) {
+            if (err instanceof MongoError && err.errorLabels.includes('TransientTransactionError')) {
                 this.log.info('transient error, continue reading from cursor');
                 return;
             }

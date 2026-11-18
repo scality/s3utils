@@ -108,8 +108,8 @@ if (skipOlderThan && Number.isNaN(skipOlderThan.getTime())) {
     process.exit(1);
 }
 
-const logProgressInterval = (LOG_PROGRESS_INTERVAL
-    && Number.parseInt(LOG_PROGRESS_INTERVAL, 10)) || defaults.LOG_PROGRESS_INTERVAL;
+const logProgressInterval =
+    (LOG_PROGRESS_INTERVAL && Number.parseInt(LOG_PROGRESS_INTERVAL, 10)) || defaults.LOG_PROGRESS_INTERVAL;
 const showClientLogsIfAvailable = SHOW_CLIENT_LOGS_IF_AVAILABLE === '1';
 
 // NOTE: aws rate limit
@@ -121,14 +121,16 @@ const listingWorkers = (LISTING_WORKERS && Number.parseInt(LISTING_WORKERS, 10))
 const bucketMatch = BUCKET_MATCH === '1';
 const destinationStorageType = DST_STORAGE_TYPE || defaults.STORAGE_TYPE;
 const destinationRegion = DST_REGION || defaults.AWS_REGION;
-const destinationRequestWorkers = (DST_MD_REQUEST_WORKERS
-    && Number.parseInt(DST_MD_REQUEST_WORKERS, 10)) || defaults.DESTINATION_MD_REQUEST_WORKERS;
+const destinationRequestWorkers =
+    (DST_MD_REQUEST_WORKERS && Number.parseInt(DST_MD_REQUEST_WORKERS, 10)) || defaults.DESTINATION_MD_REQUEST_WORKERS;
 const compareObjectSize = COMPARE_OBJECT_SIZE === '1';
 const compareObjectAllVersions = COMPARE_OBJECT_ALL_VERSIONS === '1';
 const delimiter = SRC_DELIMITER || defaults.DELIMITER;
-const prefixes = SRC_BUCKET_PREFIXES ? SRC_BUCKET_PREFIXES.split(',')
-    .filter(x => x)
-    .map(x => (x.endsWith(delimiter) ? x : `${x}${delimiter}`)) : [];
+const prefixes = SRC_BUCKET_PREFIXES
+    ? SRC_BUCKET_PREFIXES.split(',')
+          .filter(x => x)
+          .map(x => (x.endsWith(delimiter) ? x : `${x}${delimiter}`))
+    : [];
 
 function logProgress(message, status) {
     log.info(message, status);
@@ -192,16 +194,20 @@ function main() {
         delimiter,
         skipOlderThan: SKIP_OLDER_THAN,
     });
-    verifyReplication(params, err => {
-        if (err) {
-            log.error('an error occurred during replication verification', err);
-            logProgress('last status', status);
-            process.exit(1);
-        } else {
-            logProgress('completed replication verification', status);
-            process.exit(0);
-        }
-    }, status);
+    verifyReplication(
+        params,
+        err => {
+            if (err) {
+                log.error('an error occurred during replication verification', err);
+                logProgress('last status', status);
+                process.exit(1);
+            } else {
+                logProgress('completed replication verification', status);
+                process.exit(0);
+            }
+        },
+        status,
+    );
 }
 
 main();

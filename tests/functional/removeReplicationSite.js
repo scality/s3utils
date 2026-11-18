@@ -1,10 +1,6 @@
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
-const {
-    DeleteObjectCommand,
-    GetBucketReplicationCommand,
-    PutBucketReplicationCommand,
-} = require('@aws-sdk/client-s3');
+const { DeleteObjectCommand, GetBucketReplicationCommand, PutBucketReplicationCommand } = require('@aws-sdk/client-s3');
 const ReplicationSiteRemover = require('../../CRR/ReplicationSiteRemover');
 
 const {
@@ -48,14 +44,17 @@ function sitesOf(replicationInfo) {
 }
 
 function runRemover(account, siteToRemove = WRONG_SITE) {
-    const remover = new ReplicationSiteRemover({
-        buckets: [account.bucketName],
-        siteToRemove,
-        accessKey: account.accountAccessKey,
-        secretKey: account.accountSecretKey,
-        endpoint: `http://${s3Host}:${s3Port}`,
-        dryRun: false,
-    }, log);
+    const remover = new ReplicationSiteRemover(
+        {
+            buckets: [account.bucketName],
+            siteToRemove,
+            accessKey: account.accountAccessKey,
+            secretKey: account.accountSecretKey,
+            endpoint: `http://${s3Host}:${s3Port}`,
+            dryRun: false,
+        },
+        log,
+    );
     return remover.run();
 }
 
@@ -66,8 +65,15 @@ describe('removeReplicationSite', () => {
 
     beforeEach(async () => {
         vaultClient = new vaultclient.Client(
-            iamHost, iamPort, false, undefined, undefined, undefined, undefined,
-            adminAccessKeyId, adminSecretAccessKey,
+            iamHost,
+            iamPort,
+            false,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            adminAccessKeyId,
+            adminSecretAccessKey,
         );
         accountSource = await createTestAccount(vaultClient);
         accountDest = await createTestAccount(vaultClient);
@@ -98,9 +104,12 @@ describe('removeReplicationSite', () => {
 
     it('should clean delete markers', async () => {
         const versionId = await putObject(accountSource, 'obj-1');
-        const { VersionId: markerVersionId } = await accountSource.s3Client.send(new DeleteObjectCommand({
-            Bucket: accountSource.bucketName, Key: 'obj-1',
-        }));
+        const { VersionId: markerVersionId } = await accountSource.s3Client.send(
+            new DeleteObjectCommand({
+                Bucket: accountSource.bucketName,
+                Key: 'obj-1',
+            }),
+        );
         for (const vId of [versionId, markerVersionId]) {
             const repInfo = await getReplicationInfo(accountSource, 'obj-1', vId);
             await setReplicationInfo(accountSource, 'obj-1', vId, withWrongSite(repInfo));
@@ -160,14 +169,19 @@ describe('removeReplicationSite', () => {
         const versionId = await putObject(accountSource, 'obj-1');
         // name the real site in the rule StorageClass
         const { ReplicationConfiguration } = await accountSource.s3Client.send(
-            new GetBucketReplicationCommand({ Bucket: accountSource.bucketName }));
+            new GetBucketReplicationCommand({ Bucket: accountSource.bucketName }),
+        );
         ReplicationConfiguration.Rules[0].Destination.StorageClass = DEFAULT_SITE;
-        await accountSource.s3Client.send(new PutBucketReplicationCommand({
-            Bucket: accountSource.bucketName, ReplicationConfiguration,
-        }));
+        await accountSource.s3Client.send(
+            new PutBucketReplicationCommand({
+                Bucket: accountSource.bucketName,
+                ReplicationConfiguration,
+            }),
+        );
 
-        await expect(runRemover(accountSource, DEFAULT_SITE))
-            .rejects.toThrow(`SITE_TO_REMOVE "${DEFAULT_SITE}" is a destination`);
+        await expect(runRemover(accountSource, DEFAULT_SITE)).rejects.toThrow(
+            `SITE_TO_REMOVE "${DEFAULT_SITE}" is a destination`,
+        );
 
         expect(sitesOf(await getReplicationInfo(accountSource, 'obj-1', versionId))).toEqual([DEFAULT_SITE]);
     }, 60000);

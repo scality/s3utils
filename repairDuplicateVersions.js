@@ -11,9 +11,7 @@ const {
 
 const log = new Logger('s3utils:repairDuplicateVersions');
 
-const {
-    OBJECT_REPAIR_BUCKETD_HOSTPORT, OBJECT_REPAIR_SPROXYD_HOSTPORT,
-} = process.env;
+const { OBJECT_REPAIR_BUCKETD_HOSTPORT, OBJECT_REPAIR_SPROXYD_HOSTPORT } = process.env;
 
 const USAGE = `
 repairDuplicateVersions.js
@@ -56,11 +54,7 @@ if (!OBJECT_REPAIR_SPROXYD_HOSTPORT) {
 }
 
 function main() {
-    async.series([
-        getSproxydAlias,
-        readVerifyLog,
-        repairObjects,
-    ], err => {
+    async.series([getSproxydAlias, readVerifyLog, repairObjects], err => {
         if (err) {
             log.error('an error occurred during repair process', {
                 error: { message: err.message },

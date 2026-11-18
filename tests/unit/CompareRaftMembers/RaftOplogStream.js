@@ -44,10 +44,8 @@ describe('RaftOplogStream', () => {
         const handleGetOplogRequest = (req, res, url) => {
             const qsBegin = url.searchParams.get('begin');
             const qsLimit = url.searchParams.get('limit');
-            const begin = qsBegin !== undefined
-                ? Number.parseInt(qsBegin, 10) : 1;
-            const limit = qsLimit !== undefined
-                ? Number.parseInt(qsLimit, 10) : 10000;
+            const begin = qsBegin !== undefined ? Number.parseInt(qsBegin, 10) : 1;
+            const limit = qsLimit !== undefined ? Number.parseInt(qsLimit, 10) : 10000;
             const oplogToSend = TEST_OPLOG.slice(begin - 1, begin - 1 + limit);
             if (begin < 1 || oplogToSend.length === 0) {
                 res.writeHead(416);
@@ -151,10 +149,10 @@ describe('RaftOplogStream', () => {
                     return undefined;
                 })
                 .on('end', () => {
-                    fail('oplog stream should not emit "end" event');
+                    done(new Error('oplog stream should not emit "end" event'));
                 })
                 .on('error', err => {
-                    fail(`an error occurred: ${err}`);
+                    done(new Error(`an error occurred: ${err}`));
                 });
         });
     });
@@ -169,11 +167,11 @@ describe('RaftOplogStream', () => {
             maxRetryDelayMs: 100,
         });
         oplogStream
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('end', () => {
-                fail('oplog stream should not emit "end" event');
+                done(new Error('oplog stream should not emit "end" event'));
             })
             .on('error', err => {
                 expect(err).toBeTruthy();

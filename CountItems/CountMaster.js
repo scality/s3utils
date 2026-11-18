@@ -24,42 +24,53 @@ class CountMaster {
     }
 
     start(callback) {
-        async.series([
-            next => this.client.setup(err => {
+        async.series(
+            [
+                next =>
+                    this.client.setup(err => {
+                        if (err) {
+                            this.log.error('error connecting to mongodb', {
+                                error: err,
+                            });
+                            return next(err);
+                        }
+                        return next();
+                    }),
+                next => this.manager.setup(next),
+                next =>
+                    this.client.getBucketInfos(this.log, (err, bucketList) => {
+                        if (err) {
+                            this.log.error('error getting bucket list', {
+                                error: err,
+                            });
+                            return next(err);
+                        }
+                        this.log.info('got buckets infos', {
+                            bucketCount: bucketList.bucketCount,
+                        });
+                        this.manager.addWork(bucketList);
+                        return next();
+                    }),
+                next => this.manager.start(next),
+                next =>
+                    this.client.updateStorageConsumptionMetrics(
+                        this.manager.store,
+                        this.manager.dataMetrics,
+                        this.log,
+                        next,
+                    ),
+            ],
+            err => {
                 if (err) {
-                    this.log.error('error connecting to mongodb', {
-                        error: err,
+                    this.log.error('error occurred in count items job', {
+                        error: reshapeExceptionError(err),
+                        method: 'CountMaster::start',
                     });
-                    return next(err);
+                    return this.stop(null, () => callback(err));
                 }
-                return next();
-            }),
-            next => this.manager.setup(next),
-            next => this.client.getBucketInfos(this.log, (err, bucketList) => {
-                if (err) {
-                    this.log.error('error getting bucket list', {
-                        error: err,
-                    });
-                    return next(err);
-                }
-                this.log.info('got buckets infos', {
-                    bucketCount: bucketList.bucketCount,
-                });
-                this.manager.addWork(bucketList);
-                return next();
-            }),
-            next => this.manager.start(next),
-            next => this.client.updateStorageConsumptionMetrics(this.manager.store, this.manager.dataMetrics, this.log, next),
-        ], err => {
-            if (err) {
-                this.log.error('error occurred in count items job', {
-                    error: reshapeExceptionError(err),
-                    method: 'CountMaster::start',
-                });
-                return this.stop(null, () => callback(err));
-            }
-            return callback();
-        });
+                return callback();
+            },
+        );
     }
 }
 

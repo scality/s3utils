@@ -1,6 +1,8 @@
 const { Logger } = require('werelogs');
 const createMongoParams = require('../utils/createMongoParams');
-const { collectBucketMetricsAndUpdateBucketCapacityInfo } = require('./collectBucketMetricsAndUpdateBucketCapacityInfo');
+const {
+    collectBucketMetricsAndUpdateBucketCapacityInfo,
+} = require('./collectBucketMetricsAndUpdateBucketCapacityInfo');
 const S3UtilsMongoClient = require('../utils/S3UtilsMongoClient');
 
 const log = new Logger('s3utils:DataReport');

@@ -28,7 +28,7 @@ class DBListStream extends stream.Transform {
             throw new Error('DBListStream.constructor(): params.dbName must be a string');
         }
         this.dbName = params.dbName;
-        this.isLegacyDb = !(/^storeDb[0-9]+$/.test(this.dbName));
+        this.isLegacyDb = !/^storeDb[0-9]+$/.test(this.dbName);
 
         this.lastMasterKey = null;
         this.lastMasterVersionId = null;
@@ -73,15 +73,13 @@ class DBListStream extends stream.Transform {
             this.lastMasterVersionId = md.versionId;
         } else {
             const masterKey = objectKey.slice(0, vidSepPos);
-            if (masterKey === this.lastMasterKey
-                && md.versionId === this.lastMasterVersionId) {
+            if (masterKey === this.lastMasterKey && md.versionId === this.lastMasterVersionId) {
                 // we have already processed this versioned key as
                 // the master key, so skip it
                 return callback();
             }
         }
-        const versionedKey = vidSepPos === -1 && md.versionId
-            ? `${item.key}\0${md.versionId}` : item.key;
+        const versionedKey = vidSepPos === -1 && md.versionId ? `${item.key}\0${md.versionId}` : item.key;
         if (this.isLegacyDb) {
             this.push({ key: `${bucket}/${versionedKey}`, value });
         } else {

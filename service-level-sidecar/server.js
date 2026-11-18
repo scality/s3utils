@@ -28,7 +28,6 @@ function makeError(statusCode, httpMessage, httpDesc) {
     return err;
 }
 
-
 // Middleware to add request logger
 app.use((req, res, next) => {
     const reqUids = [];
@@ -68,8 +67,6 @@ const actualKeyHash = crypto.createHash('sha512').copy().update(`Bearer ${env.ap
 
 // Any handler mounted under `/api/` requires an Authorization header
 app.use('/api', (req, res, next) => {
-    const key = req.headers.authorization;
-
     // api key isn't present
     if (req.headers.authorization === undefined) {
         req.log.error('request has no api key');
@@ -80,10 +77,7 @@ app.use('/api', (req, res, next) => {
     // timingSafeEquals requires Buffers of equal length for comparison
     // We hash the header value to normalize the length
     // and get a Buffer as a bonus
-    const suppliedKeyHash = crypto
-        .createHash('sha512')
-        .update(req.headers.authorization)
-        .digest();
+    const suppliedKeyHash = crypto.createHash('sha512').update(req.headers.authorization).digest();
 
     // Use timing safe equals to avoid timing attacks
     const valid = crypto.timingSafeEqual(suppliedKeyHash, actualKeyHash);

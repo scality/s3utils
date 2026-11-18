@@ -12,9 +12,7 @@ const PHD_RANGE = [1230, 1240];
 
 function buildItemFromIndex(index, flags) {
     const paddedIndex = `000000${index}`.slice(-6);
-    const key = flags.versionKey
-        ? `key-${paddedIndex}\u0000${DUMMY_VERSION_ID}`
-        : `key-${paddedIndex}`;
+    const key = flags.versionKey ? `key-${paddedIndex}\u0000${DUMMY_VERSION_ID}` : `key-${paddedIndex}`;
     let value;
     if (flags.isPHD) {
         value = { isPHD: true };
@@ -28,8 +26,8 @@ function buildItemFromIndex(index, flags) {
         //
         // - a few empty objects i.e. with a null location
         //
-        const locationHidden = (index >= VERSIONED_RANGE[0] + 1 && index < VERSIONED_RANGE[0] + 5);
-        const emptyObject = (index >= VERSIONED_RANGE[0] + 6 && index < VERSIONED_RANGE[0] + 10);
+        const locationHidden = index >= VERSIONED_RANGE[0] + 1 && index < VERSIONED_RANGE[0] + 5;
+        const emptyObject = index >= VERSIONED_RANGE[0] + 6 && index < VERSIONED_RANGE[0] + 10;
         let location;
         if (emptyObject) {
             location = null;
@@ -59,8 +57,10 @@ function buildTestBucketContents() {
         // introduce master/nonversioned key
         if (i >= PHD_RANGE[0] && i < PHD_RANGE[1]) {
             contents.push(buildItemFromIndex(i, { isPHD: true }));
-        } else if ((i >= VERSIONED_RANGE[0] && i < VERSIONED_RANGE[1])
-                   || (i >= VERSIONING_SUSPENDED_RANGE[0] && i < VERSIONING_SUSPENDED_RANGE[1])) {
+        } else if (
+            (i >= VERSIONED_RANGE[0] && i < VERSIONED_RANGE[1]) ||
+            (i >= VERSIONING_SUSPENDED_RANGE[0] && i < VERSIONING_SUSPENDED_RANGE[1])
+        ) {
             contents.push(buildItemFromIndex(i, { hasVersionId: true }));
         } else {
             contents.push(buildItemFromIndex(i, {}));
@@ -79,10 +79,12 @@ function buildTestBucketContents() {
 }
 
 function buildBucketWithReplayKeysContents() {
-    const contents = [{
-        key: 'foo',
-        value: { location: null },
-    }];
+    const contents = [
+        {
+            key: 'foo',
+            value: { location: null },
+        },
+    ];
     for (let i = 0; i < 3000; ++i) {
         contents.push({
             key: `${versioning.VersioningConstants.DbPrefixes.Replay}replay-key-${`0000${i}`.slice(-4)}`,
@@ -116,32 +118,30 @@ describe('BucketStream', () => {
             }
             let contents;
             let isTruncated;
-            const startIndex = rawContents.findIndex(
-                item => (!marker || item.key > marker),
-            );
+            const startIndex = rawContents.findIndex(item => !marker || item.key > marker);
             if (startIndex === -1) {
                 contents = [];
                 isTruncated = false;
             } else {
                 // limit to 1000 entries returned per page, like bucketd does
                 const endIndex = startIndex + 1000;
-                contents = rawContents
-                    .slice(startIndex, endIndex)
-                    .map(item => {
-                        const { key, value } = item;
-                        const listedValue = { ...value };
-                        if (listedValue.location
-                            && listedValue.location.startsWith('location-hidden')) {
-                            delete listedValue.location;
-                        }
-                        return { key, value: JSON.stringify(listedValue) };
-                    });
-                isTruncated = (endIndex < rawContents.length);
+                contents = rawContents.slice(startIndex, endIndex).map(item => {
+                    const { key, value } = item;
+                    const listedValue = { ...value };
+                    if (listedValue.location && listedValue.location.startsWith('location-hidden')) {
+                        delete listedValue.location;
+                    }
+                    return { key, value: JSON.stringify(listedValue) };
+                });
+                isTruncated = endIndex < rawContents.length;
             }
-            const responseBody = Buffer.from(JSON.stringify({
-                Contents: contents,
-                IsTruncated: isTruncated,
-            }), 'utf8');
+            const responseBody = Buffer.from(
+                JSON.stringify({
+                    Contents: contents,
+                    IsTruncated: isTruncated,
+                }),
+                'utf8',
+            );
             res.writeHead(200, {
                 'Content-Type': 'application/json',
                 'Content-Length': responseBody.byteLength,
@@ -243,9 +243,10 @@ describe('BucketStream', () => {
                     // build the expected listing item from the test
                     // parameters specific to this index
                     const flags = {};
-                    if ((nextIndex >= VERSIONED_RANGE[0] && nextIndex < VERSIONED_RANGE[1])
-                        || (nextIndex >= VERSIONING_SUSPENDED_RANGE[0]
-                            && nextIndex < VERSIONING_SUSPENDED_RANGE[1])) {
+                    if (
+                        (nextIndex >= VERSIONED_RANGE[0] && nextIndex < VERSIONED_RANGE[1]) ||
+                        (nextIndex >= VERSIONING_SUSPENDED_RANGE[0] && nextIndex < VERSIONING_SUSPENDED_RANGE[1])
+                    ) {
                         flags.hasVersionId = true;
                     }
                     // in case where there is a PHD key, we should get the next versioned key

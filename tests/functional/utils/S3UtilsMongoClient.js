@@ -9,14 +9,11 @@ const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { ObjectMDArchive } = require('@scality/arsenal/build/lib/models');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
 const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
-const {
-    testBucketMD, testAccountCanonicalId, testUserBucketInfo, testBucketCreationDate,
-} = require('../../constants');
+const { testBucketMD, testAccountCanonicalId, testUserBucketInfo, testBucketCreationDate } = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 
 const { BucketVersioningKeyFormat } = versioning.VersioningConstants;
-
 
 const variations = [
     { it: '(v0)', vFormat: BucketVersioningKeyFormat.v0 },
@@ -27,7 +24,6 @@ const bucketMD = BucketInfo.fromObj(testBucketMD);
 const BUCKET_NAME = bucketMD.getName();
 const USERSBUCKET = '__usersbucket';
 const BUCKET_CREATE_DATE = new Date(testBucketCreationDate).getTime();
-
 
 describe('S3UtilsMongoClient::getObjectMDStats', () => {
     let client;
@@ -42,17 +38,23 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
         await util.promisify(client.setup.bind(client))();
     });
 
-
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-    ], done));
+    afterAll(done =>
+        async.series(
+            [
+                next => client.close(next),
+                next =>
+                    repl
+                        .stop()
+                        .then(() => next())
+                        .catch(next),
+            ],
+            done,
+        ),
+    );
 
     const versionedBucketMD = {
         ...bucketMD,
-        getOwner: () => (testAccountCanonicalId),
+        getOwner: () => testAccountCanonicalId,
         _versioningConfiguration: {
             Status: 'Enabled',
         },
@@ -85,50 +87,56 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
         variations.forEach(variation => {
             describe(variation.it, () => {
                 beforeEach(done => {
-                    async.series([
-                        next => {
-                            client.defaultBucketKeyFormat = variation.vFormat;
-                            return next();
-                        },
-                        next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
-                        next => {
-                            client.putObject(
-                                USERSBUCKET,
-                                `${bucketMD.getOwner()}${constants.splitter}${BUCKET_NAME}`,
-                                testUserBucketInfo.value,
-                                {
-                                    versioning: false,
-                                    versionId: null,
-                                },
-                                logger,
-                                next,
-                            );
-                        }, // put bucket entry in __usersbuckets
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1 again
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object2Params.key,
-                            object2Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object2
-                    ], done);
+                    async.series(
+                        [
+                            next => {
+                                client.defaultBucketKeyFormat = variation.vFormat;
+                                return next();
+                            },
+                            next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
+                            next => {
+                                client.putObject(
+                                    USERSBUCKET,
+                                    `${bucketMD.getOwner()}${constants.splitter}${BUCKET_NAME}`,
+                                    testUserBucketInfo.value,
+                                    {
+                                        versioning: false,
+                                        versionId: null,
+                                    },
+                                    logger,
+                                    next,
+                                );
+                            }, // put bucket entry in __usersbuckets
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1 again
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object2Params.key,
+                                    object2Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object2
+                        ],
+                        done,
+                    );
                 });
 
                 afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
@@ -315,24 +323,28 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
             const itOnlyInV1 = variation.vFormat === 'v1' ? it : it.skip;
             describe(variation.it, () => {
                 beforeEach(done => {
-                    async.series([
-                        next => {
-                            client.defaultBucketKeyFormat = variation.vFormat;
-                            return next();
-                        },
-                        next => client.createBucket(BUCKET_NAME, versionedBucketMD, logger, next),
-                        next => client.putObject(
-                            USERSBUCKET,
-                            `${versionedBucketMD.getOwner()}${constants.splitter}${BUCKET_NAME}`,
-                            testUserBucketInfo.value,
-                            {
-                                versioning: false,
-                                versionId: null,
+                    async.series(
+                        [
+                            next => {
+                                client.defaultBucketKeyFormat = variation.vFormat;
+                                return next();
                             },
-                            logger,
-                            next,
-                        ),
-                    ], done);
+                            next => client.createBucket(BUCKET_NAME, versionedBucketMD, logger, next),
+                            next =>
+                                client.putObject(
+                                    USERSBUCKET,
+                                    `${versionedBucketMD.getOwner()}${constants.splitter}${BUCKET_NAME}`,
+                                    testUserBucketInfo.value,
+                                    {
+                                        versioning: false,
+                                        versionId: null,
+                                    },
+                                    logger,
+                                    next,
+                                ),
+                        ],
+                        done,
+                    );
                 });
 
                 afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
@@ -484,63 +496,64 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         },
                         stalled: 0,
                     };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1 again
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object2Params.key,
-                            object2Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object2
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            false,
-                            logger,
-                            (err, data) => {
+                    return async.series(
+                        [
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1 again
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object2Params.key,
+                                    object2Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object2
+                        ],
+                        () =>
+                            client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
                                 assert.deepStrictEqual(err, null);
-                                // Compare each section separately to avoid circular reference issues
-                                assert.strictEqual(data.versions.toString(), expected.versions.toString());
-                                assert.strictEqual(data.objects.toString(), expected.objects.toString());
-                                assert.strictEqual(data.stalled, expected.stalled);
+                                return client.getObjectMDStats(BUCKET_NAME, bucketInfo, false, logger, (err, data) => {
+                                    assert.deepStrictEqual(err, null);
+                                    // Compare each section separately to avoid circular reference issues
+                                    assert.strictEqual(data.versions.toString(), expected.versions.toString());
+                                    assert.strictEqual(data.objects.toString(), expected.objects.toString());
+                                    assert.strictEqual(data.stalled, expected.stalled);
 
-                                // Compare dataManaged section
-                                assert.deepStrictEqual(
-                                    JSON.parse(JSON.stringify(data.dataManaged)),
-                                    JSON.parse(JSON.stringify(expected.dataManaged)),
-                                );
-
-                                // Compare dataMetrics sections separately
-                                const sections = ['account', 'bucket', 'location'];
-                                sections.forEach(section => {
+                                    // Compare dataManaged section
                                     assert.deepStrictEqual(
-                                        data.dataMetrics[section],
-                                        expected.dataMetrics[section],
+                                        JSON.parse(JSON.stringify(data.dataManaged)),
+                                        JSON.parse(JSON.stringify(expected.dataManaged)),
                                     );
+
+                                    // Compare dataMetrics sections separately
+                                    const sections = ['account', 'bucket', 'location'];
+                                    sections.forEach(section => {
+                                        assert.deepStrictEqual(
+                                            data.dataMetrics[section],
+                                            expected.dataMetrics[section],
+                                        );
+                                    });
+                                    return done();
                                 });
-                                return done();
-                            },
-                        );
-                    }));
+                            }),
+                    );
                 });
 
                 itOnlyInV1(`Should get correct results with deleteMarker ${variation.it}`, done => {
@@ -690,620 +703,639 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                             },
                         },
                     };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object1 again
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            {
-                                ...object1Params,
-                                'isDeleteMarker': true,
-                                'content-length': 0,
-                            },
-                            versionParams,
-                            logger,
-                            next,
-                        ), // delete object1
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            false,
-                            logger,
-                            (err, data) => {
+                    return async.series(
+                        [
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object1 again
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    {
+                                        ...object1Params,
+                                        'isDeleteMarker': true,
+                                        'content-length': 0,
+                                    },
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // delete object1
+                        ],
+                        () =>
+                            client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
                                 assert.deepStrictEqual(err, null);
-                                assert.deepStrictEqual(data, expected);
-                                return done();
-                            },
-                        );
-                    }));
+                                return client.getObjectMDStats(BUCKET_NAME, bucketInfo, false, logger, (err, data) => {
+                                    assert.deepStrictEqual(err, null);
+                                    assert.deepStrictEqual(data, expected);
+                                    return done();
+                                });
+                            }),
+                    );
                 });
 
-                it('should get correct results with lifecycle replication enabled '
-                    + `and location transient is true ${variation.it}`, done => {
-                    const expected = {
-                        dataManaged: {
-                            locations: {
-                                'us-east-1': { curr: 10, prev: 0 },
-                                'completed': { curr: 10, prev: 0 },
-                            },
-                            total: { curr: 20, prev: 0 },
-                        },
-                        objects: 2,
-                        stalled: 0,
-                        versions: 0,
-                        dataMetrics: {
-                            account: {
-                                [testAccountCanonicalId]: {
-                                    objectCount: {
-                                        current: 2n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 20n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
-                                    },
-                                    locations: {
-                                        'us-east-1': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
-                                        },
-                                        'completed': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
-                                        },
-                                    },
+                it(
+                    'should get correct results with lifecycle replication enabled ' +
+                        `and location transient is true ${variation.it}`,
+                    done => {
+                        const expected = {
+                            dataManaged: {
+                                locations: {
+                                    'us-east-1': { curr: 10, prev: 0 },
+                                    'completed': { curr: 10, prev: 0 },
                                 },
+                                total: { curr: 20, prev: 0 },
                             },
-                            bucket: {
-                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: {
-                                        current: 2n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 20n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
-                                    },
-                                    locations: {
-                                        'us-east-1': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
+                            objects: 2,
+                            stalled: 0,
+                            versions: 0,
+                            dataMetrics: {
+                                account: {
+                                    [testAccountCanonicalId]: {
+                                        objectCount: {
+                                            current: 2n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
                                         },
-                                        'completed': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
+                                        usedCapacity: {
+                                            current: 20n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
+                                        locations: {
+                                            'us-east-1': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
                                             },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
+                                            'completed': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
                                             },
                                         },
                                     },
                                 },
-                            },
-                            location: {
-                                'us-east-1': {
-                                    objectCount: {
-                                        current: 1n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 10n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
+                                bucket: {
+                                    [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
+                                        objectCount: {
+                                            current: 2n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 20n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
+                                        locations: {
+                                            'us-east-1': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
+                                            },
+                                            'completed': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
+                                            },
+                                        },
                                     },
                                 },
-                                'completed': {
-                                    objectCount: {
-                                        current: 1n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
+                                location: {
+                                    'us-east-1': {
+                                        objectCount: {
+                                            current: 1n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 10n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
                                     },
-                                    usedCapacity: {
-                                        current: 10n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
+                                    'completed': {
+                                        objectCount: {
+                                            current: 1n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 10n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
                                     },
                                 },
                             },
-                        },
-                    };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            {
-                                ...object1Params,
-                                replicationInfo: {
-                                    status: 'PENDING',
-                                    backends: [
+                        };
+                        return async.series(
+                            [
+                                next =>
+                                    client.putObject(
+                                        BUCKET_NAME,
+                                        object1Params.key,
                                         {
-                                            status: 'PENDING',
-                                            site: 'not-completed',
+                                            ...object1Params,
+                                            replicationInfo: {
+                                                status: 'PENDING',
+                                                backends: [
+                                                    {
+                                                        status: 'PENDING',
+                                                        site: 'not-completed',
+                                                    },
+                                                    {
+                                                        status: 'COMPLETED',
+                                                        site: 'completed',
+                                                    },
+                                                ],
+                                            },
                                         },
+                                        versionParams,
+                                        logger,
+                                        next,
+                                    ), // object1 with one site pending and one site complete
+                                next =>
+                                    client.putObject(
+                                        BUCKET_NAME,
+                                        object2Params.key,
                                         {
-                                            status: 'COMPLETED',
-                                            site: 'completed',
+                                            ...object2Params,
+                                            replicationInfo: {
+                                                status: 'COMPLETED',
+                                                backends: [
+                                                    {
+                                                        status: 'COMPLETE',
+                                                        site: 'completed',
+                                                    },
+                                                ],
+                                            },
                                         },
-                                    ],
-                                },
-                            },
-                            versionParams,
-                            logger,
-                            next,
-                        ), // object1 with one site pending and one site complete
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object2Params.key,
-                            {
-                                ...object2Params,
-                                replicationInfo: {
-                                    status: 'COMPLETED',
-                                    backends: [
-                                        {
-                                            status: 'COMPLETE',
-                                            site: 'completed',
+                                        versionParams,
+                                        logger,
+                                        next,
+                                    ), // object2 with one site complete
+                            ],
+                            () =>
+                                client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
+                                    assert.deepStrictEqual(err, null);
+                                    return client.getObjectMDStats(
+                                        BUCKET_NAME,
+                                        bucketInfo,
+                                        true,
+                                        logger,
+                                        (err, data) => {
+                                            assert.deepStrictEqual(err, null);
+                                            assert.deepStrictEqual(data, expected);
+                                            return done();
                                         },
-                                    ],
-                                },
-                            },
-                            versionParams,
-                            logger,
-                            next,
-                        ), // object2 with one site complete
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            true,
-                            logger,
-                            (err, data) => {
-                                assert.deepStrictEqual(err, null);
-                                assert.deepStrictEqual(data, expected);
-                                return done();
-                            },
+                                    );
+                                }),
                         );
-                    }));
-                });
+                    },
+                );
 
-                it('should get correct results with lifecycle replication enabled'
-                    + `and location transient is false ${variation.it}`, done => {
-                    const expected = {
-                        dataManaged: {
-                            locations: {
-                                'us-east-1': { curr: 20, prev: 0 },
-                                'completed': { curr: 10, prev: 0 },
-                            },
-                            total: { curr: 30, prev: 0 },
-                        },
-                        objects: 2,
-                        stalled: 0,
-                        versions: 0,
-                        dataMetrics: {
-                            account: {
-                                [testAccountCanonicalId]: {
-                                    objectCount: {
-                                        current: 2n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 20n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
-                                    },
-                                    locations: {
-                                        'us-east-1': {
-                                            objectCount: {
-                                                current: 2n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 20n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
-                                        },
-                                        'completed': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
-                                        },
-                                    },
+                it(
+                    'should get correct results with lifecycle replication enabled ' +
+                        `and location transient is false ${variation.it}`,
+                    done => {
+                        const expected = {
+                            dataManaged: {
+                                locations: {
+                                    'us-east-1': { curr: 20, prev: 0 },
+                                    'completed': { curr: 10, prev: 0 },
                                 },
+                                total: { curr: 30, prev: 0 },
                             },
-                            bucket: {
-                                [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
-                                    objectCount: {
-                                        current: 2n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 20n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
-                                    },
-                                    locations: {
-                                        'us-east-1': {
-                                            objectCount: {
-                                                current: 2n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
-                                            },
-                                            usedCapacity: {
-                                                current: 20n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
-                                            },
+                            objects: 2,
+                            stalled: 0,
+                            versions: 0,
+                            dataMetrics: {
+                                account: {
+                                    [testAccountCanonicalId]: {
+                                        objectCount: {
+                                            current: 2n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
                                         },
-                                        'completed': {
-                                            objectCount: {
-                                                current: 1n,
-                                                deleteMarker: 0n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUUploads: 0n,
+                                        usedCapacity: {
+                                            current: 20n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
+                                        locations: {
+                                            'us-east-1': {
+                                                objectCount: {
+                                                    current: 2n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 20n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
                                             },
-                                            usedCapacity: {
-                                                current: 10n,
-                                                nonCurrent: 0n,
-                                                _currentCold: 0n,
-                                                _nonCurrentCold: 0n,
-                                                _currentRestored: 0n,
-                                                _currentRestoring: 0n,
-                                                _nonCurrentRestored: 0n,
-                                                _nonCurrentRestoring: 0n,
-                                                _incompleteMPUParts: 0n,
+                                            'completed': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
                                             },
                                         },
                                     },
                                 },
-                            },
-                            location: {
-                                'us-east-1': {
-                                    objectCount: {
-                                        current: 2n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
-                                    },
-                                    usedCapacity: {
-                                        current: 20n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
+                                bucket: {
+                                    [`${BUCKET_NAME}_${BUCKET_CREATE_DATE}`]: {
+                                        objectCount: {
+                                            current: 2n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 20n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
+                                        locations: {
+                                            'us-east-1': {
+                                                objectCount: {
+                                                    current: 2n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 20n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
+                                            },
+                                            'completed': {
+                                                objectCount: {
+                                                    current: 1n,
+                                                    deleteMarker: 0n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUUploads: 0n,
+                                                },
+                                                usedCapacity: {
+                                                    current: 10n,
+                                                    nonCurrent: 0n,
+                                                    _currentCold: 0n,
+                                                    _nonCurrentCold: 0n,
+                                                    _currentRestored: 0n,
+                                                    _currentRestoring: 0n,
+                                                    _nonCurrentRestored: 0n,
+                                                    _nonCurrentRestoring: 0n,
+                                                    _incompleteMPUParts: 0n,
+                                                },
+                                            },
+                                        },
                                     },
                                 },
-                                'completed': {
-                                    objectCount: {
-                                        current: 1n,
-                                        deleteMarker: 0n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUUploads: 0n,
+                                location: {
+                                    'us-east-1': {
+                                        objectCount: {
+                                            current: 2n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 20n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
                                     },
-                                    usedCapacity: {
-                                        current: 10n,
-                                        nonCurrent: 0n,
-                                        _currentCold: 0n,
-                                        _nonCurrentCold: 0n,
-                                        _currentRestored: 0n,
-                                        _currentRestoring: 0n,
-                                        _nonCurrentRestored: 0n,
-                                        _nonCurrentRestoring: 0n,
-                                        _incompleteMPUParts: 0n,
+                                    'completed': {
+                                        objectCount: {
+                                            current: 1n,
+                                            deleteMarker: 0n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUUploads: 0n,
+                                        },
+                                        usedCapacity: {
+                                            current: 10n,
+                                            nonCurrent: 0n,
+                                            _currentCold: 0n,
+                                            _nonCurrentCold: 0n,
+                                            _currentRestored: 0n,
+                                            _currentRestoring: 0n,
+                                            _nonCurrentRestored: 0n,
+                                            _nonCurrentRestoring: 0n,
+                                            _incompleteMPUParts: 0n,
+                                        },
                                     },
                                 },
                             },
-                        },
-                    };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            {
-                                ...object1Params,
-                                replicationInfo: {
-                                    status: 'PENDING',
-                                    backends: [
+                        };
+                        return async.series(
+                            [
+                                next =>
+                                    client.putObject(
+                                        BUCKET_NAME,
+                                        object1Params.key,
                                         {
-                                            status: 'PENDING',
-                                            site: 'not-completed',
+                                            ...object1Params,
+                                            replicationInfo: {
+                                                status: 'PENDING',
+                                                backends: [
+                                                    {
+                                                        status: 'PENDING',
+                                                        site: 'not-completed',
+                                                    },
+                                                    {
+                                                        status: 'COMPLETED',
+                                                        site: 'completed',
+                                                    },
+                                                ],
+                                            },
                                         },
+                                        versionParams,
+                                        logger,
+                                        next,
+                                    ), // object1 with one site pending and one site complete
+                                next =>
+                                    client.putObject(
+                                        BUCKET_NAME,
+                                        object2Params.key,
                                         {
-                                            status: 'COMPLETED',
-                                            site: 'completed',
+                                            ...object2Params,
+                                            replicationInfo: {
+                                                status: 'COMPLETED',
+                                                backends: [
+                                                    {
+                                                        status: 'COMPLETE',
+                                                        site: 'completed',
+                                                    },
+                                                ],
+                                            },
                                         },
-                                    ],
-                                },
-                            },
-                            versionParams,
-                            logger,
-                            next,
-                        ), // object1 with one site pending and one site complete
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object2Params.key,
-                            {
-                                ...object2Params,
-                                replicationInfo: {
-                                    status: 'COMPLETED',
-                                    backends: [
-                                        {
-                                            status: 'COMPLETE',
-                                            site: 'completed',
+                                        versionParams,
+                                        logger,
+                                        next,
+                                    ), // object2 with one site complete
+                            ],
+                            () =>
+                                client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
+                                    assert.deepStrictEqual(err, null);
+                                    return client.getObjectMDStats(
+                                        BUCKET_NAME,
+                                        bucketInfo,
+                                        false,
+                                        logger,
+                                        (err, data) => {
+                                            assert.deepStrictEqual(err, null);
+                                            assert.deepStrictEqual(data, expected);
+                                            return done();
                                         },
-                                    ],
-                                },
-                            },
-                            versionParams,
-                            logger,
-                            next,
-                        ), // object2 with one site complete
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            false,
-                            logger,
-                            (err, data) => {
-                                assert.deepStrictEqual(err, null);
-                                assert.deepStrictEqual(data, expected);
-                                return done();
-                            },
+                                    );
+                                }),
                         );
-                    }));
-                });
+                    },
+                );
             });
         });
     });
@@ -1325,13 +1357,16 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
         variations.forEach(variation => {
             describe(variation.it, () => {
                 beforeEach(done => {
-                    async.series([
-                        next => {
-                            client.defaultBucketKeyFormat = variation.vFormat;
-                            return next();
-                        },
-                        next => client.createBucket(BUCKET_NAME, suspendedBucketMD, logger, next),
-                    ], done);
+                    async.series(
+                        [
+                            next => {
+                                client.defaultBucketKeyFormat = variation.vFormat;
+                                return next();
+                            },
+                            next => client.createBucket(BUCKET_NAME, suspendedBucketMD, logger, next),
+                        ],
+                        done,
+                    );
                 });
 
                 afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
@@ -1483,59 +1518,59 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                             },
                         },
                     };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            object1Params,
-                            {
-                                versionId: null,
-                                versioning: true,
-                            },
-                            logger,
-                            next,
-                        ), // versioned object1 put before suspend
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Params.key,
-                            {
-                                ...object1Params,
-                                isNull: true,
-                            },
-                            {
-                                versionId: null,
-
-                            },
-                            logger,
-                            next,
-                        ), // null versioned object1
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object2Params.key,
-                            {
-                                ...object2Params,
-                                isNull: true,
-                            },
-                            {
-                                versionId: null,
-                            },
-                            logger,
-                            next,
-                        ), // null versioned object2
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            false,
-                            logger,
-                            (err, data) => {
+                    return async.series(
+                        [
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    object1Params,
+                                    {
+                                        versionId: null,
+                                        versioning: true,
+                                    },
+                                    logger,
+                                    next,
+                                ), // versioned object1 put before suspend
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Params.key,
+                                    {
+                                        ...object1Params,
+                                        isNull: true,
+                                    },
+                                    {
+                                        versionId: null,
+                                    },
+                                    logger,
+                                    next,
+                                ), // null versioned object1
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object2Params.key,
+                                    {
+                                        ...object2Params,
+                                        isNull: true,
+                                    },
+                                    {
+                                        versionId: null,
+                                    },
+                                    logger,
+                                    next,
+                                ), // null versioned object2
+                        ],
+                        () =>
+                            client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
                                 assert.deepStrictEqual(err, null);
-                                assert.deepStrictEqual(data, expected);
-                                return done();
-                            },
-                        );
-                    }));
+                                return client.getObjectMDStats(BUCKET_NAME, bucketInfo, false, logger, (err, data) => {
+                                    assert.deepStrictEqual(err, null);
+                                    assert.deepStrictEqual(data, expected);
+                                    return done();
+                                });
+                            }),
+                    );
                 });
             });
         });
@@ -1586,13 +1621,16 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
         variations.forEach(variation => {
             describe(variation.it, () => {
                 beforeEach(done => {
-                    async.series([
-                        next => {
-                            client.defaultBucketKeyFormat = variation.vFormat;
-                            return next();
-                        },
-                        next => client.createBucket(BUCKET_NAME, versionedBucketMD, logger, next),
-                    ], done);
+                    async.series(
+                        [
+                            next => {
+                                client.defaultBucketKeyFormat = variation.vFormat;
+                                return next();
+                            },
+                            next => client.createBucket(BUCKET_NAME, versionedBucketMD, logger, next),
+                        ],
+                        done,
+                    );
                 });
 
                 afterEach(done => client.deleteBucket(BUCKET_NAME, logger, done));
@@ -1831,45 +1869,46 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                         stalled: 0,
                         versions: 2,
                     };
-                    return async.series([
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1InCold.key,
-                            object1InCold,
-                            versionParams,
-                            logger,
-                            next,
-                        ),
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Restoring.key,
-                            object1Restoring,
-                            versionParams,
-                            logger,
-                            next,
-                        ),
-                        next => client.putObject(
-                            BUCKET_NAME,
-                            object1Restored.key,
-                            object1Restored,
-                            versionParams,
-                            logger,
-                            next,
-                        ), // put object2
-                    ], () => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                        assert.deepStrictEqual(err, null);
-                        return client.getObjectMDStats(
-                            BUCKET_NAME,
-                            bucketInfo,
-                            false,
-                            logger,
-                            (err, data) => {
+                    return async.series(
+                        [
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1InCold.key,
+                                    object1InCold,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ),
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Restoring.key,
+                                    object1Restoring,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ),
+                            next =>
+                                client.putObject(
+                                    BUCKET_NAME,
+                                    object1Restored.key,
+                                    object1Restored,
+                                    versionParams,
+                                    logger,
+                                    next,
+                                ), // put object2
+                        ],
+                        () =>
+                            client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
                                 assert.deepStrictEqual(err, null);
-                                assert.deepStrictEqual(data, expected);
-                                return done();
-                            },
-                        );
-                    }));
+                                return client.getObjectMDStats(BUCKET_NAME, bucketInfo, false, logger, (err, data) => {
+                                    assert.deepStrictEqual(err, null);
+                                    assert.deepStrictEqual(data, expected);
+                                    return done();
+                                });
+                            }),
+                    );
                 });
             });
         });
@@ -1889,13 +1928,19 @@ describe('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
         await util.promisify(client.setup.bind(client))();
     });
 
-
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-    ], done));
+    afterAll(done =>
+        async.series(
+            [
+                next => client.close(next),
+                next =>
+                    repl
+                        .stop()
+                        .then(() => next())
+                        .catch(next),
+            ],
+            done,
+        ),
+    );
 
     describe('Should update correctly CapacityInfo attributes of a bucket', () => {
         variations.forEach(variation => {
@@ -1914,25 +1959,29 @@ describe('S3UtilsMongoClient::updateBucketCapacityInfo', () => {
                         Available: 10n,
                         Used: 10n,
                     };
-                    async.series([
-                        next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
-                        next => client.updateBucketCapacityInfo(BUCKET_NAME, capacityInfo, logger, err => {
-                            assert.equal(err, null);
-                            next();
-                        }),
-                        next => client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
-                            assert.equal(err, null);
-                            const {
-                                Capacity, Available, Used, LastModified,
-                            } = bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
-                            assert.strictEqual(Capacity, 30n);
-                            assert.strictEqual(Available, 10n);
-                            assert.strictEqual(Used, 10n);
-                            assert(new Date(LastModified) > startTime);
-                            assert(new Date(LastModified) < new Date());
-                            next();
-                        }),
-                    ], done);
+                    async.series(
+                        [
+                            next => client.createBucket(BUCKET_NAME, bucketMD, logger, next),
+                            next =>
+                                client.updateBucketCapacityInfo(BUCKET_NAME, capacityInfo, logger, err => {
+                                    assert.equal(err, null);
+                                    next();
+                                }),
+                            next =>
+                                client.getBucketAttributes(BUCKET_NAME, logger, (err, bucketInfo) => {
+                                    assert.equal(err, null);
+                                    const { Capacity, Available, Used, LastModified } =
+                                        bucketInfo.getCapabilities().VeeamSOSApi.CapacityInfo;
+                                    assert.strictEqual(Capacity, 30n);
+                                    assert.strictEqual(Available, 10n);
+                                    assert.strictEqual(Used, 10n);
+                                    assert(new Date(LastModified) > startTime);
+                                    assert(new Date(LastModified) < new Date());
+                                    next();
+                                }),
+                        ],
+                        done,
+                    );
                 });
             });
         });
@@ -1952,12 +2001,19 @@ describe('S3UtilsMongoClient::getBucketInfos', () => {
         await util.promisify(client.setup.bind(client))();
     });
 
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-    ], done));
+    afterAll(done =>
+        async.series(
+            [
+                next => client.close(next),
+                next =>
+                    repl
+                        .stop()
+                        .then(() => next())
+                        .catch(next),
+            ],
+            done,
+        ),
+    );
 
     describe('Should get correct bucket infos', () => {
         const buckets = [
@@ -1978,36 +2034,48 @@ describe('S3UtilsMongoClient::getBucketInfos', () => {
                 _versioningConfiguration: {
                     Status: 'Suspended',
                 },
-            }];
-        beforeEach(done => async.series([
-            next => client.createBucket(buckets[0]._name, buckets[0], logger, next),
-            next => client.createBucket(buckets[1]._name, buckets[1], logger, next),
-            next => client.createBucket(buckets[2]._name, buckets[2], logger, next),
-        ], done));
+            },
+        ];
+        beforeEach(done =>
+            async.series(
+                [
+                    next => client.createBucket(buckets[0]._name, buckets[0], logger, next),
+                    next => client.createBucket(buckets[1]._name, buckets[1], logger, next),
+                    next => client.createBucket(buckets[2]._name, buckets[2], logger, next),
+                ],
+                done,
+            ),
+        );
 
-        afterEach(done => async.series([
-            next => client.deleteBucket(buckets[0]._name, logger, next),
-            next => client.deleteBucket(buckets[1]._name, logger, next),
-            next => client.deleteBucket(buckets[2]._name, logger, next),
-        ], done));
+        afterEach(done =>
+            async.series(
+                [
+                    next => client.deleteBucket(buckets[0]._name, logger, next),
+                    next => client.deleteBucket(buckets[1]._name, logger, next),
+                    next => client.deleteBucket(buckets[2]._name, logger, next),
+                ],
+                done,
+            ),
+        );
 
-        it('Should get correct bucket infos', done => client.getBucketInfos(logger, (err, data) => {
-            assert.equal(err, null);
-            assert.strictEqual(data.bucketCount, 3);
-            assert.strictEqual(
-                data.bucketInfos.find(bucket => bucket._name === buckets[0]._name).serialize(),
-                BucketInfo.fromObj(buckets[0]).serialize(),
-            );
-            assert.strictEqual(
-                data.bucketInfos.find(bucket => bucket._name === buckets[1]._name).serialize(),
-                BucketInfo.fromObj(buckets[1]).serialize(),
-            );
-            assert.strictEqual(
-                data.bucketInfos.find(bucket => bucket._name === buckets[2]._name).serialize(),
-                BucketInfo.fromObj(buckets[2]).serialize(),
-            );
-            done();
-        }));
+        it('Should get correct bucket infos', done =>
+            client.getBucketInfos(logger, (err, data) => {
+                assert.equal(err, null);
+                assert.strictEqual(data.bucketCount, 3);
+                assert.strictEqual(
+                    data.bucketInfos.find(bucket => bucket._name === buckets[0]._name).serialize(),
+                    BucketInfo.fromObj(buckets[0]).serialize(),
+                );
+                assert.strictEqual(
+                    data.bucketInfos.find(bucket => bucket._name === buckets[1]._name).serialize(),
+                    BucketInfo.fromObj(buckets[1]).serialize(),
+                );
+                assert.strictEqual(
+                    data.bucketInfos.find(bucket => bucket._name === buckets[2]._name).serialize(),
+                    BucketInfo.fromObj(buckets[2]).serialize(),
+                );
+                done();
+            }));
 
         it('Should ignore buckets in collection list but not in metastore', async () => {
             const metastoreCollection = client.getCollection('__metastore');
@@ -2030,7 +2098,10 @@ describe('S3UtilsMongoClient::getBucketInfos', () => {
 
             // Perform the assertions
             assert.strictEqual(data.bucketCount, 2);
-            assert.strictEqual(data.bucketInfos.find(bucket => bucket._name === buckets[0]._name), undefined);
+            assert.strictEqual(
+                data.bucketInfos.find(bucket => bucket._name === buckets[0]._name),
+                undefined,
+            );
             assert.strictEqual(!!data.bucketInfos.find(bucket => bucket._name === buckets[1]._name), true);
             assert.strictEqual(!!data.bucketInfos.find(bucket => bucket._name === buckets[2]._name), true);
         });

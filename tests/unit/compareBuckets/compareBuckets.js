@@ -2,10 +2,7 @@ const utils = require('../../../compareBuckets/utils');
 
 const listBucketMasterKeys = jest.spyOn(utils, 'listBucketMasterKeys');
 
-const {
-    compareBuckets,
-    compareObjectsReport,
-} = require('../../../compareBuckets/compareBuckets');
+const { compareBuckets, compareObjectsReport } = require('../../../compareBuckets/compareBuckets');
 const DummyLogger = require('../../mocks/DummyLogger');
 
 const log = new DummyLogger();
@@ -75,9 +72,7 @@ describe('compareBuckets', () => {
     });
 
     it('should complete successfully with only source listings', done => {
-        srcStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
-        );
+        srcStack.push([false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]);
         dstStack.push([false, '', []]);
 
         compareBuckets(params, log, err => {
@@ -94,9 +89,7 @@ describe('compareBuckets', () => {
 
     it('should complete successfully with only destination listings', done => {
         srcStack.push([false, '', []]);
-        dstStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
-        );
+        dstStack.push([false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]);
 
         compareBuckets(params, log, err => {
             expect(err).toBeNull();
@@ -111,12 +104,8 @@ describe('compareBuckets', () => {
     });
 
     it('should successfully perform compare (single listing call)', done => {
-        srcStack.push(
-            [false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]],
-        );
-        dstStack.push(
-            [false, '6', [newEntry('4'), newEntry('5'), newEntry('6')]],
-        );
+        srcStack.push([false, '3', [newEntry('1'), newEntry('2'), newEntry('3')]]);
+        dstStack.push([false, '6', [newEntry('4'), newEntry('5'), newEntry('6')]]);
 
         compareBuckets(params, log, err => {
             expect(err).toBeNull();
@@ -131,17 +120,9 @@ describe('compareBuckets', () => {
     });
 
     it('should successfully perform compare (with multiple listing calls)', done => {
-        srcStack.push(
-            [false, '3', [newEntry('3')]],
-            [true, '2', [newEntry('2')]],
-            [true, '1', [newEntry('1')]],
-        );
+        srcStack.push([false, '3', [newEntry('3')]], [true, '2', [newEntry('2')]], [true, '1', [newEntry('1')]]);
 
-        dstStack.push(
-            [false, '6', [newEntry('6')]],
-            [true, '5', [newEntry('5')]],
-            [true, '4', [newEntry('4')]],
-        );
+        dstStack.push([false, '6', [newEntry('6')]], [true, '5', [newEntry('5')]], [true, '4', [newEntry('4')]]);
 
         compareBuckets(params, log, err => {
             expect(err).toBeNull();
@@ -328,7 +309,7 @@ describe('commpareObjectsReports', () => {
         });
     });
 
-    it('should return report if version-id does not match', () => {
+    it('should return report if version-id does match', () => {
         const report = compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },

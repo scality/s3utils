@@ -117,17 +117,23 @@ describe('DiffStreamOplogFilter', () => {
                     const bucketName = `bucket${b}-on-rs${rs}`;
                     const key = `key${k}`;
                     // insert a diff entry that should pass through if on RS 1-4
-                    inputDiffEntries.push([{
-                        key: `${bucketName}/${key}`,
-                        value: 'foobar',
-                    }, null]);
+                    inputDiffEntries.push([
+                        {
+                            key: `${bucketName}/${key}`,
+                            value: 'foobar',
+                        },
+                        null,
+                    ]);
                     // insert a diff entry that should be filtered out
                     // because the key appears somewhere in the latest
                     // oplog
-                    inputDiffEntries.push([{
-                        key: `${bucketName}/${key}-updated`,
-                        value: 'oldfoobar',
-                    }, null]);
+                    inputDiffEntries.push([
+                        {
+                            key: `${bucketName}/${key}-updated`,
+                            value: 'oldfoobar',
+                        },
+                        null,
+                    ]);
                     // insert the updated key's oplog entry
                     latestRsOplog.push({
                         entry: {
@@ -180,10 +186,13 @@ describe('DiffStreamOplogFilter', () => {
                         for (let k = 1; k <= 5; ++k) {
                             const bucketName = `bucket${b}-on-rs${rs}`;
                             const key = `key${k}`;
-                            const outputDiffEntry = [{
-                                key: `${bucketName}/${key}`,
-                                value: 'foobar',
-                            }, null];
+                            const outputDiffEntry = [
+                                {
+                                    key: `${bucketName}/${key}`,
+                                    value: 'foobar',
+                                },
+                                null,
+                            ];
                             const jsonOutputDiffEntry = JSON.stringify(outputDiffEntry);
                             expect(filteredDiffEntries.has(jsonOutputDiffEntry)).toBeTruthy();
                             filteredDiffEntries.delete(jsonOutputDiffEntry);
@@ -195,7 +204,7 @@ describe('DiffStreamOplogFilter', () => {
                 done();
             })
             .on('error', err => {
-                fail(`an error occurred during filtering: ${err}`);
+                done(new Error(`an error occurred during filtering: ${err}`));
             });
     });
 
@@ -208,14 +217,14 @@ describe('DiffStreamOplogFilter', () => {
         });
         oplogFilter.end();
         oplogFilter
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('end', () => {
                 done();
             })
             .on('error', err => {
-                fail(`an error occurred during filtering: ${err}`);
+                done(new Error(`an error occurred during filtering: ${err}`));
             });
     });
 
@@ -239,8 +248,8 @@ describe('DiffStreamOplogFilter', () => {
         oplogFilter.write([{ key: 'bucket-with-error/key', value: 'foobar' }, null]);
         oplogFilter.end();
         oplogFilter
-            .on('data', event => {
-                fail('should not have received a "data" event', event);
+            .on('data', () => {
+                done(new Error('should not have received a "data" event'));
             })
             .on('error', err => {
                 expect(err).toBeTruthy();

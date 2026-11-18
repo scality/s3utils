@@ -7,8 +7,8 @@ class Warp10Client {
     constructor(config) {
         this._writeToken = (config && config.writeToken) || 'writeTokenStatic';
         this._readToken = (config && config.readToken) || 'readTokenStatic';
-        this.nodeId = (config && config.nodeId);
-        const proto = (config && config.tls) ? 'https' : 'http';
+        this.nodeId = config && config.nodeId;
+        const proto = config && config.tls ? 'https' : 'http';
         this._requestTimeout = (config && config.requestTimeout) || 30000;
         this._connectTimeout = (config && config.connectTimeout) || 30000;
         const host = (config && config.host) || 'localhost';
@@ -66,6 +66,5 @@ class Warp10Client {
         };
     }
 }
-
 
 module.exports = new Warp10Client(env.warp10);

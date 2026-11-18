@@ -2,12 +2,11 @@
 
 const { http, https } = require('httpagent');
 const async = require('async');
-const crypto = require('crypto');
-const { 
-    S3Client, 
+const {
+    S3Client,
     GetBucketVersioningCommand,
-    ListObjectVersionsCommand, 
-    DeleteObjectsCommand 
+    ListObjectVersionsCommand,
+    DeleteObjectsCommand,
 } = require('@aws-sdk/client-s3');
 const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { Logger } = require('werelogs');
@@ -35,7 +34,8 @@ Mandatory environment variables:
 Optional environment variables:
     TARGET_PREFIX: only process a specific prefix in the bucket(s)
     WORKERS: concurrency value for listing / batch delete requests (default ${DEFAULT_WORKERS})
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
+    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines
+    (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
     LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
     KEY_MARKER: resume processing from a specific key
     VERSION_ID_MARKER: resume processing from a specific version ID
@@ -47,16 +47,13 @@ const { SECRET_KEY } = process.env;
 const { ENDPOINT } = process.env;
 
 const { TARGET_PREFIX } = process.env;
-const WORKERS = (
-    process.env.WORKERS
-        && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
+const WORKERS = (process.env.WORKERS && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
 
 const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide '
-                  + 'a comma-separated list of buckets on the command line');
+    console.error('No buckets given as input, please provide a comma-separated list of buckets on the command line');
     console.error(USAGE);
     process.exit(1);
 }
@@ -75,15 +72,12 @@ if (!SECRET_KEY) {
     console.error(USAGE);
     process.exit(1);
 }
-const LISTING_LIMIT = (
-    process.env.LISTING_LIMIT
-        && Number.parseInt(process.env.LISTING_LIMIT, 10))
-      || DEFAULT_LISTING_LIMIT;
+const LISTING_LIMIT =
+    (process.env.LISTING_LIMIT && Number.parseInt(process.env.LISTING_LIMIT, 10)) || DEFAULT_LISTING_LIMIT;
 
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
+const LOG_PROGRESS_INTERVAL =
+    (process.env.LOG_PROGRESS_INTERVAL && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10)) ||
+    DEFAULT_LOG_PROGRESS_INTERVAL;
 
 const s3 = new S3Client({
     credentials: {
@@ -95,9 +89,9 @@ const s3 = new S3Client({
     forcePathStyle: true,
     requestHandler: new NodeHttpHandler({
         httpAgent: new http.Agent({ keepAlive: true }),
-        httpsAgent: new https.Agent({ 
+        httpsAgent: new https.Agent({
             keepAlive: true,
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
         }),
     }),
 });
@@ -122,155 +116,161 @@ function logProgress(message) {
     });
 }
 
-const progressInterval = setInterval(
-    () => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000,
-);
+const progressInterval = setInterval(() => logProgress('progress update'), LOG_PROGRESS_INTERVAL * 1000);
 
 const taskQueue = async.queue((task, done) => {
-    const {
-        bucket, beginBucket, keyMarker, versionIdMarker,
-    } = task;
+    const { bucket, beginBucket, keyMarker, versionIdMarker } = task;
     let bucketDone = false;
 
     status.keyMarker = keyMarker;
     status.versionIdMarker = versionIdMarker;
 
-    return async.waterfall([
-        next => {
-            if (!beginBucket) {
-                return next();
-            }
-            logProgress('start scanning bucket');
-            return s3.send(new GetBucketVersioningCommand({
-                Bucket: bucket,
-            }))
-                .then(data => {
-                    if (data.Status !== 'Suspended') {
-                        log.error('bucket versioning status is not "Suspended", skipping bucket', {
+    return async.waterfall(
+        [
+            next => {
+                if (!beginBucket) {
+                    return next();
+                }
+                logProgress('start scanning bucket');
+                return s3
+                    .send(
+                        new GetBucketVersioningCommand({
+                            Bucket: bucket,
+                        }),
+                    )
+                    .then(data => {
+                        if (data.Status !== 'Suspended') {
+                            log.error('bucket versioning status is not "Suspended", skipping bucket', {
+                                bucket,
+                                versioningStatus: data.Status,
+                            });
+                            bucketDone = true;
+                            return next(new Error('bucket not processed'));
+                        }
+                        return next();
+                    })
+                    .catch(err => {
+                        log.error('error getting bucket versioning', {
                             bucket,
-                            versioningStatus: data.Status,
+                            error: err.message,
                         });
                         bucketDone = true;
-                        return next(new Error('bucket not processed'));
-                    }
-                    return next();
-                })
-                .catch(err => {
-                    log.error('error getting bucket versioning', {
-                        bucket,
-                        error: err.message,
+                        return next(err);
                     });
-                    bucketDone = true;
-                    return next(err);
-                });
-        },
-        next => s3.send(new ListObjectVersionsCommand({
-            Bucket: bucket,
-            MaxKeys: LISTING_LIMIT,
-            Prefix: TARGET_PREFIX,
-            KeyMarker: keyMarker,
-            VersionIdMarker: versionIdMarker,
-        }))
-            .then(data => {
-                status.objectsListed += (data.Versions || []).length + (data.DeleteMarkers || []).length;
-                if (data.NextKeyMarker || data.NextVersionIdMarker) {
-                    taskQueue.push({
-                        bucket,
-                        keyMarker: data.NextKeyMarker,
-                        versionIdMarker: data.NextVersionIdMarker,
-                    });
-                } else {
-                    bucketDone = true;
-                }
-                return next(null, data.DeleteMarkers || []);
-            })
-            .catch(err => {
-                log.error('error listing object versions', {
-                    bucket,
-                    keyMarker,
-                    versionIdMarker,
-                    error: err.message,
-                });
-                bucketDone = true;
-                return next(err);
-            }),
-        (deleteMarkers, next) => {
-            if (deleteMarkers.length === 0) {
-                return next();
-            }
-            const command = new DeleteObjectsCommand({
-                Bucket: bucket,
-                Delete: {
-                    Objects: deleteMarkers.map(item => ({
-                        Key: item.Key,
-                        VersionId: item.VersionId,
-                    })),
-                },
-            });
-            
-            return s3.send(command)
-                .then(data => {
-                    if (data.Deleted) {
-                        status.deleteMarkersDeleted += data.Deleted.length;
-                        data.Deleted.forEach(entry => {
-                            log.info('delete marker deleted', {
+            },
+            next =>
+                s3
+                    .send(
+                        new ListObjectVersionsCommand({
+                            Bucket: bucket,
+                            MaxKeys: LISTING_LIMIT,
+                            Prefix: TARGET_PREFIX,
+                            KeyMarker: keyMarker,
+                            VersionIdMarker: versionIdMarker,
+                        }),
+                    )
+                    .then(data => {
+                        status.objectsListed += (data.Versions || []).length + (data.DeleteMarkers || []).length;
+                        if (data.NextKeyMarker || data.NextVersionIdMarker) {
+                            taskQueue.push({
                                 bucket,
-                                objectKey: entry.Key,
-                                versionId: entry.VersionId,
+                                keyMarker: data.NextKeyMarker,
+                                versionIdMarker: data.NextVersionIdMarker,
                             });
+                        } else {
+                            bucketDone = true;
+                        }
+                        return next(null, data.DeleteMarkers || []);
+                    })
+                    .catch(err => {
+                        log.error('error listing object versions', {
+                            bucket,
+                            keyMarker,
+                            versionIdMarker,
+                            error: err.message,
                         });
-                    }
-                    if (data.Errors) {
-                        status.deleteMarkersErrors += data.Errors.length;
-                        data.Errors.forEach(entry => {
+                        bucketDone = true;
+                        return next(err);
+                    }),
+            (deleteMarkers, next) => {
+                if (deleteMarkers.length === 0) {
+                    return next();
+                }
+                const command = new DeleteObjectsCommand({
+                    Bucket: bucket,
+                    Delete: {
+                        Objects: deleteMarkers.map(item => ({
+                            Key: item.Key,
+                            VersionId: item.VersionId,
+                        })),
+                    },
+                });
+
+                return s3
+                    .send(command)
+                    .then(data => {
+                        if (data.Deleted) {
+                            status.deleteMarkersDeleted += data.Deleted.length;
+                            data.Deleted.forEach(entry => {
+                                log.info('delete marker deleted', {
+                                    bucket,
+                                    objectKey: entry.Key,
+                                    versionId: entry.VersionId,
+                                });
+                            });
+                        }
+                        if (data.Errors) {
+                            status.deleteMarkersErrors += data.Errors.length;
+                            data.Errors.forEach(entry => {
+                                log.error('error deleting delete marker', {
+                                    bucket,
+                                    objectKey: entry.Key,
+                                    versionId: entry.VersionId,
+                                    error: entry.Code,
+                                    errorDesc: entry.Message,
+                                });
+                            });
+                        }
+                        return next();
+                    })
+                    .catch(err => {
+                        log.error('batch delete request error', {
+                            bucket,
+                            keyMarker,
+                            versionIdMarker,
+                            error: err.message,
+                        });
+                        status.deleteMarkersErrors += deleteMarkers.length;
+                        deleteMarkers.forEach(entry => {
                             log.error('error deleting delete marker', {
                                 bucket,
                                 objectKey: entry.Key,
                                 versionId: entry.VersionId,
-                                error: entry.Code,
-                                errorDesc: entry.Message,
+                                error: 'batch delete request failed',
                             });
                         });
-                    }
-                    return next();
-                })
-                .catch(err => {
-                    log.error('batch delete request error', {
-                        bucket,
-                        keyMarker,
-                        versionIdMarker,
-                        error: err.message,
+                        return next();
                     });
-                    status.deleteMarkersErrors += deleteMarkers.length;
-                    deleteMarkers.forEach(entry => {
-                        log.error('error deleting delete marker', {
-                            bucket,
-                            objectKey: entry.Key,
-                            versionId: entry.VersionId,
-                            error: 'batch delete request failed',
-                        });
+            },
+        ],
+        err => {
+            if (bucketDone) {
+                status.keyMarker = null;
+                status.versionIdMarker = null;
+                if (!err) {
+                    logProgress('completed listing of bucket');
+                }
+                if (BUCKETS.length > 0) {
+                    status.bucketInProgress = BUCKETS.shift();
+                    taskQueue.push({
+                        bucket: status.bucketInProgress,
+                        beginBucket: true,
                     });
-                    return next();
-                });
+                }
+            }
+            return done();
         },
-    ], err => {
-        if (bucketDone) {
-            status.keyMarker = null;
-            status.versionIdMarker = null;
-            if (!err) {
-                logProgress('completed listing of bucket');
-            }
-            if (BUCKETS.length > 0) {
-                status.bucketInProgress = BUCKETS.shift();
-                taskQueue.push({
-                    bucket: status.bucketInProgress,
-                    beginBucket: true,
-                });
-            }
-        }
-        return done();
-    });
+    );
 }, WORKERS);
 
 log.info('starting cleanup of delete markers in buckets', {

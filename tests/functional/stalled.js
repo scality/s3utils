@@ -2,17 +2,10 @@ const async = require('async');
 const werelogs = require('werelogs');
 const { BucketInfo, ObjectMD } = require('@scality/arsenal').models;
 
-const {
-    MongoClientInterfaceStalled,
-} = require('../../StalledRetry/MongoClientInterfaceStalled');
-const {
-    RateLimitingCursor,
-} = require('../../StalledRetry/CursorWrapper');
+const { MongoClientInterfaceStalled } = require('../../StalledRetry/MongoClientInterfaceStalled');
+const { RateLimitingCursor } = require('../../StalledRetry/CursorWrapper');
 
-const {
-    StalledRequestHandler,
-} = require('../../StalledRetry/StalledRequestHandler');
-
+const { StalledRequestHandler } = require('../../StalledRetry/StalledRequestHandler');
 
 const loggerConfig = {
     level: 'debug',
@@ -26,15 +19,12 @@ const { MONGODB_REPLICASET } = process.env;
 const dbName = 'stalledRetryTest';
 
 function wrapperFactory(bucketName, cmpDate, cursor, log) {
-    return new RateLimitingCursor(
-        cursor,
-        {
-            queueLimit: 10,
-            log,
-            cmpDate,
-            bucketName,
-        },
-    );
+    return new RateLimitingCursor(cursor, {
+        queueLimit: 10,
+        log,
+        cmpDate,
+        bucketName,
+    });
 }
 
 class TrackingClient {
@@ -49,15 +39,12 @@ class TrackingClient {
 }
 
 function handlerFactory(client, log) {
-    return new StalledRequestHandler(
-        client,
-        {
-            dryRun: false,
-            batchSize: 10,
-            concurrentRequests: 5,
-            log,
-        },
-    );
+    return new StalledRequestHandler(client, {
+        dryRun: false,
+        batchSize: 10,
+        concurrentRequests: 5,
+        log,
+    });
 }
 
 function createStalledObject(objName, lastModified) {
@@ -108,99 +95,117 @@ function createCompletedObject(objName) {
 }
 
 function populateMongo(client, callback) {
-    async.series([
-        next => async.timesSeries(10, (n, done) => {
-            const bucketName = `test-bucket-${n}`;
-            const bucketMD = BucketInfo.fromObj({
-                _name: bucketName,
-                _owner: 'testowner',
-                _ownerDisplayName: 'testdisplayname',
-                _creationDate: new Date().toJSON(),
-                _acl: {
-                    Canned: 'private',
-                    FULL_CONTROL: [],
-                    WRITE: [],
-                    WRITE_ACP: [],
-                    READ: [],
-                    READ_ACP: [],
-                },
-                _mdBucketModelVersion: 10,
-                _transient: false,
-                _deleted: false,
-                _serverSideEncryption: null,
-                _versioningConfiguration: { Status: 'Enabled' },
-                _locationConstraint: 'primary-location',
-                _readLocationConstraint: null,
-                _cors: null,
-                _replicationConfiguration: null,
-                _lifecycleConfiguration: null,
-                _uid: '',
-                _isNFS: null,
-                ingestion: null,
-            });
-            async.series([
-                next => client.createBucket(bucketName, bucketMD, logger, next),
-                next => async.timesSeries(100, (m, done) => {
-                    async.parallel([
-                        done => {
-                            const objName = `stalled-1hr-${m}`;
-                            const cmpDate = new Date();
-                            cmpDate.setHours(cmpDate.getHours() - 1);
-                            const lastModified = cmpDate.toUTCString();
-                            return client.putObject(
-                                bucketName,
-                                objName,
-                                createStalledObject(objName, lastModified),
-                                { versionId: null, versioning: true },
-                                logger,
-                                done,
-                            );
-                        },
-                        done => {
-                            const objName = `stalled-10hr-${m}`;
-                            const cmpDate = new Date();
-                            cmpDate.setHours(cmpDate.getHours() - 10);
-                            const lastModified = cmpDate.toUTCString();
-                            return client.putObject(
-                                bucketName,
-                                objName,
-                                createStalledObject(objName, lastModified),
-                                { versionId: null, versioning: true },
-                                logger,
-                                done,
-                            );
-                        },
-                        done => {
-                            const objName = `pending-${m}`;
-                            const cmpDate = new Date();
-                            const lastModified = cmpDate.toUTCString();
-                            return client.putObject(
-                                bucketName,
-                                objName,
-                                createStalledObject(objName, lastModified),
-                                { versionId: null, versioning: true },
-                                logger,
-                                done,
-                            );
-                        },
-                        done => {
-                            const objName = `completed-${m}`;
-                            return client.putObject(
-                                bucketName,
-                                objName,
-                                createCompletedObject(objName),
-                                { versionId: null, versioning: true },
-                                logger,
-                                done,
-                            );
-                        },
-                    ], done);
-                }, next),
-            ], done);
-        }, next),
-    ], callback);
+    async.series(
+        [
+            next =>
+                async.timesSeries(
+                    10,
+                    (n, done) => {
+                        const bucketName = `test-bucket-${n}`;
+                        const bucketMD = BucketInfo.fromObj({
+                            _name: bucketName,
+                            _owner: 'testowner',
+                            _ownerDisplayName: 'testdisplayname',
+                            _creationDate: new Date().toJSON(),
+                            _acl: {
+                                Canned: 'private',
+                                FULL_CONTROL: [],
+                                WRITE: [],
+                                WRITE_ACP: [],
+                                READ: [],
+                                READ_ACP: [],
+                            },
+                            _mdBucketModelVersion: 10,
+                            _transient: false,
+                            _deleted: false,
+                            _serverSideEncryption: null,
+                            _versioningConfiguration: { Status: 'Enabled' },
+                            _locationConstraint: 'primary-location',
+                            _readLocationConstraint: null,
+                            _cors: null,
+                            _replicationConfiguration: null,
+                            _lifecycleConfiguration: null,
+                            _uid: '',
+                            _isNFS: null,
+                            ingestion: null,
+                        });
+                        async.series(
+                            [
+                                next => client.createBucket(bucketName, bucketMD, logger, next),
+                                next =>
+                                    async.timesSeries(
+                                        100,
+                                        (m, done) => {
+                                            async.parallel(
+                                                [
+                                                    done => {
+                                                        const objName = `stalled-1hr-${m}`;
+                                                        const cmpDate = new Date();
+                                                        cmpDate.setHours(cmpDate.getHours() - 1);
+                                                        const lastModified = cmpDate.toUTCString();
+                                                        return client.putObject(
+                                                            bucketName,
+                                                            objName,
+                                                            createStalledObject(objName, lastModified),
+                                                            { versionId: null, versioning: true },
+                                                            logger,
+                                                            done,
+                                                        );
+                                                    },
+                                                    done => {
+                                                        const objName = `stalled-10hr-${m}`;
+                                                        const cmpDate = new Date();
+                                                        cmpDate.setHours(cmpDate.getHours() - 10);
+                                                        const lastModified = cmpDate.toUTCString();
+                                                        return client.putObject(
+                                                            bucketName,
+                                                            objName,
+                                                            createStalledObject(objName, lastModified),
+                                                            { versionId: null, versioning: true },
+                                                            logger,
+                                                            done,
+                                                        );
+                                                    },
+                                                    done => {
+                                                        const objName = `pending-${m}`;
+                                                        const cmpDate = new Date();
+                                                        const lastModified = cmpDate.toUTCString();
+                                                        return client.putObject(
+                                                            bucketName,
+                                                            objName,
+                                                            createStalledObject(objName, lastModified),
+                                                            { versionId: null, versioning: true },
+                                                            logger,
+                                                            done,
+                                                        );
+                                                    },
+                                                    done => {
+                                                        const objName = `completed-${m}`;
+                                                        return client.putObject(
+                                                            bucketName,
+                                                            objName,
+                                                            createCompletedObject(objName),
+                                                            { versionId: null, versioning: true },
+                                                            logger,
+                                                            done,
+                                                        );
+                                                    },
+                                                ],
+                                                done,
+                                            );
+                                        },
+                                        next,
+                                    ),
+                            ],
+                            done,
+                        );
+                    },
+                    next,
+                ),
+        ],
+        callback,
+    );
 }
-
 
 jest.setTimeout(3600000);
 describe('StalledRetry', () => {
@@ -223,17 +228,21 @@ describe('StalledRetry', () => {
             requestHandlerFactory: handlerFactory.bind(null, reqClient),
         };
         mgoClient = new MongoClientInterfaceStalled(opts);
-        async.series([
-            next => mgoClient.setup(next),
-            next => populateMongo(mgoClient, next),
-        ], done);
+        async.series([next => mgoClient.setup(next), next => populateMongo(mgoClient, next)], done);
     });
 
     afterAll(done => {
-        async.series([
-            next => mgoClient.db.dropDatabase().then(() => next()).catch(() => next()),
-            next => mgoClient.close(next),
-        ], done);
+        async.series(
+            [
+                next =>
+                    mgoClient.db
+                        .dropDatabase()
+                        .then(() => next())
+                        .catch(() => next()),
+                next => mgoClient.close(next),
+            ],
+            done,
+        );
     });
 
     test('should correctly process stalled entries (all stalled)', done => {

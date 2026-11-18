@@ -115,10 +115,7 @@ const s3 = new S3Client({
         AWS_SDK_REQUEST_RETRIES,
         // Custom backoff with exponential delay capped at 1mn max
         // between retries, and a little added jitter
-        attempt => Math.min(
-            AWS_SDK_REQUEST_INITIAL_DELAY_MS * 2 ** attempt,
-            60000
-        ) * (0.9 + Math.random() * 0.2)
+        attempt => Math.min(AWS_SDK_REQUEST_INITIAL_DELAY_MS * 2 ** attempt, 60000) * (0.9 + Math.random() * 0.2),
     ),
 });
 
@@ -160,19 +157,16 @@ function _logProgress(message) {
     });
 }
 
-const logProgressInterval = setInterval(
-    () => _logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL_MS,
-);
+const logProgressInterval = setInterval(() => _logProgress('progress update'), LOG_PROGRESS_INTERVAL_MS);
 
 async function listBucket(bucket) {
     let NextKeyMarker = KEY_MARKER;
     let NextVersionIdMarker = VERSION_ID_MARKER;
-    
+
     while (true) {
         KeyMarker = NextKeyMarker;
         VersionIdMarker = NextVersionIdMarker;
-        
+
         const command = new ListObjectVersionsCommand({
             Bucket: bucket,
             MaxKeys: LISTING_LIMIT,
@@ -180,7 +174,7 @@ async function listBucket(bucket) {
             KeyMarker,
             VersionIdMarker,
         });
-        
+
         try {
             const data = await s3.send(command);
             const versions = data.Versions || [];
@@ -205,10 +199,10 @@ async function listBucket(bucket) {
                     });
                 }
             }
-            
+
             NextKeyMarker = data.NextKeyMarker;
             NextVersionIdMarker = data.NextVersionIdMarker;
-            
+
             if (!NextKeyMarker && !NextVersionIdMarker) {
                 break;
             }

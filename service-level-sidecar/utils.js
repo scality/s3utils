@@ -4,7 +4,7 @@ const env = require('./env');
 
 const ebConfig = {
     times: env.retryLimit,
-    interval: retryCount => 50 * (2 ** retryCount),
+    interval: retryCount => 50 * 2 ** retryCount,
 };
 
 /**

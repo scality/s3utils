@@ -34,32 +34,35 @@ class CountManager {
     }
 
     _setupQueue() {
-        this.q = async.queue((bucketInfo, done) => {
-            if (this.workerList.length === 0) {
-                return done(new Error('emptyWorkerList'));
-            }
-            const id = this.workerList.shift();
-            const processingStartTime = process.hrtime.bigint();
-            return this.workers[id].count(bucketInfo, (err, res) => {
-                this.log.info('processing a bucket', {
-                    method: 'CountManager::_setupQueue',
-                    workInQueue: this.q.length(),
-                    bucketInfo: {
-                        name: bucketInfo.getName(),
-                        uid: bucketInfo.getUid(),
-                        creationDate: bucketInfo.getCreationDate(),
-                    }
-                });
-                if (err) {
-                    return done(err);
+        this.q = async.queue(
+            (bucketInfo, done) => {
+                if (this.workerList.length === 0) {
+                    return done(new Error('emptyWorkerList'));
                 }
-                const processingDuration = Number(process.hrtime.bigint() - processingStartTime) / 1e9;
-                monitoring.bucketProcessingDuration.observe(processingDuration);
-                this._consolidateData(res);
-                this.workerList.push(id);
-                return done();
-            });
-        }, Object.keys(this.workers).length * this.maxConcurrent);
+                const id = this.workerList.shift();
+                const processingStartTime = process.hrtime.bigint();
+                return this.workers[id].count(bucketInfo, (err, res) => {
+                    this.log.info('processing a bucket', {
+                        method: 'CountManager::_setupQueue',
+                        workInQueue: this.q.length(),
+                        bucketInfo: {
+                            name: bucketInfo.getName(),
+                            uid: bucketInfo.getUid(),
+                            creationDate: bucketInfo.getCreationDate(),
+                        },
+                    });
+                    if (err) {
+                        return done(err);
+                    }
+                    const processingDuration = Number(process.hrtime.bigint() - processingStartTime) / 1e9;
+                    monitoring.bucketProcessingDuration.observe(processingDuration);
+                    this._consolidateData(res);
+                    this.workerList.push(id);
+                    return done();
+                });
+            },
+            Object.keys(this.workers).length * this.maxConcurrent,
+        );
         this.q.pause();
     }
 
@@ -68,12 +71,10 @@ class CountManager {
         if (!results) {
             return;
         }
-        this.store.versions += (results.versions || 0);
-        this.store.objects += (results.objects || 0);
+        this.store.versions += results.versions || 0;
+        this.store.objects += results.objects || 0;
         this.store.stalled += results.stalled;
-        if (results.dataManaged
-            && results.dataManaged.locations
-            && results.dataManaged.total) {
+        if (results.dataManaged && results.dataManaged.locations && results.dataManaged.total) {
             const { locations, total } = results.dataManaged;
             this.store.dataManaged.total.curr += total.curr;
             this.store.dataManaged.total.prev += total.prev;
@@ -81,17 +82,17 @@ class CountManager {
                 if (!this.store.dataManaged.byLocation[site]) {
                     this.store.dataManaged.byLocation[site] = { ...locations[site] };
                 } else {
-                    this.store.dataManaged.byLocation[site].curr
-                        += locations[site].curr;
-                    this.store.dataManaged.byLocation[site].prev
-                        += locations[site].prev;
+                    this.store.dataManaged.byLocation[site].curr += locations[site].curr;
+                    this.store.dataManaged.byLocation[site].prev += locations[site].prev;
                 }
             });
         }
-        if (results.dataMetrics
-            && results.dataMetrics.bucket
-            && results.dataMetrics.location
-            && results.dataMetrics.account) {
+        if (
+            results.dataMetrics &&
+            results.dataMetrics.bucket &&
+            results.dataMetrics.location &&
+            results.dataMetrics.account
+        ) {
             Object.keys(results.dataMetrics).forEach(metricLevel => {
                 // metricLevel can only be 'bucket', 'location' or 'account'
                 if (validStorageMetricLevels.has(metricLevel)) {
@@ -103,15 +104,18 @@ class CountManager {
                         );
                         // if metricLevel is account or bucket, add the locations details
                         if (metricLevel === 'account' || metricLevel === 'bucket') {
-                            Object.keys((results.dataMetrics[metricLevel][resourceName].locations || {})).forEach(locationName => {
-                                if (!this.temporaryStore[metricLevel][resourceName]) {
-                                    this.temporaryStore[metricLevel][resourceName] = {};
-                                }
-                                this.temporaryStore[metricLevel][resourceName][locationName] = consolidateDataMetrics(
-                                    this.temporaryStore[metricLevel][resourceName][locationName],
-                                    results.dataMetrics[metricLevel][resourceName].locations[locationName],
-                                );
-                            });
+                            Object.keys(results.dataMetrics[metricLevel][resourceName].locations || {}).forEach(
+                                locationName => {
+                                    if (!this.temporaryStore[metricLevel][resourceName]) {
+                                        this.temporaryStore[metricLevel][resourceName] = {};
+                                    }
+                                    this.temporaryStore[metricLevel][resourceName][locationName] =
+                                        consolidateDataMetrics(
+                                            this.temporaryStore[metricLevel][resourceName][locationName],
+                                            results.dataMetrics[metricLevel][resourceName].locations[locationName],
+                                        );
+                                },
+                            );
                         }
                     });
                 }
@@ -132,26 +136,17 @@ class CountManager {
     }
 
     setup(callback) {
-        async.series([
-            next => async.forEach(
-                this.workers,
-                (worker, done) => worker.init(done),
-                next,
-            ),
-            next => async.forEach(
-                this.workers,
-                (worker, done) => worker.setup(done),
-                next,
-            ),
-        ], callback);
+        async.series(
+            [
+                next => async.forEach(this.workers, (worker, done) => worker.init(done), next),
+                next => async.forEach(this.workers, (worker, done) => worker.setup(done), next),
+            ],
+            callback,
+        );
     }
 
     teardown(callback) {
-        async.forEach(
-            this.workers,
-            (worker, done) => worker.teardown(done),
-            callback,
-        );
+        async.forEach(this.workers, (worker, done) => worker.teardown(done), callback);
     }
 
     stop(callback) {
@@ -198,8 +193,7 @@ class CountManager {
         const onceCB = once(callback);
         this.workerList = [];
         for (let i = 0; i < this.maxConcurrent; ++i) {
-            Object.values(this.workers)
-                .forEach(worker => this.workerList.push(worker.id));
+            Object.values(this.workers).forEach(worker => this.workerList.push(worker.id));
         }
         this.q.error(err => {
             this.log.error('error processing bucket', {

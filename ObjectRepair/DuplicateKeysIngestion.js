@@ -29,15 +29,13 @@ class RaftJournalReader {
         this.limit = limit;
         this.sessionId = sessionId;
         this.url = this._getJournalUrl(sessionId);
-        this.processor = new SproxydKeysProcessor(
-            env.OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE,
-            subscribers,
-        );
+        this.processor = new SproxydKeysProcessor(env.OBJECT_REPAIR_DUPLICATE_KEYS_WINDOW_SIZE, subscribers);
         this._httpRequest = httpRequest;
-        this._useHttps = (process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined
-                          && process.env.OBJECT_REPAIR_TLS_KEY_PATH !== ''
-                          && process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined
-                          && process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '');
+        this._useHttps =
+            process.env.OBJECT_REPAIR_TLS_KEY_PATH !== undefined &&
+            process.env.OBJECT_REPAIR_TLS_KEY_PATH !== '' &&
+            process.env.OBJECT_REPAIR_TLS_CERT_PATH !== undefined &&
+            process.env.OBJECT_REPAIR_TLS_CERT_PATH !== '';
     }
 
     /**
@@ -79,17 +77,14 @@ class RaftJournalReader {
                 this.cseq = 1;
             } else {
                 if (res.statusCode !== 200) {
-                    log.error(
-                        'unable to fetch cseq: error HTTP status code returned',
-                        { statusCode: res.statusCode },
-                    );
+                    log.error('unable to fetch cseq: error HTTP status code returned', { statusCode: res.statusCode });
                     return cb(errors.InternalError);
                 }
 
                 try {
                     const body = JSON.parse(res.body);
                     this._setCseq(body);
-                } catch (err) {
+                } catch {
                     log.error('unable to fetch cseq: invalid JSON in response body');
                     return cb(errors.InternalError);
                 }
@@ -103,9 +98,9 @@ class RaftJournalReader {
     }
 
     /**
-    * @typedef {Object} LogObjectEntry
-    * @property {string} key - ObjectKey which may be version or unversioned.
-    * @property {string} value - All metadata for the object with the accompanying Sproxyd Key.
+     * @typedef {Object} LogObjectEntry
+     * @property {string} key - ObjectKey which may be version or unversioned.
+     * @property {string} value - All metadata for the object with the accompanying Sproxyd Key.
      */
 
     /**
@@ -154,7 +149,7 @@ class RaftJournalReader {
             let body;
             try {
                 body = JSON.parse(res.body);
-            } catch (err) {
+            } catch {
                 return cb(new Error(`GET ${requestUrl}: invalid JSON in response body`));
             }
             // FIXME this special case should be taken care of once S3C-3928 is fixed
@@ -198,10 +193,10 @@ class RaftJournalReader {
 
                     const bucket = record.db;
 
-                    let json = null;
+                    let json;
                     try {
                         json = JSON.parse(entry.value);
-                    } catch (err) {
+                    } catch {
                         log.error('json corrupted', {
                             begin: this.begin,
                             limit: this.limit,
@@ -261,58 +256,55 @@ class RaftJournalReader {
      */
 
     runOnce(cb) {
-        return waterfall([
-            next => this.setBegin(
-                err => {
-                    if (err) {
-                        log.error('in setBegin', { error: err.message });
-                        next(err);
-                    } else {
-                        next(null);
-                    }
-                },
-            ),
-            next => this.getBatch(
-                (err, res) => {
-                    if (err) {
-                        if (!(err instanceof RangeError)) {
-                            log.error('in getBatch', { error: err.message });
+        return waterfall(
+            [
+                next =>
+                    this.setBegin(err => {
+                        if (err) {
+                            log.error('in setBegin', { error: err.message });
+                            next(err);
+                        } else {
+                            next(null);
                         }
-                        next(err);
-                    } else {
-                        next(null, res);
-                    }
-                },
-            ),
-            (body, next) => this.processBatch(
-                body,
-                (err, extractedKeys) => {
-                    if (err) {
-                        log.error('in processBatch', { error: err.message });
-                        next(err);
-                    } else {
-                        next(null, extractedKeys);
-                    }
-                },
-            ),
-            (extractedKeys, next) => this.updateStatus(
-                extractedKeys,
-                (err, res) => {
-                    if (err) {
-                        log.error('in updateStatus', { error: err.message });
-                        next(err);
-                    } else {
-                        next(null, res);
-                    }
-                },
-            ),
-        ], err => {
-            if (err) {
-                cb(err, 5000);
-            } else {
-                cb(null, 0);
-            }
-        });
+                    }),
+                next =>
+                    this.getBatch((err, res) => {
+                        if (err) {
+                            if (!(err instanceof RangeError)) {
+                                log.error('in getBatch', { error: err.message });
+                            }
+                            next(err);
+                        } else {
+                            next(null, res);
+                        }
+                    }),
+                (body, next) =>
+                    this.processBatch(body, (err, extractedKeys) => {
+                        if (err) {
+                            log.error('in processBatch', { error: err.message });
+                            next(err);
+                        } else {
+                            next(null, extractedKeys);
+                        }
+                    }),
+                (extractedKeys, next) =>
+                    this.updateStatus(extractedKeys, (err, res) => {
+                        if (err) {
+                            log.error('in updateStatus', { error: err.message });
+                            next(err);
+                        } else {
+                            next(null, res);
+                        }
+                    }),
+            ],
+            err => {
+                if (err) {
+                    cb(err, 5000);
+                } else {
+                    cb(null, 0);
+                }
+            },
+        );
     }
 
     /**

@@ -24,12 +24,16 @@ describe('SproxydKeysSubscribers', () => {
                 };
                 const [newerVersion, olderVersion] = [params.objectKey, params.existingObjectKey].sort();
 
-                const [olderVersionURL, newerVersionURL] = [olderVersion, newerVersion]
-                    .map(obj => duplicateHandler._getObjectURL(params.bucket, obj));
+                const [olderVersionURL, newerVersionURL] = [olderVersion, newerVersion].map(obj =>
+                    duplicateHandler._getObjectURL(params.bucket, obj),
+                );
 
                 duplicateHandler.handle(params);
                 if (idx === 0) {
-                    expect(duplicateHandler.queue.push).toHaveBeenCalledWith({ objectUrl: olderVersionURL, objectUrl2: newerVersionURL }, expect.anything());
+                    expect(duplicateHandler.queue.push).toHaveBeenCalledWith(
+                        { objectUrl: olderVersionURL, objectUrl2: newerVersionURL },
+                        expect.anything(),
+                    );
                 } else {
                     expect(duplicateHandler.queue.push).not.toHaveBeenCalledWith();
                 }

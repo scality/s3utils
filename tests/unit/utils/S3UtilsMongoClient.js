@@ -8,14 +8,9 @@ const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { Long } = require('mongodb');
 const { constants, errors } = require('@scality/arsenal');
 const S3UtilsMongoClient = require('../../../utils/S3UtilsMongoClient');
-const {
-    mongoMemoryServerParams,
-    createMongoParamsFromMongoMemoryRepl,
-} = require('../../utils/mongoUtils');
+const { mongoMemoryServerParams, createMongoParamsFromMongoMemoryRepl } = require('../../utils/mongoUtils');
 const getLocationConfig = require('../../../utils/locationConfig');
-const {
-    testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo,
-} = require('../../constants');
+const { testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo } = require('../../constants');
 
 const logger = new werelogs.Logger('S3UtilsMongoClient', 'debug', 'debug');
 const USERSBUCKET = '__usersbucket';
@@ -597,7 +592,8 @@ describe('S3UtilsMongoClient::_handleResults', () => {
         };
         const testResults = mongoTestClient._handleResults(testInputOnlyContainsLocation, true);
         const expectedRes = {
-            versions: 0, objects: 4,
+            versions: 0,
+            objects: 4,
         };
         assert.deepStrictEqual(testResults.versions, expectedRes.versions);
         assert.deepStrictEqual(testResults.objects, expectedRes.objects);
@@ -631,8 +627,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
     const locationConfig = getLocationConfig(logger);
     const tests = [
         [
-            'should add content-length to current dataStore but not replication destination '
-            + 'if replication status != COMPLETED and transient == true',
+            'should add content-length to current dataStore but not replication destination ' +
+                'if replication status != COMPLETED and transient == true',
             testBucketName,
             true,
             {
@@ -641,10 +637,12 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     ...objectMdTemp,
                     replicationInfo: {
                         ...objectMdTemp.replicationInfo,
-                        backends: [{
-                            site: 'not-completed',
-                            status: 'PENDING',
-                        }],
+                        backends: [
+                            {
+                                site: 'not-completed',
+                                status: 'PENDING',
+                            },
+                        ],
                         status: 'PENDING',
                     },
                 },
@@ -659,8 +657,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should not add content-length to replication destination but not in current dataStore '
-            + 'if replication status == COMPLETED and transient == true',
+            'should not add content-length to replication destination but not in current dataStore ' +
+                'if replication status == COMPLETED and transient == true',
             testBucketName,
             true,
             {
@@ -669,10 +667,12 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     ...objectMdTemp,
                     replicationInfo: {
                         ...objectMdTemp.replicationInfo,
-                        backends: [{
-                            site: 'completed',
-                            status: 'COMPLETED',
-                        }],
+                        backends: [
+                            {
+                                site: 'completed',
+                                status: 'COMPLETED',
+                            },
+                        ],
                         status: 'COMPLETED',
                     },
                 },
@@ -687,8 +687,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to current dataStore but not replication destination '
-            + 'if replication status != COMPLETED and transient == false',
+            'should add content-length to current dataStore but not replication destination ' +
+                'if replication status != COMPLETED and transient == false',
             testBucketName,
             false,
             {
@@ -697,10 +697,12 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     ...objectMdTemp,
                     replicationInfo: {
                         ...objectMdTemp.replicationInfo,
-                        backends: [{
-                            site: 'not-completed',
-                            status: 'PENDING',
-                        }],
+                        backends: [
+                            {
+                                site: 'not-completed',
+                                status: 'PENDING',
+                            },
+                        ],
                         status: 'PENDING',
                     },
                 },
@@ -715,8 +717,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to current dataStore and replication destination '
-            + 'if replication status == COMPLETED and transient == false',
+            'should add content-length to current dataStore and replication destination ' +
+                'if replication status == COMPLETED and transient == false',
             testBucketName,
             false,
             {
@@ -725,10 +727,12 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     ...objectMdTemp,
                     replicationInfo: {
                         ...objectMdTemp.replicationInfo,
-                        backends: [{
-                            site: 'completed',
-                            status: 'COMPLETED',
-                        }],
+                        backends: [
+                            {
+                                site: 'completed',
+                                status: 'COMPLETED',
+                            },
+                        ],
                         status: 'COMPLETED',
                     },
                 },
@@ -743,8 +747,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to each COMPLETED replication destination but not current dataStore '
-            + '(object replication status: COMPLETED)',
+            'should add content-length to each COMPLETED replication destination but not current dataStore ' +
+                '(object replication status: COMPLETED)',
             testBucketName,
             true,
             {
@@ -785,8 +789,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to each COMPLETED replications destination and current dataStore '
-            + '(object replication status: PENDING)',
+            'should add content-length to each COMPLETED replications destination and current dataStore ' +
+                '(object replication status: PENDING)',
             testBucketName,
             true,
             {
@@ -839,13 +843,15 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
                     replicationInfo: {
                         backends: [],
                     },
-                    location: [{
-                        key: 1,
-                        size: 10,
-                        start: 0,
-                        dataStoreName: 'cold-location',
-                        dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
-                    }],
+                    location: [
+                        {
+                            key: 1,
+                            size: 10,
+                            start: 0,
+                            dataStoreName: 'cold-location',
+                            dataStoreETag: '1:6c840340c3c297ca02bce0900fcfd214',
+                        },
+                    ],
                     archive: { archiveInfo: {} },
                 },
             },
@@ -861,8 +867,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore '
-            + 'when object is restoring',
+            'should add content-length to cold storage location and current dataStore when object is restoring',
             testBucketName,
             true,
             {
@@ -894,8 +899,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore '
-            + 'when object is restoring with string typed timestamps',
+            'should add content-length to cold storage location and current dataStore ' +
+                'when object is restoring with string typed timestamps',
             testBucketName,
             true,
             {
@@ -927,8 +932,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore '
-            + 'when object is restored',
+            'should add content-length to cold storage location and current dataStore when object is restored',
             testBucketName,
             true,
             {
@@ -959,8 +963,8 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore '
-            + 'when object is restored with string typed timestamps',
+            'should add content-length to cold storage location and current dataStore ' +
+                'when object is restored with string typed timestamps',
             testBucketName,
             true,
             {
@@ -1047,7 +1051,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             { error: new Error('empty locationConfig') },
         ],
         [
-            'should ignore the location if bucket\'s location is not in locationConfig',
+            "should ignore the location if bucket's location is not in locationConfig",
             testBucketName,
             true,
             {
@@ -1081,49 +1085,68 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             {},
         ],
     ];
-    tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) => it(msg, () => {
-        assert.deepStrictEqual(
-            mongoTestClient._processEntryData(bucketName, bucketInfo, params, testBucketCreationDate, isTransient, locationConfig, {
-                isCold: mongoTestClient._isObjectCold(params),
-                isRestoring: mongoTestClient._isObjectRestoring(params),
-                isRestored: mongoTestClient._isObjectRestored(params),
-            }),
-            expected,
-        );
-    }));
+    tests.forEach(([msg, bucketName, isTransient, params, locationConfig, expected]) =>
+        it(msg, () => {
+            assert.deepStrictEqual(
+                mongoTestClient._processEntryData(
+                    bucketName,
+                    bucketInfo,
+                    params,
+                    testBucketCreationDate,
+                    isTransient,
+                    locationConfig,
+                    {
+                        isCold: mongoTestClient._isObjectCold(params),
+                        isRestoring: mongoTestClient._isObjectRestoring(params),
+                        isRestored: mongoTestClient._isObjectRestored(params),
+                    },
+                ),
+                expected,
+            );
+        }),
+    );
 });
 
 function createBucket(client, bucketName, isVersioned, callback) {
     const bucketMD = BucketInfo.fromObj({
         ...testBucketMD,
         _name: bucketName,
-        _versioningConfiguration: isVersioned
-            ? { Status: 'Enabled' }
-            : null,
+        _versioningConfiguration: isVersioned ? { Status: 'Enabled' } : null,
     });
     client.createBucket(bucketName, bucketMD, logger, callback);
 }
 
 function uploadObjects(client, bucketName, objectList, callback) {
-    async.eachSeries(objectList, (obj, done) => {
-        const length = obj.contentLength >= 0 ? obj.contentLength : 100;
-        const objMD = new ObjectMD()
-            .setKey(obj.name)
-            .setDataStoreName(obj.dataStore || 'us-east-1')
-            .setContentLength(length)
-            .setLastModified(obj.lastModified)
-            .setOwnerId(obj.ownerId)
-            .setIsNull(obj.isNull)
-            .setArchive(obj.archive)
-            .setIsDeleteMarker(obj.isDeleteMarker);
-        if (obj.repInfo) {
-            objMD.setReplicationInfo(obj.repInfo);
-        }
-        client.putObject(bucketName, obj.name, objMD.getValue(), {
-            versionId: obj.versionId,
-            versioning: obj.versioning,
-        }, logger, done);
-    }, callback);
+    async.eachSeries(
+        objectList,
+        (obj, done) => {
+            const length = obj.contentLength >= 0 ? obj.contentLength : 100;
+            const objMD = new ObjectMD()
+                .setKey(obj.name)
+                .setDataStoreName(obj.dataStore || 'us-east-1')
+                .setContentLength(length)
+                .setLastModified(obj.lastModified)
+                .setOwnerId(obj.ownerId)
+                .setIsNull(obj.isNull)
+                .setArchive(obj.archive)
+                .setIsDeleteMarker(obj.isDeleteMarker);
+            if (obj.repInfo) {
+                objMD.setReplicationInfo(obj.repInfo);
+            }
+            client.putObject(
+                bucketName,
+                obj.name,
+                objMD.getValue(),
+                {
+                    versionId: obj.versionId,
+                    versioning: obj.versioning,
+                },
+                logger,
+                done,
+            );
+        },
+        callback,
+    );
 }
 
 describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
@@ -1134,7 +1157,14 @@ describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
     it('should seed zero-value bucket, account and location entries and return true', () => {
         const collRes = { bucket: {}, location: {}, account: {} };
         const log = { warn: sinon.spy() };
-        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, false, log);
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(
+            collRes,
+            bucketResource,
+            bucketInfo,
+            locationConfig,
+            false,
+            log,
+        );
         assert.strictEqual(seeded, true);
         assert.deepStrictEqual(Object.keys(collRes.bucket), [bucketResource]);
         assert.deepStrictEqual(Object.keys(collRes.account), [testAccountCanonicalId]);
@@ -1145,7 +1175,14 @@ describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
     it('should warn and seed nothing when no __usersbucket creation date is available', () => {
         const collRes = { bucket: {}, location: {}, account: {} };
         const log = { warn: sinon.spy() };
-        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, undefined, bucketInfo, locationConfig, false, log);
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(
+            collRes,
+            undefined,
+            bucketInfo,
+            locationConfig,
+            false,
+            log,
+        );
         assert.strictEqual(seeded, false);
         assert.deepStrictEqual(collRes, { bucket: {}, location: {}, account: {} });
         assert.strictEqual(log.warn.calledOnce, true);
@@ -1154,7 +1191,14 @@ describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
     it('should warn and seed nothing when the scan had processing errors', () => {
         const collRes = { bucket: {}, location: {}, account: {} };
         const log = { warn: sinon.spy() };
-        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, true, log);
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(
+            collRes,
+            bucketResource,
+            bucketInfo,
+            locationConfig,
+            true,
+            log,
+        );
         assert.strictEqual(seeded, false);
         assert.deepStrictEqual(collRes, { bucket: {}, location: {}, account: {} });
         assert.strictEqual(log.warn.calledOnce, true);
@@ -1163,7 +1207,14 @@ describe('S3UtilsMongoClient::_seedEmptyBucketMetrics', () => {
     it('should seed nothing when the bucket already produced metrics', () => {
         const collRes = { bucket: { existing: {} }, location: {}, account: {} };
         const log = { warn: sinon.spy() };
-        const seeded = mongoTestClient._seedEmptyBucketMetrics(collRes, bucketResource, bucketInfo, locationConfig, false, log);
+        const seeded = mongoTestClient._seedEmptyBucketMetrics(
+            collRes,
+            bucketResource,
+            bucketInfo,
+            locationConfig,
+            false,
+            log,
+        );
         assert.strictEqual(seeded, false);
         assert.deepStrictEqual(collRes, { bucket: { existing: {} }, location: {}, account: {} });
         assert.strictEqual(log.warn.called, false);
@@ -1183,16 +1234,23 @@ describe('S3UtilsMongoClient, tests', () => {
         await util.promisify(client.setup).bind(client)();
     });
 
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-        next => {
-            sinon.restore();
-            next();
-        },
-    ], done));
+    afterAll(done =>
+        async.series(
+            [
+                next => client.close(next),
+                next =>
+                    repl
+                        .stop()
+                        .then(() => next())
+                        .catch(next),
+                next => {
+                    sinon.restore();
+                    next();
+                },
+            ],
+            done,
+        ),
+    );
 
     const nonVersionedObjectMdTemp = {
         name: 'testkey',
@@ -2073,7 +2131,7 @@ describe('S3UtilsMongoClient, tests', () => {
             },
         ],
         [
-            'getObjectMDStats() should return correct results for versioned bucket with objects in cold storage, restoring and restored',
+            'getObjectMDStats() should return correct results for versioned cold, restoring and restored objects',
             {
                 bucketName: 'test-bucket',
                 isVersioned: true,
@@ -2973,89 +3031,98 @@ describe('S3UtilsMongoClient, tests', () => {
             },
         ],
     ];
-    tests.forEach(([msg, testCase, expected]) => it(msg, done => {
-        const {
-            bucketName,
-            isVersioned,
-            objectList,
-            inflights,
-            skipUsersBucket,
-        } = testCase;
-        return async.waterfall([
-            next => createBucket(client, bucketName, isVersioned, err => next(err)),
-            next => (skipUsersBucket
-                ? next()
-                : client.putObject(
-                    USERSBUCKET,
-                    `${testBucketMD._owner}${constants.splitter}${bucketName}`,
-                    testUserBucketInfo.value,
-                    {
-                        versioning: false,
-                        versionId: null,
-                    },
-                    logger,
-                    next,
-                )),
-            next => uploadObjects(client, bucketName, objectList, err => next(err)),
-            next => client.getBucketAttributes(bucketName, logger, next),
-            (bucketInfo, next) => {
-                if (inflights) {
-                    const mock = sinon.stub(client, 'readStorageConsumptionInflights');
-                    mock.onFirstCall().returns(Promise.resolve(inflights));
-                    mock.onSecondCall().returns(Promise.resolve((inflights * 3n) / 2n));
-                }
-                return client.getObjectMDStats(
-                    bucketName,
-                    BucketInfo.fromObj(bucketInfo),
-                    false,
-                    logger,
-                    (err, res) => {
-                        if (err) {
-                            return next(err);
+    tests.forEach(([msg, testCase, expected]) =>
+        it(msg, done => {
+            const { bucketName, isVersioned, objectList, inflights, skipUsersBucket } = testCase;
+            return async.waterfall(
+                [
+                    next => createBucket(client, bucketName, isVersioned, err => next(err)),
+                    next =>
+                        skipUsersBucket
+                            ? next()
+                            : client.putObject(
+                                  USERSBUCKET,
+                                  `${testBucketMD._owner}${constants.splitter}${bucketName}`,
+                                  testUserBucketInfo.value,
+                                  {
+                                      versioning: false,
+                                      versionId: null,
+                                  },
+                                  logger,
+                                  next,
+                              ),
+                    next => uploadObjects(client, bucketName, objectList, err => next(err)),
+                    next => client.getBucketAttributes(bucketName, logger, next),
+                    (bucketInfo, next) => {
+                        if (inflights) {
+                            const mock = sinon.stub(client, 'readStorageConsumptionInflights');
+                            mock.onFirstCall().returns(Promise.resolve(inflights));
+                            mock.onSecondCall().returns(Promise.resolve((inflights * 3n) / 2n));
                         }
-                        assert.deepStrictEqual(res, expected);
-                        return next();
+                        return client.getObjectMDStats(
+                            bucketName,
+                            BucketInfo.fromObj(bucketInfo),
+                            false,
+                            logger,
+                            (err, res) => {
+                                if (err) {
+                                    return next(err);
+                                }
+                                assert.deepStrictEqual(res, expected);
+                                return next();
+                            },
+                        );
                     },
-                );
-            },
-            next => client.deleteBucket(bucketName, logger, next),
-        ], done);
-    }));
+                    next => client.deleteBucket(bucketName, logger, next),
+                ],
+                done,
+            );
+        }),
+    );
 
     it('getObjectMDStats() should not seed metrics when entries fail processing', done => {
         const name = 'test-bucket-scan-errors';
-        return async.waterfall([
-            next => createBucket(client, name, false, err => next(err)),
-            next => client.putObject(
-                USERSBUCKET,
-                `${testBucketMD._owner}${constants.splitter}${name}`,
-                testUserBucketInfo.value,
-                { versioning: false, versionId: null },
-                logger,
-                next,
-            ),
-            next => uploadObjects(
-                client,
-                name,
-                [{ name: 'obj1', ownerId: testAccountCanonicalId, lastModified: new Date(Date.now()) }],
-                err => next(err),
-            ),
-            next => client.getBucketAttributes(name, logger, next),
-            (bucketInfo, next) => {
-                // Every entry fails _processEntryData, so collRes stays empty even
-                // though the bucket has an object: seeding zero here would under-report.
-                const stub = sinon.stub(client, '_processEntryData').returns({ error: new Error('boom') });
-                return client.getObjectMDStats(name, BucketInfo.fromObj(bucketInfo), false, logger, (err, res) => {
-                    stub.restore();
-                    if (err) {
-                        return next(err);
-                    }
-                    assert.deepStrictEqual(res.dataMetrics.bucket, {}, 'must not seed when entries failed processing');
-                    return next();
-                });
-            },
-            next => client.deleteBucket(name, logger, next),
-        ], done);
+        return async.waterfall(
+            [
+                next => createBucket(client, name, false, err => next(err)),
+                next =>
+                    client.putObject(
+                        USERSBUCKET,
+                        `${testBucketMD._owner}${constants.splitter}${name}`,
+                        testUserBucketInfo.value,
+                        { versioning: false, versionId: null },
+                        logger,
+                        next,
+                    ),
+                next =>
+                    uploadObjects(
+                        client,
+                        name,
+                        [{ name: 'obj1', ownerId: testAccountCanonicalId, lastModified: new Date(Date.now()) }],
+                        err => next(err),
+                    ),
+                next => client.getBucketAttributes(name, logger, next),
+                (bucketInfo, next) => {
+                    // Every entry fails _processEntryData, so collRes stays empty even
+                    // though the bucket has an object: seeding zero here would under-report.
+                    const stub = sinon.stub(client, '_processEntryData').returns({ error: new Error('boom') });
+                    return client.getObjectMDStats(name, BucketInfo.fromObj(bucketInfo), false, logger, (err, res) => {
+                        stub.restore();
+                        if (err) {
+                            return next(err);
+                        }
+                        assert.deepStrictEqual(
+                            res.dataMetrics.bucket,
+                            {},
+                            'must not seed when entries failed processing',
+                        );
+                        return next();
+                    });
+                },
+                next => client.deleteBucket(name, logger, next),
+            ],
+            done,
+        );
     });
 });
 
@@ -3168,12 +3235,19 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
         done();
     });
 
-    afterAll(done => async.series([
-        next => client.close(next),
-        next => repl.stop()
-            .then(() => next())
-            .catch(next),
-    ], done));
+    afterAll(done =>
+        async.series(
+            [
+                next => client.close(next),
+                next =>
+                    repl
+                        .stop()
+                        .then(() => next())
+                        .catch(next),
+            ],
+            done,
+        ),
+    );
 
     it('should do nothing if the metrics are empty', async () => {
         const input = [];
@@ -3207,9 +3281,7 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
                 close: async () => {},
             }),
         });
-        const output = await client.updateInflightDeltas([
-            ...metrics,
-        ], logger);
+        const output = await client.updateInflightDeltas([...metrics], logger);
         // first bucket: 1000 current + (3000 post scan - 100 pre scan) = 3900
         assert.strictEqual(output[0].usedCapacity.current, 3900n);
         // second bucket: 1000 current + (5000 post scan - 1500 pre scan) = 4500
@@ -3221,22 +3293,23 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
 
     // `updateInflightDeltas` mutates the entries it is given, so build a fresh set
     // rather than sharing `metrics` with the tests above.
-    const longMetrics = () => [
-        {
-            _id: 'bucket_bucket1_1715849127256',
-            accountOwnerID: '1234',
-            usedCapacity: { current: 1000n, _inflightsPreScan: 100n },
-        },
-        {
-            _id: 'bucket_bucket2_1715849127257',
-            accountOwnerID: '1234',
-            usedCapacity: { current: 1000n, _inflightsPreScan: 1500n },
-        },
-        {
-            _id: 'account_1234',
-            usedCapacity: { current: 2000n },
-        },
-    ].map(entry => S3UtilsMongoClient.convertNumberToLong(entry));
+    const longMetrics = () =>
+        [
+            {
+                _id: 'bucket_bucket1_1715849127256',
+                accountOwnerID: '1234',
+                usedCapacity: { current: 1000n, _inflightsPreScan: 100n },
+            },
+            {
+                _id: 'bucket_bucket2_1715849127257',
+                accountOwnerID: '1234',
+                usedCapacity: { current: 1000n, _inflightsPreScan: 1500n },
+            },
+            {
+                _id: 'account_1234',
+                usedCapacity: { current: 2000n },
+            },
+        ].map(entry => S3UtilsMongoClient.convertNumberToLong(entry));
 
     it('should compute the inflights deltas with the types mongodb returns', async () => {
         // `__infostore` stores BSON Longs and the driver promotes them to Numbers on
@@ -3275,13 +3348,16 @@ describe('S3UtilsMongoClient, update inflight deltas', () => {
             usedCapacity: { _inflight: Long.fromNumber(3000) },
         });
 
-        const output = await client.updateInflightDeltas([
-            S3UtilsMongoClient.convertNumberToLong({
-                _id: 'bucket_bucket1_1715849127256',
-                accountOwnerID: '1234',
-                usedCapacity: { current: 1000n },
-            }),
-        ], logger);
+        const output = await client.updateInflightDeltas(
+            [
+                S3UtilsMongoClient.convertNumberToLong({
+                    _id: 'bucket_bucket1_1715849127256',
+                    accountOwnerID: '1234',
+                    usedCapacity: { current: 1000n },
+                }),
+            ],
+            logger,
+        );
 
         // 1000 current + (3000 post scan - 0 pre scan) = 4000
         assert.strictEqual(BigInt(output[0].usedCapacity.current), 4000n);

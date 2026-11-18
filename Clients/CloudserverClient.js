@@ -1,4 +1,4 @@
-const { 
+const {
     CloudserverClient,
     GetMetadataCommand,
     PutMetadataCommand,
@@ -13,13 +13,13 @@ class Client {
     constructor(endpoint, accessKey, secretKey, agent) {
         const isHttps = endpoint.startsWith('https:');
         let httpAgent = agent;
-        
+
         if (!httpAgent) {
             if (isHttps) {
                 httpAgent = new https.Agent({
                     keepAlive: true,
                     rejectUnauthorized: false,
-                    timeout: 60000,                    
+                    timeout: 60000,
                 });
             } else {
                 httpAgent = new httpArsn.Agent({
@@ -38,7 +38,7 @@ class Client {
         } else {
             requestHandler.httpAgent = httpAgent;
         }
-        
+
         const config = {
             endpoint,
             credentials: {
@@ -55,35 +55,40 @@ class Client {
 
     getMetadata(params, callback) {
         const command = new GetMetadataCommand(params);
-        this.client.backbeatRoutes.send(command)
+        this.client.backbeatRoutes
+            .send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     putMetadata(params, callback) {
         const command = new PutMetadataCommand(params);
-        this.client.backbeatRoutes.send(command)
+        this.client.backbeatRoutes
+            .send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     getLocationsStatus(callback) {
         const command = new GetLocationsStatusCommand({});
-        this.client.proxyBackbeatApis.send(command)
+        this.client.proxyBackbeatApis
+            .send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     listFailed(params, callback) {
         const command = new ListFailedCommand(params);
-        this.client.proxyBackbeatApis.send(command)
+        this.client.proxyBackbeatApis
+            .send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }
 
     retryFailedObjects(params, callback) {
         const command = new RetryFailedObjectsCommand(params);
-        this.client.proxyBackbeatApis.send(command)
+        this.client.proxyBackbeatApis
+            .send(command)
             .then(data => callback(null, data))
             .catch(err => callback(err));
     }

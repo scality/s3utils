@@ -23,4 +23,4 @@ tests:
                 No successful artesca-data-ops-update-bucket-capacity-info-1
                 job run in the last 600s, will cause bucket capacity to be out of date
                 and Veeam will process all buckets in non-SOSAPI mode.
-              summary: "No successful artesca-data-ops-update-bucket-capacity-info-1 job run, affecting Veeam SOSAPI"
+              summary: 'No successful artesca-data-ops-update-bucket-capacity-info-1 job run, affecting Veeam SOSAPI'
