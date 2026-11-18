@@ -81,6 +81,7 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb
       - run: yarn --network-concurrency 1
       - run: yarn --silent lint -- --max-warnings 0
+      - run: yarn --silent prettier:check
       - run: yarn --silent test:unit
       - run: yarn --silent test:functional
         env:

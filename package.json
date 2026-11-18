@@ -7,6 +7,7 @@
   "description": "Awesome scripts to use when working with S3 at scale",
   "scripts": {
     "lint": "eslint $(git ls-files '*.js')",
+    "prettier:check": "prettier --check .",
     "jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/unit --testPathPatterns='tests/unit/[\\w/-]+\\.[tj]s'",
     "test:functional": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/functional --testPathPatterns='tests/functional/[\\w/-]+\\.[tj]s'"
@@ -56,6 +57,7 @@
     "eslint-plugin-jest": "^29.17.0",
     "jest": "^30.5.2",
     "mongodb-memory-server": "10.1.2",
+    "prettier": "^3.10.1",
     "sinon": "^22.1.0"
   }
 }
