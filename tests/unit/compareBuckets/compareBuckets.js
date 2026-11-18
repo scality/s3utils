@@ -328,7 +328,7 @@ describe('commpareObjectsReports', () => {
         });
     });
 
-    it('should return report if version-id does not match', () => {
+    it('should return report if version-id does match', () => {
         const report = compareObjectsReport(
             'sourceBucket',
             { key: 'key1', value: objectMDVersion1Size100 },
