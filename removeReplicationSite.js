@@ -17,7 +17,7 @@ const FORCE_REMOVE_CONFIGURED_SITE =
     process.env.FORCE_REMOVE_CONFIGURED_SITE === 'true' || process.env.FORCE_REMOVE_CONFIGURED_SITE === '1';
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' + 'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide a comma-separated list of buckets');
     process.exit(1);
 }
 ['ENDPOINT', 'ACCESS_KEY', 'SECRET_KEY', 'SITE_TO_REMOVE'].forEach(name => {

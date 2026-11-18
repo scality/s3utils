@@ -88,7 +88,7 @@ Optional environment variables:
 // We accept console statements for usage purpose
 /* eslint-disable no-console */
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide ' + 'a comma-separated list of buckets');
+    console.error('No buckets given as input, please provide a comma-separated list of buckets');
     console.error(USAGE);
     process.exit(1);
 }

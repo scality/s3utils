@@ -538,12 +538,12 @@ async function processBucket(bucket) {
 
 async function main() {
     if (!BUCKETS && !RAFT_SESSIONS) {
-        console.error('ERROR: either BUCKETS or RAFT_SESSIONS environment ' + 'variable must be defined');
+        console.error('ERROR: either BUCKETS or RAFT_SESSIONS environment variable must be defined');
         console.error(USAGE);
         process.exit(1);
     }
     if (BUCKETS && RAFT_SESSIONS) {
-        console.error('ERROR: only one of BUCKETS or RAFT_SESSIONS environment ' + 'variables can be defined');
+        console.error('ERROR: only one of BUCKETS or RAFT_SESSIONS environment variables can be defined');
         console.error(USAGE);
         process.exit(1);
     }

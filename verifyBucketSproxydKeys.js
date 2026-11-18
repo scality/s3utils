@@ -103,14 +103,14 @@ Optional environment variables:
 
 if (!BUCKETS && !RAFT_SESSIONS && !KEYS_FROM_STDIN) {
     console.error(
-        'ERROR: either BUCKETS or RAFT_SESSIONS or KEYS_FROM_STDIN environment ' + 'variable must be defined',
+        'ERROR: either BUCKETS or RAFT_SESSIONS or KEYS_FROM_STDIN environment variable must be defined',
     );
     console.error(USAGE);
     process.exit(1);
 }
 if ((BUCKETS ? 1 : 0) + (RAFT_SESSIONS ? 1 : 0) + (KEYS_FROM_STDIN ? 1 : 0) > 1) {
     console.error(
-        'ERROR: only one of BUCKETS, RAFT_SESSIONS or KEYS_FROM_STDIN environment ' + 'variables can be defined',
+        'ERROR: only one of BUCKETS, RAFT_SESSIONS or KEYS_FROM_STDIN environment variables can be defined',
     );
     console.error(USAGE);
     process.exit(1);

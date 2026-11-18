@@ -16,7 +16,7 @@ const { ACCESS_KEY } = process.env;
 const { SECRET_KEY } = process.env;
 const { ENDPOINT } = process.env;
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' + 'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {

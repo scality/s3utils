@@ -29,7 +29,7 @@ const { ACCESS_KEY, SECRET_KEY, ENDPOINT } = process.env;
 const LISTING_LIMIT = (process.env.LISTING_LIMIT && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide ' + 'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -72,10 +72,10 @@ log.info(
 
 // FORCE_USING_CONFIGURATION was only on with 'true' or '1': we warn in these cases only.
 if (['true', '1'].includes(process.env.FORCE_USING_CONFIGURATION)) {
-    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket ' + 'replication configuration');
+    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket replication configuration');
 }
 if (process.env.STORAGE_TYPE) {
-    log.warn('STORAGE_TYPE is ignored: backbeat reads the location type from the location ' + 'config of the site');
+    log.warn('STORAGE_TYPE is ignored: backbeat reads the location type from the location config of the site');
 }
 
 // Optional: tells which sites are public clouds, which get no bucket and no role on their

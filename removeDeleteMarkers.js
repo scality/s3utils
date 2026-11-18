@@ -53,7 +53,7 @@ const { VERSION_ID_MARKER } = process.env;
 
 if (!BUCKETS || BUCKETS.length === 0) {
     console.error(
-        'No buckets given as input, please provide ' + 'a comma-separated list of buckets on the command line',
+        'No buckets given as input, please provide a comma-separated list of buckets on the command line',
     );
     console.error(USAGE);
     process.exit(1);

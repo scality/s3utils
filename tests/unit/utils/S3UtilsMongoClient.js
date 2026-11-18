@@ -867,7 +867,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore ' + 'when object is restoring',
+            'should add content-length to cold storage location and current dataStore when object is restoring',
             testBucketName,
             true,
             {
@@ -932,7 +932,7 @@ describe('S3UtilsMongoClient::_processEntryData', () => {
             },
         ],
         [
-            'should add content-length to cold storage location and current dataStore ' + 'when object is restored',
+            'should add content-length to cold storage location and current dataStore when object is restored',
             testBucketName,
             true,
             {
