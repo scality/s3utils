@@ -1,8 +1,6 @@
 const async = require('async');
 
-const {
-    MongoClientInterface,
-} = require('@scality/arsenal').storage.metadata.mongoclient;
+const { MongoClientInterface } = require('@scality/arsenal').storage.metadata.mongoclient;
 
 class MongoClientInterfaceStalled extends MongoClientInterface {
     constructor(params) {
@@ -24,14 +22,16 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
             },
             'value.last-modified': 1,
         };
-        return c.aggregate([
-            {
-                $match: {
-                    'value.replicationInfo.status': { $eq: 'PENDING' },
+        return c
+            .aggregate([
+                {
+                    $match: {
+                        'value.replicationInfo.status': { $eq: 'PENDING' },
+                    },
                 },
-            },
-            { $project: reducedFields },
-        ]).stream();
+                { $project: reducedFields },
+            ])
+            .stream();
     }
 
     async queueStalledObjects(expiredBy, cb) {
@@ -42,37 +42,41 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
         let stalledCount = 0;
         try {
             const collections = await this.db.listCollections().toArray();
-            return async.eachSeries(collections, (value, next) => {
-                if (this._isSpecialCollection(value.name)) {
-                    // skip
-                    return next();
-                }
-                const bucketName = value.name;
-                const wrapper = this.cursorWrapperFactory(
-                    bucketName,
-                    cmpDate,
-                    this._getStalledObjectsByBucket(bucketName),
-                    this.logger,
-                );
-                return reqHandler.handleRequests(wrapper, (err, results) => {
-                    if (err) {
-                        this.logger.error(
-                            'encountered error while processing requests',
-                            { method: 'queueStalledObjects', error: err },
-                        );
-                        return next(err);
+            return async.eachSeries(
+                collections,
+                (value, next) => {
+                    if (this._isSpecialCollection(value.name)) {
+                        // skip
+                        return next();
                     }
+                    const bucketName = value.name;
+                    const wrapper = this.cursorWrapperFactory(
+                        bucketName,
+                        cmpDate,
+                        this._getStalledObjectsByBucket(bucketName),
+                        this.logger,
+                    );
+                    return reqHandler.handleRequests(wrapper, (err, results) => {
+                        if (err) {
+                            this.logger.error('encountered error while processing requests', {
+                                method: 'queueStalledObjects',
+                                error: err,
+                            });
+                            return next(err);
+                        }
 
-                    this.logger.debug('completed handling requests', {
-                        method: 'queueStalledObjects',
-                        bucket: value.name,
-                        info: results,
+                        this.logger.debug('completed handling requests', {
+                            method: 'queueStalledObjects',
+                            bucket: value.name,
+                            info: results,
+                        });
+
+                        stalledCount += results.stalled;
+                        return next();
                     });
-
-                    stalledCount += results.stalled;
-                    return next();
-                });
-            }, err => cb(err, stalledCount));
+                },
+                err => cb(err, stalledCount),
+            );
         } catch (err) {
             return cb(err);
         }
@@ -82,4 +86,3 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
 module.exports = {
     MongoClientInterfaceStalled,
 };
-

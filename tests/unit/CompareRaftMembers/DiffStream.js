@@ -13,13 +13,7 @@ class MockBucketStream extends stream.Readable {
     constructor(params) {
         super({ objectMode: true });
 
-        const {
-            bucketdHost,
-            bucketdPort,
-            bucketName,
-            marker,
-            lastKey,
-        } = params;
+        const { bucketdHost, bucketdPort, bucketName, marker, lastKey } = params;
         expect(bucketdHost).toEqual('dummy-host');
         expect(bucketdPort).toEqual(4242);
 
@@ -32,8 +26,7 @@ class MockBucketStream extends stream.Readable {
             if (itemBucketName !== bucketName) {
                 return false;
             }
-            return (!marker || objectKey > marker)
-                && (!lastKey || objectKey <= lastKey);
+            return (!marker || objectKey > marker) && (!lastKey || objectKey <= lastKey);
         });
     }
 
@@ -58,16 +51,16 @@ class MockDigestsDB {
     iterator(params) {
         const { gte, lt } = params || {};
         const digests = this.storedDigests.filter(
-            digestEntry => (!gte || digestEntry.key >= gte)
-                && (!lt || digestEntry.key < lt),
+            digestEntry => (!gte || digestEntry.key >= gte) && (!lt || digestEntry.key < lt),
         );
         return {
-            next: () => new Promise(resolve => {
-                setTimeout(() => {
-                    const digest = digests.shift();
-                    resolve(digest && [digest.key, digest.value]);
-                }, 5);
-            }),
+            next: () =>
+                new Promise(resolve => {
+                    setTimeout(() => {
+                        const digest = digests.shift();
+                        resolve(digest && [digest.key, digest.value]);
+                    }, 5);
+                }),
             close: async () => {},
         };
     }
@@ -106,9 +99,7 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with a digests DB containing a single block for the first DB key',
-                storedDigests: [
-                    { key: 'bucket/key1', value: '{"size":1,"digest":"somedigest"}' },
-                ],
+                storedDigests: [{ key: 'bucket/key1', value: '{"size":1,"digest":"somedigest"}' }],
                 dbKeys: [
                     {
                         key: 'bucket/key1',
@@ -354,16 +345,20 @@ describe('DiffStream', () => {
                     maxBufferSize: 2000,
                     BucketStreamClass: MockBucketStream,
                 });
-                async.eachSeries(testCase.dbKeys, (item, itemDone) => {
-                    const itemInfo = diffStream._parseItem(item);
-                    diffStream._getDigestBlockForItem(itemInfo, digestBlock => {
-                        expect(digestBlock).toEqual(item.expectedDigestBlock);
-                        itemDone();
-                    });
-                }, err => {
-                    expect(err).toBeFalsy();
-                    diffStream.cleanup(done);
-                });
+                async.eachSeries(
+                    testCase.dbKeys,
+                    (item, itemDone) => {
+                        const itemInfo = diffStream._parseItem(item);
+                        diffStream._getDigestBlockForItem(itemInfo, digestBlock => {
+                            expect(digestBlock).toEqual(item.expectedDigestBlock);
+                            itemDone();
+                        });
+                    },
+                    err => {
+                        expect(err).toBeFalsy();
+                        diffStream.cleanup(done);
+                    },
+                );
             });
         });
     });
@@ -394,12 +389,8 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with a single identical entry in db and bucketd',
-                dbContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
-                bucketdContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
+                dbContents: [{ key: 'bucket/key1', value: '{}' }],
+                bucketdContents: [{ key: 'bucket/key1', value: '{}' }],
                 expectedOutput: [],
                 withDigests: [
                     {
@@ -439,21 +430,11 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with a single entry with different key in db and bucketd',
-                dbContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
-                bucketdContents: [
-                    { key: 'bucket/key2', value: '{}' },
-                ],
+                dbContents: [{ key: 'bucket/key1', value: '{}' }],
+                bucketdContents: [{ key: 'bucket/key2', value: '{}' }],
                 expectedOutput: [
-                    [
-                        { key: 'bucket/key1', value: '{}' },
-                        null,
-                    ],
-                    [
-                        null,
-                        { key: 'bucket/key2', value: '{}' },
-                    ],
+                    [{ key: 'bucket/key1', value: '{}' }, null],
+                    [null, { key: 'bucket/key2', value: '{}' }],
                 ],
                 withDigests: [
                     {
@@ -488,12 +469,8 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with a single entry with same key but different value in db and bucketd',
-                dbContents: [
-                    { key: 'bucket/key1', value: '{"foo":"bar"}' },
-                ],
-                bucketdContents: [
-                    { key: 'bucket/key1', value: '{"foo":"qux"}' },
-                ],
+                dbContents: [{ key: 'bucket/key1', value: '{"foo":"bar"}' }],
+                bucketdContents: [{ key: 'bucket/key1', value: '{"foo":"qux"}' }],
                 expectedOutput: [
                     [
                         { key: 'bucket/key1', value: '{"foo":"bar"}' },
@@ -533,19 +510,12 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with single entry in db and two entries in bucketd',
-                dbContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
+                dbContents: [{ key: 'bucket/key1', value: '{}' }],
                 bucketdContents: [
                     { key: 'bucket/key1', value: '{}' },
                     { key: 'bucket/key2', value: '{"foo":"bar"}' },
                 ],
-                expectedOutput: [
-                    [
-                        null,
-                        { key: 'bucket/key2', value: '{"foo":"bar"}' },
-                    ],
-                ],
+                expectedOutput: [[null, { key: 'bucket/key2', value: '{"foo":"bar"}' }]],
                 withDigests: [
                     {
                         desc: 'with no digests DB',
@@ -580,9 +550,7 @@ describe('DiffStream', () => {
             {
                 desc: 'with an empty db and a single entry in bucketd',
                 dbContents: [],
-                bucketdContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
+                bucketdContents: [{ key: 'bucket/key1', value: '{}' }],
                 // here the absolute difference is not empty but the
                 // output is, because there is no input bucket from
                 // the db, hence no request can be made to bucketd to
@@ -598,16 +566,9 @@ describe('DiffStream', () => {
             },
             {
                 desc: 'with a single entry in db and an empty bucketd',
-                dbContents: [
-                    { key: 'bucket/key1', value: '{}' },
-                ],
+                dbContents: [{ key: 'bucket/key1', value: '{}' }],
                 bucketdContents: [],
-                expectedOutput: [
-                    [
-                        { key: 'bucket/key1', value: '{}' },
-                        null,
-                    ],
-                ],
+                expectedOutput: [[{ key: 'bucket/key1', value: '{}' }, null]],
                 withDigests: [
                     {
                         desc: 'with no digests DB',
@@ -841,8 +802,7 @@ describe('DiffStream', () => {
                     }
                     return bucketdList;
                 },
-                expectedOutput: [
-                ],
+                expectedOutput: [],
                 withDigests: [
                     {
                         desc: 'with no digests DB',
@@ -943,10 +903,7 @@ describe('DiffStream', () => {
                     const expectedDiff = [];
                     for (let i = 0; i < 7777; ++i) {
                         const paddedI = `000000${i}`.slice(-6);
-                        expectedDiff.push([
-                            { key: `bucket/key-${paddedI}`, value: '{"foo":"bar"}' },
-                            null,
-                        ]);
+                        expectedDiff.push([{ key: `bucket/key-${paddedI}`, value: '{"foo":"bar"}' }, null]);
                     }
                     return expectedDiff;
                 },
@@ -1008,18 +965,12 @@ describe('DiffStream', () => {
                     return bucketdList;
                 },
                 expectedOutput: [
-                    [
-                        null,
-                        { key: 'bucket/key-002222', value: '{"foo":"bar"}' },
-                    ],
+                    [null, { key: 'bucket/key-002222', value: '{"foo":"bar"}' }],
                     [
                         { key: 'bucket/key-003333', value: '{"foo":"qux"}' },
                         { key: 'bucket/key-003333', value: '{"foo":"bar"}' },
                     ],
-                    [
-                        { key: 'bucket/key-004444', value: '{"foo":"bar"}' },
-                        null,
-                    ],
+                    [{ key: 'bucket/key-004444', value: '{"foo":"bar"}' }, null],
                 ],
                 withDigests: [
                     {
@@ -1106,10 +1057,7 @@ describe('DiffStream', () => {
                     for (let i = 0; i < 7777; ++i) {
                         if (![1234, 6667].includes(i)) {
                             const paddedI = `000000${i}`.slice(-6);
-                            expectedDiff.push([
-                                null,
-                                { key: `bucket/key-${paddedI}`, value: '{"foo":"bar"}' },
-                            ]);
+                            expectedDiff.push([null, { key: `bucket/key-${paddedI}`, value: '{"foo":"bar"}' }]);
                         }
                     }
                     return expectedDiff;
@@ -1186,8 +1134,7 @@ describe('DiffStream', () => {
                         })
                         .on('end', () => {
                             expect(output).toEqual(expectedOutput);
-                            expect(MOCK_BUCKET_STREAM_REQUESTS_MADE)
-                                .toEqual(withDigests.expectedBucketStreamRequests);
+                            expect(MOCK_BUCKET_STREAM_REQUESTS_MADE).toEqual(withDigests.expectedBucketStreamRequests);
                             done();
                         })
                         .on('error', done);

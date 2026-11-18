@@ -1,29 +1,18 @@
-const {
-    waterfall, doWhilst, eachLimit, retry,
-} = require('async');
+const { waterfall, doWhilst, eachLimit, retry } = require('async');
 const http = require('http');
 const { Producer } = require('node-rdkafka');
 const { scheduleJob } = require('node-schedule');
 
 const { errors } = require('@scality/arsenal');
-const VID_SEP = require('@scality/arsenal').versioning.VersioningConstants
-    .VersionId.Separator;
+const VID_SEP = require('@scality/arsenal').versioning.VersioningConstants.VersionId.Separator;
 const { Logger } = require('werelogs');
 
 const CloudserverClient = require('./Clients/CloudserverClient');
 
 const log = new Logger('s3utils::requeueFailedCRRCronJob');
-const {
-    CLOUDSERVER_ENDPOINT,
-    BACKBEAT_API_ENDPOINT,
-    ACCESS_KEY,
-    SECRET_KEY,
-    SITE_NAME,
-    KAFKA_HOSTS,
-    KAFKA_TOPIC,
-} = process.env;
+const { CLOUDSERVER_ENDPOINT, BACKBEAT_API_ENDPOINT, ACCESS_KEY, SECRET_KEY, SITE_NAME, KAFKA_HOSTS, KAFKA_TOPIC } =
+    process.env;
 const CRON_RULE = process.env.CRON_RULE || '0 */6 * * *';
-
 
 if (!CLOUDSERVER_ENDPOINT) {
     throw new Error('CLOUDSERVER_ENDPOINT not defined');
@@ -38,8 +27,10 @@ if (!SECRET_KEY) {
     throw new Error('SECRET_KEY not defined');
 }
 if (!SITE_NAME) {
-    throw new Error('missing SITE_NAME environment variable, must be set to'
-                    + ' the value of "site" property in the CRR configuration');
+    throw new Error(
+        'missing SITE_NAME environment variable, must be set to' +
+            ' the value of "site" property in the CRR configuration',
+    );
 }
 if (!KAFKA_HOSTS) {
     throw new Error('KAFKA_HOSTS not defined');
@@ -53,17 +44,15 @@ const PRODUCER_RETRY_DELAY_MS = 5000;
 const PRODUCER_MAX_RETRIES = 60;
 const PRODUCER_POLL_INTERVAL_MS = 2000;
 
-const cloudserverclient = new CloudserverClient(
-    CLOUDSERVER_ENDPOINT,
-    ACCESS_KEY,
-    SECRET_KEY,
-);
+const cloudserverclient = new CloudserverClient(CLOUDSERVER_ENDPOINT, ACCESS_KEY, SECRET_KEY);
 
-const producer = new Producer({
-    'metadata.broker.list': KAFKA_HOSTS,
-    'message.max.bytes': PRODUCER_MESSAGE_MAX_BYTES,
-}, {
-});
+const producer = new Producer(
+    {
+        'metadata.broker.list': KAFKA_HOSTS,
+        'message.max.bytes': PRODUCER_MESSAGE_MAX_BYTES,
+    },
+    {},
+);
 
 let requeueInProgress = false;
 let stopRequest = false;
@@ -73,98 +62,105 @@ function _requeueObject(bucket, key, versionId, counters, cb) {
     if (stopRequest) {
         return process.nextTick(cb);
     }
-    return waterfall([
-        // get object blob
-        next => cloudserverclient.getMetadata({
-            Bucket: bucket,
-            Key: key,
-            VersionId: versionId,
-        }, (err, mdRes) => {
-            if (err) {
-                log.error('error getting metadata of object', {
-                    bucket,
-                    key,
-                    error: err.message,
-                });
-                ++counters.errors;
-            }
-            next(err, mdRes);
-        }),
-        (mdRes, next) => {
-            const objMD = JSON.parse(mdRes.Body);
-            if (!objMD.replicationInfo
-                || objMD.replicationInfo.status !== 'FAILED') {
-                log.info('skipping object: not FAILED', {
-                    bucket,
-                    key,
-                    versionId,
-                    status: objMD.replicationInfo
-                        ? objMD.replicationInfo.status : 'NEW',
-                });
-                ++counters.skipped;
-                return next();
-            }
-            const objSize = objMD['content-length'];
-            // reset to PENDING
-            objMD.replicationInfo.status = 'PENDING';
-            objMD.replicationInfo.backends[0].status = 'PENDING';
-            const mdBlob = JSON.stringify(objMD);
-            // create an entry as if coming from the raft log
-            const entry = JSON.stringify({
-                type: 'put',
-                bucket,
-                key: `${key}${VID_SEP}${objMD.versionId}`,
-                value: mdBlob,
-            });
-            return retry({
-                times: PRODUCER_MAX_RETRIES,
-                interval: PRODUCER_RETRY_DELAY_MS,
-            }, attemptDone => {
-                try {
-                    producer.produce(
-                        KAFKA_TOPIC,
-                        null, // partition
-                        Buffer.from(entry), // value
-                        `${bucket}/${key}`, // key (for keyed partitioning)
-                        Date.now(), // timestamp
-                        null,
-                    );
-                    log.info('requeued object version for replication', {
+    return waterfall(
+        [
+            // get object blob
+            next =>
+                cloudserverclient.getMetadata(
+                    {
+                        Bucket: bucket,
+                        Key: key,
+                        VersionId: versionId,
+                    },
+                    (err, mdRes) => {
+                        if (err) {
+                            log.error('error getting metadata of object', {
+                                bucket,
+                                key,
+                                error: err.message,
+                            });
+                            ++counters.errors;
+                        }
+                        next(err, mdRes);
+                    },
+                ),
+            (mdRes, next) => {
+                const objMD = JSON.parse(mdRes.Body);
+                if (!objMD.replicationInfo || objMD.replicationInfo.status !== 'FAILED') {
+                    log.info('skipping object: not FAILED', {
                         bucket,
                         key,
                         versionId,
+                        status: objMD.replicationInfo ? objMD.replicationInfo.status : 'NEW',
                     });
-                    ++counters.requeued;
-                    counters.requeuedBytes += objSize;
-                    return attemptDone();
-                } catch (err) {
-                    log.error('error producing entry to kafka, retrying', {
-                        bucket,
-                        key,
-                        error: err.message,
-                    });
-                    return attemptDone(err);
+                    ++counters.skipped;
+                    return next();
                 }
-            }, err => {
-                if (err) {
-                    log.error(
-                        'give up producing entry to kafka after retries',
-                        { bucket, key, error: err.message },
-                    );
-                    ++counters.errors;
-                }
-                next(err);
-            });
+                const objSize = objMD['content-length'];
+                // reset to PENDING
+                objMD.replicationInfo.status = 'PENDING';
+                objMD.replicationInfo.backends[0].status = 'PENDING';
+                const mdBlob = JSON.stringify(objMD);
+                // create an entry as if coming from the raft log
+                const entry = JSON.stringify({
+                    type: 'put',
+                    bucket,
+                    key: `${key}${VID_SEP}${objMD.versionId}`,
+                    value: mdBlob,
+                });
+                return retry(
+                    {
+                        times: PRODUCER_MAX_RETRIES,
+                        interval: PRODUCER_RETRY_DELAY_MS,
+                    },
+                    attemptDone => {
+                        try {
+                            producer.produce(
+                                KAFKA_TOPIC,
+                                null, // partition
+                                Buffer.from(entry), // value
+                                `${bucket}/${key}`, // key (for keyed partitioning)
+                                Date.now(), // timestamp
+                                null,
+                            );
+                            log.info('requeued object version for replication', {
+                                bucket,
+                                key,
+                                versionId,
+                            });
+                            ++counters.requeued;
+                            counters.requeuedBytes += objSize;
+                            return attemptDone();
+                        } catch (err) {
+                            log.error('error producing entry to kafka, retrying', {
+                                bucket,
+                                key,
+                                error: err.message,
+                            });
+                            return attemptDone(err);
+                        }
+                    },
+                    err => {
+                        if (err) {
+                            log.error('give up producing entry to kafka after retries', {
+                                bucket,
+                                key,
+                                error: err.message,
+                            });
+                            ++counters.errors;
+                        }
+                        next(err);
+                    },
+                );
+            },
+        ],
+        err => {
+            if (err) {
+                log.error('error in _requeueObject waterfall', { error: err.message });
+            }
+            return cb();
         },
-    ], err => {
-        if (err) {
-            log.error(
-                'error in _requeueObject waterfall',
-                { error: err.message },
-            );
-        }
-        return cb();
-    });
+    );
     /* eslint-enable no-param-reassign */
 }
 
@@ -214,7 +210,8 @@ function _requeueAll() {
                     return eachLimit(
                         result.Versions,
                         10,
-                        (version, objDone) => _requeueObject(version.Bucket, version.Key, version.VersionId, counters, objDone),
+                        (version, objDone) =>
+                            _requeueObject(version.Bucket, version.Key, version.VersionId, counters, objDone),
                         () => batchDone(null, result.IsTruncated),
                     );
                 });
@@ -256,9 +253,7 @@ producer.on('event.error', error => {
     // harmless errors (moreover with the current
     // implementation there's no way to access the original
     // error code, so we match the message instead).
-    if (!['broker transport failure',
-        'all broker connections are down']
-        .includes(error.message)) {
+    if (!['broker transport failure', 'all broker connections are down'].includes(error.message)) {
         log.error('error with producer', {
             error: error.message,
         });

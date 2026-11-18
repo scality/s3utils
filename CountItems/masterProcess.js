@@ -11,8 +11,7 @@ const createWorkers = require('./utils/createWorkers');
 const WebServer = network.http.server;
 const monitoring = require('../utils/monitoring');
 
-const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
-    ? 'debug' : 'info';
+const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1 ? 'debug' : 'info';
 
 const loggerConfig = {
     level: logLevel,
@@ -33,14 +32,15 @@ const prometheusPollingPeriod = tryParseInt(process.env.PROMETHEUS_POLLING_PERIO
 
 const prometheusPollingAttempts = tryParseInt(process.env.PROMETHEUS_POLLING_ATTEMPTS, 5);
 
-const numWorkers = process.env.NUM_WORKERS && !Number.isNaN(process.env.NUM_WORKERS)
-    ? Number.parseInt(process.env.NUM_WORKERS, 10)
-    : 4;
+const numWorkers =
+    process.env.NUM_WORKERS && !Number.isNaN(process.env.NUM_WORKERS)
+        ? Number.parseInt(process.env.NUM_WORKERS, 10)
+        : 4;
 
-const concurrentCursors = (process.env.CONCURRENT_CURSORS
-    && !Number.isNaN(process.env.CONCURRENT_CURSORS))
-    ? Number.parseInt(process.env.CONCURRENT_CURSORS, 10)
-    : 5;
+const concurrentCursors =
+    process.env.CONCURRENT_CURSORS && !Number.isNaN(process.env.CONCURRENT_CURSORS)
+        ? Number.parseInt(process.env.CONCURRENT_CURSORS, 10)
+        : 5;
 
 const countMaster = new CountMaster({
     log,
@@ -52,15 +52,17 @@ const countMaster = new CountMaster({
     client: new S3UtilsMongoClient(createMongoParams(log)),
 });
 
-const metricServer = new WebServer(8003, log).onRequest((req, res) => monitoring.metricsHandler(
-    () => {
-        if (waitingForPromScraping === true) {
-            countMaster.stop(null, () => process.exit(0));
-        }
-    },
-    req,
-    res,
-));
+const metricServer = new WebServer(8003, log).onRequest((req, res) =>
+    monitoring.metricsHandler(
+        () => {
+            if (waitingForPromScraping === true) {
+                countMaster.stop(null, () => process.exit(0));
+            }
+        },
+        req,
+        res,
+    ),
+);
 metricServer.start();
 
 const handleSignal = sig => countMaster.stop(sig, () => process.exit(0));
@@ -80,7 +82,10 @@ countMaster.start(err => {
         process.exit(1);
     }
     waitingForPromScraping = true;
-    setTimeout(() => {
-        countMaster.stop(null, () => process.exit(0));
-    }, prometheusPollingAttempts * prometheusPollingPeriod * 1000);
+    setTimeout(
+        () => {
+            countMaster.stop(null, () => process.exit(0));
+        },
+        prometheusPollingAttempts * prometheusPollingPeriod * 1000,
+    );
 });

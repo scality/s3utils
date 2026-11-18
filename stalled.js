@@ -2,17 +2,11 @@ const assert = require('assert');
 const { Logger } = require('werelogs');
 const CloudserverClient = require('./Clients/CloudserverClient');
 
-const {
-    MongoClientInterfaceStalled,
-} = require('./StalledRetry/MongoClientInterfaceStalled');
+const { MongoClientInterfaceStalled } = require('./StalledRetry/MongoClientInterfaceStalled');
 
-const {
-    RateLimitingCursor,
-} = require('./StalledRetry/CursorWrapper');
+const { RateLimitingCursor } = require('./StalledRetry/CursorWrapper');
 
-const {
-    StalledRequestHandler,
-} = require('./StalledRetry/StalledRequestHandler');
+const { StalledRequestHandler } = require('./StalledRetry/StalledRequestHandler');
 
 const { parseEnvInt } = require('./utils');
 const createMongoParams = require('./utils/createMongoParams');
@@ -47,33 +41,23 @@ require('./utils/heapProfiler')(HEAP_PROFILER_PATH, HEAP_PROFILER_INTERVAL_MS);
 const log = new Logger('S3Utils::Stalled');
 
 function wrapperFactory(bucketName, cmpDate, cursor, log) {
-    return new RateLimitingCursor(
-        cursor,
-        {
-            log,
-            queueLimit: QUEUE_LIMIT,
-            cmpDate,
-            bucketName,
-        },
-    );
+    return new RateLimitingCursor(cursor, {
+        log,
+        queueLimit: QUEUE_LIMIT,
+        cmpDate,
+        bucketName,
+    });
 }
 
 function handlerFactory(log) {
-    const cloudserverClient = new CloudserverClient(
-        ENDPOINT,
-        ACCESS_KEY,
-        SECRET_KEY,
-    );
+    const cloudserverClient = new CloudserverClient(ENDPOINT, ACCESS_KEY, SECRET_KEY);
 
-    return new StalledRequestHandler(
-        cloudserverClient,
-        {
-            dryRun: DRY_RUN,
-            batchSize: BATCH_SIZE,
-            concurrentRequests: CONCURRENT_REQUESTS,
-            log,
-        },
-    );
+    return new StalledRequestHandler(cloudserverClient, {
+        dryRun: DRY_RUN,
+        batchSize: BATCH_SIZE,
+        concurrentRequests: CONCURRENT_REQUESTS,
+        log,
+    });
 }
 
 const readPreference = MONGODB_READ_PREFERENCE;

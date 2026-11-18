@@ -46,7 +46,6 @@ class MetricReport {
     }
 }
 
-
 /**
  * @param {Array<Number>} sessionIds - raft session ids to retrieve metrics for (only contains info if scuba backend is enabled)
  * @param {integer} timestamp - timestamp to retrieve metrics in microseconds
@@ -72,10 +71,13 @@ async function getMetricsForBucket(sessionIds, timestamp, bucket, log) {
 
         return logResults
             .filter(result => result !== null)
-            .reduce((acc, result) => ({
-                count: acc.count + parseInt(result.value.metrics.objectsTotal, 10),
-                bytes: acc.bytes + parseInt(result.value.metrics.bytesTotal, 10),
-            }), { count: 0, bytes: 0 });
+            .reduce(
+                (acc, result) => ({
+                    count: acc.count + parseInt(result.value.metrics.objectsTotal, 10),
+                    bytes: acc.bytes + parseInt(result.value.metrics.bytesTotal, 10),
+                }),
+                { count: 0, bytes: 0 },
+            );
     }
     return warp10.getMetricsForBucket(timestamp, bucket.name, log);
 }

@@ -119,15 +119,22 @@ class ReplicationSiteRemover {
         this.replicationGroupId = crypto.randomBytes(4).toString('hex').slice(0, 7);
         this.instanceId = crypto.randomBytes(3).toString('hex').slice(0, 6);
 
-        this.s3 = createS3Client({
-            accessKey: params.accessKey,
-            secretKey: params.secretKey,
-            endpoint: params.endpoint,
-        }, log);
+        this.s3 = createS3Client(
+            {
+                accessKey: params.accessKey,
+                secretKey: params.secretKey,
+                endpoint: params.endpoint,
+            },
+            log,
+        );
         this.cloudserverClient = new CloudserverClient(params.endpoint, params.accessKey, params.secretKey);
 
         this.stats = {
-            scanned: 0, updated: 0, reset: 0, skipped: 0, errors: 0,
+            scanned: 0,
+            updated: 0,
+            reset: 0,
+            skipped: 0,
+            errors: 0,
         };
         this._bucketInProgress = null;
         this._keyMarker = null;
@@ -197,7 +204,10 @@ class ReplicationSiteRemover {
             }
             const remaining = backends.filter(b => b.site !== this.siteToRemove);
             const { storageClass, storageType } = removeSiteFromLists(
-                objMD.getReplicationStorageClass(), objMD.getReplicationStorageType(), this.siteToRemove);
+                objMD.getReplicationStorageClass(),
+                objMD.getReplicationStorageType(),
+                this.siteToRemove,
+            );
             const reset = remaining.length === 0;
             const newStatus = reset ? '' : getGlobalStatus(remaining);
             this.log.info(this.dryRun ? 'would update object (dry run)' : 'updating object', {
@@ -223,8 +233,7 @@ class ReplicationSiteRemover {
                         objMD.getReplicationInfo().isReplica = repInfo.isReplica;
                     }
                 } else {
-                    objMD.setReplicationBackends(remaining)
-                        .setReplicationStatus(newStatus);
+                    objMD.setReplicationBackends(remaining).setReplicationStatus(newStatus);
                     // deprecated fields, still present on metadata in the old single-destination
                     // format (S3C 9.5): keep them in line with the backends
                     const ri = objMD.getReplicationInfo();
@@ -268,9 +277,10 @@ class ReplicationSiteRemover {
         }
         const ruleSites = getRuleSites(rules);
         if (ruleSites.includes(this.siteToRemove)) {
-            const message = `SITE_TO_REMOVE "${this.siteToRemove}" is a destination of bucket ${bucket} `
-                + '(StorageClass of its replication rule). Removing it would reset objects that '
-                + 'replicate to it. Check SITE_TO_REMOVE, or set FORCE_REMOVE_CONFIGURED_SITE=true';
+            const message =
+                `SITE_TO_REMOVE "${this.siteToRemove}" is a destination of bucket ${bucket} ` +
+                '(StorageClass of its replication rule). Removing it would reset objects that ' +
+                'replicate to it. Check SITE_TO_REMOVE, or set FORCE_REMOVE_CONFIGURED_SITE=true';
             this.log.error(message, { bucket, site: this.siteToRemove, ruleSites });
             throw new Error(message);
         }
@@ -291,20 +301,24 @@ class ReplicationSiteRemover {
         this.inputKeyMarker = undefined;
         this.inputVersionIdMarker = undefined;
         this.log.info('starting bucket', {
-            bucket, site: this.siteToRemove, dryRun: this.dryRun,
-            keyMarker: this._keyMarker, versionIdMarker: this._versionIdMarker,
+            bucket,
+            site: this.siteToRemove,
+            dryRun: this.dryRun,
+            keyMarker: this._keyMarker,
+            versionIdMarker: this._versionIdMarker,
         });
         do {
-            const data = await this.s3.send(new ListObjectVersionsCommand({
-                Bucket: bucket,
-                MaxKeys: this.listingLimit,
-                Prefix: this.targetPrefix,
-                KeyMarker: this._keyMarker || undefined,
-                VersionIdMarker: this._versionIdMarker || undefined,
-            }));
+            const data = await this.s3.send(
+                new ListObjectVersionsCommand({
+                    Bucket: bucket,
+                    MaxKeys: this.listingLimit,
+                    Prefix: this.targetPrefix,
+                    KeyMarker: this._keyMarker || undefined,
+                    VersionIdMarker: this._versionIdMarker || undefined,
+                }),
+            );
             const versions = (data.Versions || []).concat(data.DeleteMarkers || []);
-            await eachLimit(versions, this.workers,
-                async v => this._processVersion(bucket, v.Key, v.VersionId));
+            await eachLimit(versions, this.workers, async v => this._processVersion(bucket, v.Key, v.VersionId));
             this._keyMarker = data.NextKeyMarker || null;
             this._versionIdMarker = data.NextVersionIdMarker || null;
             if (this._limitReached()) {
@@ -331,8 +345,8 @@ class ReplicationSiteRemover {
                 if (limit) {
                     const remaining = this.buckets.slice(bucketDone ? i + 1 : i);
                     if (remaining.length > 0) {
-                        let message = `reached ${limit}, resume by re-running `
-                            + `with the bucket list "${remaining.join(',')}"`;
+                        let message =
+                            `reached ${limit}, resume by re-running ` + `with the bucket list "${remaining.join(',')}"`;
                         if (!bucketDone) {
                             message += ` and KEY_MARKER=${this._keyMarker} VERSION_ID_MARKER=${this._versionIdMarker}`;
                         }

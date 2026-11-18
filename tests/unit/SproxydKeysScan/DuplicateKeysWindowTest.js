@@ -4,7 +4,11 @@ const { setupProcessor } = require('../../utils/setupProcessor');
 
 const range = n => Array.from({ length: n }, (_, i) => i);
 
-const randomize = (_pattern, length) => crypto.randomBytes(length / 2).toString('hex').toUpperCase();
+const randomize = (_pattern, length) =>
+    crypto
+        .randomBytes(length / 2)
+        .toString('hex')
+        .toUpperCase();
 
 describe('DuplicateKeysWindow', () => {
     describe('BoundedMap', () => {
@@ -92,4 +96,3 @@ describe('DuplicateKeysWindow', () => {
         });
     });
 });
-

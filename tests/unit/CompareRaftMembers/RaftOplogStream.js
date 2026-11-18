@@ -44,10 +44,8 @@ describe('RaftOplogStream', () => {
         const handleGetOplogRequest = (req, res, url) => {
             const qsBegin = url.searchParams.get('begin');
             const qsLimit = url.searchParams.get('limit');
-            const begin = qsBegin !== undefined
-                ? Number.parseInt(qsBegin, 10) : 1;
-            const limit = qsLimit !== undefined
-                ? Number.parseInt(qsLimit, 10) : 10000;
+            const begin = qsBegin !== undefined ? Number.parseInt(qsBegin, 10) : 1;
+            const limit = qsLimit !== undefined ? Number.parseInt(qsLimit, 10) : 10000;
             const oplogToSend = TEST_OPLOG.slice(begin - 1, begin - 1 + limit);
             if (begin < 1 || oplogToSend.length === 0) {
                 res.writeHead(416);

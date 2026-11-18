@@ -15,12 +15,14 @@ const params = {
 
 const metadata = new BucketClientInterface(params, bucketclient, rootLogger);
 
-const listObjects = utils.retryable((bucket, params, log, cb) => metadata.listObject(bucket, params, log, (err, res) => {
-    if (err && err.NoSuchBucket) {
-        return cb(null, []);
-    }
-    return cb(err, res);
-}));
+const listObjects = utils.retryable((bucket, params, log, cb) =>
+    metadata.listObject(bucket, params, log, (err, res) => {
+        if (err && err.NoSuchBucket) {
+            return cb(null, []);
+        }
+        return cb(err, res);
+    }),
+);
 
 function roundToDay(timestamp) {
     return new Date(
@@ -29,7 +31,7 @@ function roundToDay(timestamp) {
 }
 
 const LENGTH_TS = 14;
-const MAX_TS = parseInt(('9'.repeat(LENGTH_TS)), 10);
+const MAX_TS = parseInt('9'.repeat(LENGTH_TS), 10);
 
 function formatMetricsKey(resourceName, timestamp) {
     const ts = (MAX_TS - roundToDay(timestamp).getTime()).toString().padStart(LENGTH_TS, '0');

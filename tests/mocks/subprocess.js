@@ -14,4 +14,3 @@ class Subprocess extends EventEmitter {
 }
 
 module.exports = Subprocess;
-

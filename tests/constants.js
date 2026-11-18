@@ -62,5 +62,4 @@ module.exports = {
     testAccountCanonicalId: 'd1d40abd2bd8250962f7f5774af1bbbeaec9b77a0853749d41ec46f142e66fe4',
     testBucketCreationDate: 1678284808000,
     testUserBucketInfo: { value: { creationDate: new Date(1678284808000).toString() } },
-
 };

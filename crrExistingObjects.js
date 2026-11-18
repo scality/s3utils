@@ -2,8 +2,7 @@ const werelogs = require('werelogs');
 const ReplicationStatusUpdater = require('./CRR/ReplicationStatusUpdater');
 const getLocationConfig = require('./utils/locationConfig');
 
-const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1
-    ? 'debug' : 'info';
+const logLevel = Number.parseInt(process.env.DEBUG, 10) === 1 ? 'debug' : 'info';
 const loggerConfig = {
     level: logLevel,
     dump: 'error',
@@ -15,30 +14,22 @@ const BUCKETS = process.argv[2] ? process.argv[2].split(',') : null;
 const { SITE_NAME } = process.env;
 let { TARGET_REPLICATION_STATUS } = process.env;
 const { TARGET_PREFIX } = process.env;
-const WORKERS = (process.env.WORKERS
-    && Number.parseInt(process.env.WORKERS, 10)) || 10;
-const MAX_UPDATES = (process.env.MAX_UPDATES
-    && Number.parseInt(process.env.MAX_UPDATES, 10));
-const MAX_SCANNED = (process.env.MAX_SCANNED
-    && Number.parseInt(process.env.MAX_SCANNED, 10));
+const WORKERS = (process.env.WORKERS && Number.parseInt(process.env.WORKERS, 10)) || 10;
+const MAX_UPDATES = process.env.MAX_UPDATES && Number.parseInt(process.env.MAX_UPDATES, 10);
+const MAX_SCANNED = process.env.MAX_SCANNED && Number.parseInt(process.env.MAX_SCANNED, 10);
 const { KEY_MARKER } = process.env;
 const { VERSION_ID_MARKER } = process.env;
-const CURRENT_VERSION_ONLY = process.env.CURRENT_VERSION_ONLY === 'true' || process.env.CURRENT_VERSION_ONLY === '1' || false;
+const CURRENT_VERSION_ONLY =
+    process.env.CURRENT_VERSION_ONLY === 'true' || process.env.CURRENT_VERSION_ONLY === '1' || false;
 const ALLOW_NEW_SITE = process.env.ALLOW_NEW_SITE === 'true' || process.env.ALLOW_NEW_SITE === '1' || false;
 const { LOCATION_CONFIG_FILE } = process.env;
 
-const {
-    ACCESS_KEY,
-    SECRET_KEY,
-    ENDPOINT,
-} = process.env;
+const { ACCESS_KEY, SECRET_KEY, ENDPOINT } = process.env;
 
-const LISTING_LIMIT = (process.env.LISTING_LIMIT
-    && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
+const LISTING_LIMIT = (process.env.LISTING_LIMIT && Number.parseInt(process.env.LISTING_LIMIT, 10)) || 1000;
 
 if (!BUCKETS || BUCKETS.length === 0) {
-    log.fatal('No buckets given as input! Please provide '
-      + 'a comma-separated list of buckets');
+    log.fatal('No buckets given as input! Please provide ' + 'a comma-separated list of buckets');
     process.exit(1);
 }
 if (!ENDPOINT) {
@@ -65,24 +56,26 @@ if (CURRENT_VERSION_ONLY) {
 const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
 replicationStatusToProcess.forEach(state => {
     if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
-        log.fatal('invalid TARGET_REPLICATION_STATUS environment: must be a '
-            + 'comma-separated list of replication statuses to requeue, '
-            + 'as NEW,PENDING,COMPLETED,FAILED,REPLICA.');
+        log.fatal(
+            'invalid TARGET_REPLICATION_STATUS environment: must be a ' +
+                'comma-separated list of replication statuses to requeue, ' +
+                'as NEW,PENDING,COMPLETED,FAILED,REPLICA.',
+        );
         process.exit(1);
     }
 });
-log.info('Objects with replication status '
-    + `${replicationStatusToProcess.join(' or ')} `
-    + 'will be reset to PENDING to trigger CRR');
+log.info(
+    'Objects with replication status ' +
+        `${replicationStatusToProcess.join(' or ')} ` +
+        'will be reset to PENDING to trigger CRR',
+);
 
 // FORCE_USING_CONFIGURATION was only on with 'true' or '1': we warn in these cases only.
 if (['true', '1'].includes(process.env.FORCE_USING_CONFIGURATION)) {
-    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket '
-        + 'replication configuration');
+    log.warn('FORCE_USING_CONFIGURATION is ignored: the script always uses the bucket ' + 'replication configuration');
 }
 if (process.env.STORAGE_TYPE) {
-    log.warn('STORAGE_TYPE is ignored: backbeat reads the location type from the location '
-        + 'config of the site');
+    log.warn('STORAGE_TYPE is ignored: backbeat reads the location type from the location ' + 'config of the site');
 }
 
 // Optional: tells which sites are public clouds, which get no bucket and no role on their
@@ -101,24 +94,27 @@ if (LOCATION_CONFIG_FILE) {
     log.info('LOCATION_CONFIG_FILE is not set: every site is handled as a CRR site');
 }
 
-const replicationStatusUpdater = new ReplicationStatusUpdater({
-    buckets: BUCKETS,
-    replicationStatusToProcess,
-    workers: WORKERS,
-    accessKey: ACCESS_KEY,
-    secretKey: SECRET_KEY,
-    endpoint: ENDPOINT,
-    siteName: SITE_NAME,
-    targetPrefix: TARGET_PREFIX,
-    listingLimit: LISTING_LIMIT,
-    maxUpdates: MAX_UPDATES,
-    maxScanned: MAX_SCANNED,
-    keyMarker: KEY_MARKER,
-    versionIdMarker: VERSION_ID_MARKER,
-    currentVersionOnly: CURRENT_VERSION_ONLY,
-    allowNewSite: ALLOW_NEW_SITE,
-    locationConfig,
-}, log);
+const replicationStatusUpdater = new ReplicationStatusUpdater(
+    {
+        buckets: BUCKETS,
+        replicationStatusToProcess,
+        workers: WORKERS,
+        accessKey: ACCESS_KEY,
+        secretKey: SECRET_KEY,
+        endpoint: ENDPOINT,
+        siteName: SITE_NAME,
+        targetPrefix: TARGET_PREFIX,
+        listingLimit: LISTING_LIMIT,
+        maxUpdates: MAX_UPDATES,
+        maxScanned: MAX_SCANNED,
+        keyMarker: KEY_MARKER,
+        versionIdMarker: VERSION_ID_MARKER,
+        currentVersionOnly: CURRENT_VERSION_ONLY,
+        allowNewSite: ALLOW_NEW_SITE,
+        locationConfig,
+    },
+    log,
+);
 
 replicationStatusUpdater.run(err => {
     if (err) {

@@ -1,7 +1,12 @@
 const vaultclient = require('vaultclient');
 const { Logger } = require('werelogs');
 const { PutObjectCommand, HeadObjectCommand, CreateBucketCommand } = require('@aws-sdk/client-s3');
-const { CreatePolicyCommand, CreateUserCommand, CreateAccessKeyCommand, AttachUserPolicyCommand } = require('@aws-sdk/client-iam');
+const {
+    CreatePolicyCommand,
+    CreateUserCommand,
+    CreateAccessKeyCommand,
+    AttachUserPolicyCommand,
+} = require('@aws-sdk/client-iam');
 const { listObjectsByReplicationStatus } = require('../../listObjectsByReplicationStatus');
 
 const {
@@ -18,7 +23,6 @@ const {
 } = require('../utils/S3Setup');
 
 const log = new Logger('listObjectsByReplicationStatus:test');
-
 
 describe('listObjectsByReplicationStatus', () => {
     let vaultClient;
@@ -37,7 +41,7 @@ describe('listObjectsByReplicationStatus', () => {
             undefined,
             undefined,
             adminAccessKeyId,
-            adminSecretAccessKey
+            adminSecretAccessKey,
         );
         log.info('Setting up test accounts and buckets');
         accountSource = await createTestAccount(vaultClient);
@@ -94,8 +98,7 @@ describe('listObjectsByReplicationStatus', () => {
             await deleteTestAccount(vaultClient, noPermAccount);
         }
 
-        const authErrorLogs = capturedLogs.filter(entry =>
-            entry && entry.error && entry.error.Code === 'AccessDenied');
+        const authErrorLogs = capturedLogs.filter(entry => entry && entry.error && entry.error.Code === 'AccessDenied');
         expect(authErrorLogs).toBeDefined();
         expect(authErrorLogs.length).toBe(1);
     });
@@ -105,14 +108,18 @@ describe('listObjectsByReplicationStatus', () => {
         const s3ResourceArn = `arn:aws:s3:::${accountSource.bucketName}`;
 
         // Create the user
-        await accountSource.iamClient.send(new CreateUserCommand({
-            UserName: restrictedUserName,
-        }));
+        await accountSource.iamClient.send(
+            new CreateUserCommand({
+                UserName: restrictedUserName,
+            }),
+        );
 
         // Create access keys for the new user
-        const createAccessKeyResp = await accountSource.iamClient.send(new CreateAccessKeyCommand({
-            UserName: restrictedUserName,
-        }));
+        const createAccessKeyResp = await accountSource.iamClient.send(
+            new CreateAccessKeyCommand({
+                UserName: restrictedUserName,
+            }),
+        );
         const accessKeyId = createAccessKeyResp.AccessKey.AccessKeyId;
         const secretAccessKey = createAccessKeyResp.AccessKey.SecretAccessKey;
 
@@ -122,27 +129,29 @@ describe('listObjectsByReplicationStatus', () => {
             Statement: [
                 {
                     Effect: 'Allow',
-                    Action: [
-                        's3:ListBucket'
-                    ],
-                    Resource: [s3ResourceArn]
-                }
+                    Action: ['s3:ListBucket'],
+                    Resource: [s3ResourceArn],
+                },
                 // No object-level permissions on purpose
-            ]
+            ],
         };
 
         // Create the policy
-        const createPolicyResp = await accountSource.iamClient.send(new CreatePolicyCommand({
-            PolicyName: `ListOnlyPolicy-${Date.now()}`,
-            PolicyDocument: JSON.stringify(listOnlyPolicyDoc),
-        }));
+        const createPolicyResp = await accountSource.iamClient.send(
+            new CreatePolicyCommand({
+                PolicyName: `ListOnlyPolicy-${Date.now()}`,
+                PolicyDocument: JSON.stringify(listOnlyPolicyDoc),
+            }),
+        );
         const policyArn = createPolicyResp.Policy.Arn;
 
         // Attach policy to user
-        await accountSource.iamClient.send(new AttachUserPolicyCommand({
-            UserName: restrictedUserName,
-            PolicyArn: policyArn,
-        }));
+        await accountSource.iamClient.send(
+            new AttachUserPolicyCommand({
+                UserName: restrictedUserName,
+                PolicyArn: policyArn,
+            }),
+        );
 
         // Add objects as the admin
         const testObjects = [
@@ -151,11 +160,13 @@ describe('listObjectsByReplicationStatus', () => {
         ];
         const objectVersions = [];
         for (const obj of testObjects) {
-            const putObjectResponse = await accountSource.s3Client.send(new PutObjectCommand({
-                Bucket: accountSource.bucketName,
-                Key: obj.Key,
-                Body: obj.Body,
-            }));
+            const putObjectResponse = await accountSource.s3Client.send(
+                new PutObjectCommand({
+                    Bucket: accountSource.bucketName,
+                    Key: obj.Key,
+                    Body: obj.Body,
+                }),
+            );
             objectVersions.push({ Key: obj.Key, VersionId: putObjectResponse.VersionId });
         }
 
@@ -180,14 +191,16 @@ describe('listObjectsByReplicationStatus', () => {
             });
         } catch {
             // Swallow error, we're inspecting logs
-        } 
+        }
 
         // We expect error logs related to inability to HeadObject
-        const objectAccessErrors = capturedLogs.filter(log =>
-            log.level === 'error' &&
-            log.message === 'error getting object metadata' &&
-            log.error && 
-                (log.error.$metadata && log.error.$metadata.httpStatusCode === 403) 
+        const objectAccessErrors = capturedLogs.filter(
+            log =>
+                log.level === 'error' &&
+                log.message === 'error getting object metadata' &&
+                log.error &&
+                log.error.$metadata &&
+                log.error.$metadata.httpStatusCode === 403,
         );
         expect(objectAccessErrors).toBeDefined();
         expect(objectAccessErrors.length).toBe(testObjects.length);
@@ -196,9 +209,11 @@ describe('listObjectsByReplicationStatus', () => {
     it('should not fail when scanning a non-replicated bucket', async () => {
         // Create a new bucket without replication
         const nonRepBucketName = `${accountSource.bucketName}-norep-${Math.random().toString(36).substr(2, 6)}`;
-        await accountSource.s3Client.send(new CreateBucketCommand({
-            Bucket: nonRepBucketName,
-        }));
+        await accountSource.s3Client.send(
+            new CreateBucketCommand({
+                Bucket: nonRepBucketName,
+            }),
+        );
 
         // Put one or more objects in the non-replicated bucket
         const testObjects = [
@@ -207,11 +222,13 @@ describe('listObjectsByReplicationStatus', () => {
         ];
 
         for (const obj of testObjects) {
-            await accountSource.s3Client.send(new PutObjectCommand({
-                Bucket: nonRepBucketName,
-                Key: obj.Key,
-                Body: obj.Body,
-            }));
+            await accountSource.s3Client.send(
+                new PutObjectCommand({
+                    Bucket: nonRepBucketName,
+                    Key: obj.Key,
+                    Body: obj.Body,
+                }),
+            );
         }
 
         // Use a capture logger to verify code path
@@ -248,11 +265,8 @@ describe('listObjectsByReplicationStatus', () => {
 
         expect(errorCaught).toBeNull();
 
-        const fatalErrors = capturedLogs.filter(log =>
-            log.level === 'error'
-        );
+        const fatalErrors = capturedLogs.filter(log => log.level === 'error');
         expect(fatalErrors.length).toBe(0);
-
     });
 
     it('should return a HTTP 404 when scanning a non-existent bucket', async () => {
@@ -294,25 +308,29 @@ describe('listObjectsByReplicationStatus', () => {
         ];
 
         for (const obj of testObjects) {
-            await accountSource.s3Client.send(new PutObjectCommand({
-                Bucket: accountSource.bucketName,
-                Key: obj.Key,
-                Body: obj.Body,
-            }));
+            await accountSource.s3Client.send(
+                new PutObjectCommand({
+                    Bucket: accountSource.bucketName,
+                    Key: obj.Key,
+                    Body: obj.Body,
+                }),
+            );
             log.info('Uploaded object', { key: obj.Key });
         }
 
         // Verify objects have replication status
         log.info('Verifying objects have replication status');
         for (const obj of testObjects) {
-            const headResult = await accountSource.s3Client.send(new HeadObjectCommand({
-                Bucket: accountSource.bucketName,
-                Key: obj.Key,
-            }));
+            const headResult = await accountSource.s3Client.send(
+                new HeadObjectCommand({
+                    Bucket: accountSource.bucketName,
+                    Key: obj.Key,
+                }),
+            );
             log.info('Object metadata', {
                 key: obj.Key,
                 replicationStatus: headResult.ReplicationStatus,
-                versionId: headResult.VersionId
+                versionId: headResult.VersionId,
             });
             expect(headResult.ReplicationStatus).toBeDefined();
         }
@@ -344,8 +362,8 @@ describe('listObjectsByReplicationStatus', () => {
 
         // Verify that objects were found and logged
         // Filter out the test object from the previous test (test-limited-access-object.txt)
-        const foundObjectLogs = capturedLogs.filter(entry =>
-            entry.message === 'object with matching replication status found' 
+        const foundObjectLogs = capturedLogs.filter(
+            entry => entry.message === 'object with matching replication status found',
         );
 
         log.info('Found object logs', { count: foundObjectLogs.length });
@@ -366,7 +384,7 @@ describe('listObjectsByReplicationStatus', () => {
             expect(['PENDING', 'FAILED', 'COMPLETED']).toContain(logEntry.data.ReplicationStatus);
             log.info('Verified replication status', {
                 key: logEntry.data.Key,
-                status: logEntry.data.ReplicationStatus
+                status: logEntry.data.ReplicationStatus,
             });
         }
     }, 30000);

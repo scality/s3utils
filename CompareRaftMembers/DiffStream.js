@@ -32,12 +32,7 @@ class DiffStream extends stream.Transform {
      */
     constructor(params) {
         super({ objectMode: true });
-        const {
-            bucketdHost, bucketdPort,
-            digestsDb,
-            maxBufferSize,
-            BucketStreamClass,
-        } = params;
+        const { bucketdHost, bucketdPort, digestsDb, maxBufferSize, BucketStreamClass } = params;
 
         this.bucketdHost = bucketdHost;
         this.bucketdPort = bucketdPort;
@@ -131,12 +126,9 @@ class DiffStream extends stream.Transform {
         // the digests database is incomplete. It should be acceptable
         // for the purpose of integrity checking.
 
-        const isNewBucket = (this.inputBufferBucket && bucketName !== this.inputBufferBucket);
-        if ((isNewBucket && this.inputBuffer.length > 0)
-            || this.inputBuffer.length === this.maxBufferSize) {
-            const lastObjectKey = isNewBucket
-                ? null
-                : this.inputBuffer[this.inputBuffer.length - 1].objectKey;
+        const isNewBucket = this.inputBufferBucket && bucketName !== this.inputBufferBucket;
+        if ((isNewBucket && this.inputBuffer.length > 0) || this.inputBuffer.length === this.maxBufferSize) {
+            const lastObjectKey = isNewBucket ? null : this.inputBuffer[this.inputBuffer.length - 1].objectKey;
             this._compareInputBufferWithBucketd(lastObjectKey, () => {
                 this.inputBufferBucket = bucketName;
                 this.currentMarker = lastObjectKey;
@@ -230,8 +222,7 @@ class DiffStream extends stream.Transform {
      */
     _compareBuffers(inputBuffer, bucketBuffer) {
         let [inputIndex, bucketIndex] = [0, 0];
-        while (inputIndex < inputBuffer.length
-               && bucketIndex < bucketBuffer.length) {
+        while (inputIndex < inputBuffer.length && bucketIndex < bucketBuffer.length) {
             const [inputItem, bucketItem] = [inputBuffer[inputIndex], bucketBuffer[bucketIndex]];
             if (inputItem.fullKey < bucketItem.key) {
                 this.push([{ key: inputItem.fullKey, value: inputItem.value }, null]);

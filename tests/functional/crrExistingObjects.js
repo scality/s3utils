@@ -27,12 +27,10 @@ const DEFAULT_SITE = process.env.CRR_DEFAULT_SITE || 'sf';
 function makeCaptureLogger() {
     const captured = [];
     const inner = new Logger('crrExistingObjects:test:capture');
-    const wrap = level => (
-        (msg, data) => {
-            captured.push({ level, message: msg, ...(data || {}) });
-            return inner[level](msg, data);
-        }
-    );
+    const wrap = level => (msg, data) => {
+        captured.push({ level, message: msg, ...(data || {}) });
+        return inner[level](msg, data);
+    };
     return {
         captured,
         logger: {
@@ -88,20 +86,23 @@ describe('crrExistingObjects', () => {
         }
 
         const { captured, logger } = makeCaptureLogger();
-        const updater = new ReplicationStatusUpdater({
-            buckets: [accountSource.bucketName],
-            replicationStatusToProcess: ['NEW'],
-            workers: 10,
-            accessKey: accountSource.accountAccessKey,
-            secretKey: accountSource.accountSecretKey,
-            endpoint,
-            siteName: SITE_NAME,
-            listingLimit: 1000,
-            currentVersionOnly: false,
-            // these tests check key encoding: SITE_NAME is not the bucket's
-            // default replication site, so allow it explicitly
-            allowNewSite: true,
-        }, logger);
+        const updater = new ReplicationStatusUpdater(
+            {
+                buckets: [accountSource.bucketName],
+                replicationStatusToProcess: ['NEW'],
+                workers: 10,
+                accessKey: accountSource.accountAccessKey,
+                secretKey: accountSource.accountSecretKey,
+                endpoint,
+                siteName: SITE_NAME,
+                listingLimit: 1000,
+                currentVersionOnly: false,
+                // these tests check key encoding: SITE_NAME is not the bucket's
+                // default replication site, so allow it explicitly
+                allowNewSite: true,
+            },
+            logger,
+        );
         await promisify(updater.run.bind(updater))();
 
         const objectUpdateErrors = captured.filter(
@@ -112,10 +113,12 @@ describe('crrExistingObjects', () => {
         expect(updater._nUpdated).toBe(testObjects.length);
 
         for (const obj of testObjects) {
-            const head = await accountSource.s3Client.send(new HeadObjectCommand({
-                Bucket: accountSource.bucketName,
-                Key: obj.Key,
-            }));
+            const head = await accountSource.s3Client.send(
+                new HeadObjectCommand({
+                    Bucket: accountSource.bucketName,
+                    Key: obj.Key,
+                }),
+            );
             expect(head.ReplicationStatus).toBe('PENDING');
         }
     }
@@ -153,17 +156,19 @@ describe('crrExistingObjects', () => {
     it('should stop the run when SITE_NAME is not a known replication site', async () => {
         const versionId = await putObject(accountSource, 'obj-1');
 
-        const updater = new ReplicationStatusUpdater({
-            buckets: [accountSource.bucketName],
-            replicationStatusToProcess: ['NEW', 'PENDING', 'COMPLETED', 'FAILED'],
-            workers: 10,
-            accessKey: accountSource.accountAccessKey,
-            secretKey: accountSource.accountSecretKey,
-            endpoint,
-            siteName: 'wrong-site',
-        }, log);
-        await expect(promisify(updater.run.bind(updater))())
-            .rejects.toThrow('stopped on an unknown replication site');
+        const updater = new ReplicationStatusUpdater(
+            {
+                buckets: [accountSource.bucketName],
+                replicationStatusToProcess: ['NEW', 'PENDING', 'COMPLETED', 'FAILED'],
+                workers: 10,
+                accessKey: accountSource.accountAccessKey,
+                secretKey: accountSource.accountSecretKey,
+                endpoint,
+                siteName: 'wrong-site',
+            },
+            log,
+        );
+        await expect(promisify(updater.run.bind(updater))()).rejects.toThrow('stopped on an unknown replication site');
 
         expect(updater._nUpdated).toBe(0);
         expect(updater._unknownSite).toEqual(expect.objectContaining({ key: 'obj-1' }));

@@ -33,11 +33,12 @@ class BucketStream extends stream.Readable {
         const maxRetryDelayMs = userMaxRetryDelayMs || 10000;
         this.retryParams = {
             times: 20,
-            interval: retryCount => Math.min(
-                // the first retry comes as "retryCount=2", hence substract 2
-                this.retryDelayMs * (2 ** (retryCount - 2)),
-                this.maxRetryDelayMs,
-            ),
+            interval: retryCount =>
+                Math.min(
+                    // the first retry comes as "retryCount=2", hence substract 2
+                    this.retryDelayMs * 2 ** (retryCount - 2),
+                    this.maxRetryDelayMs,
+                ),
         };
         // for filtering seen master keys from listing
         if (marker && marker.indexOf('\0') === -1) {
@@ -51,27 +52,30 @@ class BucketStream extends stream.Readable {
     }
 
     _requestWrapper(reqParams, cb) {
-        const req = http.request({
-            hostname: this.bucketdHost,
-            port: this.bucketdPort,
-            agent: httpAgent,
-            ...reqParams,
-        }, res => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.once('end', () => {
-                if (res.statusCode === 404) {
-                    // bucket/object does not exist: return no contents
-                    return cb();
-                }
-                if (res.statusCode !== 200) {
-                    return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
-                }
-                const body = chunks.join('');
-                return cb(null, { statusCode: res.statusCode, body });
-            });
-            res.once('error', err => cb(err));
-        });
+        const req = http.request(
+            {
+                hostname: this.bucketdHost,
+                port: this.bucketdPort,
+                agent: httpAgent,
+                ...reqParams,
+            },
+            res => {
+                const chunks = [];
+                res.on('data', chunk => chunks.push(chunk));
+                res.once('end', () => {
+                    if (res.statusCode === 404) {
+                        // bucket/object does not exist: return no contents
+                        return cb();
+                    }
+                    if (res.statusCode !== 200) {
+                        return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
+                    }
+                    const body = chunks.join('');
+                    return cb(null, { statusCode: res.statusCode, body });
+                });
+                res.once('error', err => cb(err));
+            },
+        );
         req.once('error', err => cb(err));
         req.end();
     }
@@ -98,8 +102,7 @@ class BucketStream extends stream.Readable {
                 return {};
             }
         }
-        const versionedKey = vidSepPos === -1 && md.versionId
-            ? `${item.key}\0${md.versionId}` : item.key;
+        const versionedKey = vidSepPos === -1 && md.versionId ? `${item.key}\0${md.versionId}` : item.key;
         return { versionedKey, metadata: md };
     }
 
@@ -122,58 +125,63 @@ class BucketStream extends stream.Readable {
                 const parsedBody = JSON.parse(response.body);
                 const { Contents, IsTruncated } = parsedBody;
                 let ended = false;
-                return async.mapLimit(Contents, 10, (item, itemCb) => {
-                    if (this.lastKey && item.key > this.lastKey) {
-                        ended = true;
-                        return itemCb(null, null);
-                    }
-                    const { versionedKey, metadata } = this._preprocessItem(item);
-                    if (!metadata) {
-                        return itemCb(null, null);
-                    }
-                    if (metadata.location !== undefined) {
-                        return itemCb(null, { key: versionedKey, value: item.value });
-                    }
-                    // need to fetch the object metadata to retrieve
-                    // the full location array
-                    return this._fetchObjectMetadata(item.key, (err, completeMetadata) => {
-                        if (err) {
-                            return itemCb(err);
-                        }
-                        if (!completeMetadata) {
-                            // can happen if the object was not found,
-                            // just skip it in that case
+                return async.mapLimit(
+                    Contents,
+                    10,
+                    (item, itemCb) => {
+                        if (this.lastKey && item.key > this.lastKey) {
+                            ended = true;
                             return itemCb(null, null);
                         }
-                        return itemCb(null, { key: versionedKey, value: completeMetadata });
-                    });
-                }, (err, listing) => {
-                    if (err) {
-                        // there was an error fetching metadata after
-                        // retries: destroy the stream
-                        return this.destroy(err);
-                    }
-                    let hasPushed = false;
-                    for (const item of listing) {
-                        if (item) {
-                            const fullKey = `${this.bucketName}/${item.key}`;
-                            this.push({
-                                key: fullKey,
-                                value: item.value,
-                            });
-                            hasPushed = true;
+                        const { versionedKey, metadata } = this._preprocessItem(item);
+                        if (!metadata) {
+                            return itemCb(null, null);
                         }
-                    }
-                    if (IsTruncated && !ended) {
-                        this.marker = Contents[Contents.length - 1].key;
-                        if (!hasPushed) {
-                            this._listMore();
+                        if (metadata.location !== undefined) {
+                            return itemCb(null, { key: versionedKey, value: item.value });
                         }
-                    } else {
-                        this.push(null);
-                    }
-                    return undefined;
-                });
+                        // need to fetch the object metadata to retrieve
+                        // the full location array
+                        return this._fetchObjectMetadata(item.key, (err, completeMetadata) => {
+                            if (err) {
+                                return itemCb(err);
+                            }
+                            if (!completeMetadata) {
+                                // can happen if the object was not found,
+                                // just skip it in that case
+                                return itemCb(null, null);
+                            }
+                            return itemCb(null, { key: versionedKey, value: completeMetadata });
+                        });
+                    },
+                    (err, listing) => {
+                        if (err) {
+                            // there was an error fetching metadata after
+                            // retries: destroy the stream
+                            return this.destroy(err);
+                        }
+                        let hasPushed = false;
+                        for (const item of listing) {
+                            if (item) {
+                                const fullKey = `${this.bucketName}/${item.key}`;
+                                this.push({
+                                    key: fullKey,
+                                    value: item.value,
+                                });
+                                hasPushed = true;
+                            }
+                        }
+                        if (IsTruncated && !ended) {
+                            this.marker = Contents[Contents.length - 1].key;
+                            if (!hasPushed) {
+                                this._listMore();
+                            }
+                        } else {
+                            this.push(null);
+                        }
+                        return undefined;
+                    },
+                );
             },
         );
     }

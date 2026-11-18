@@ -10,10 +10,7 @@ const DEFAULT_LISTING_PAGE_SIZE = 1000;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
 const RETRY_PARAMS = { times: 100, interval: 5000 };
 
-const {
-    BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
-    BUCKETS, RAFT_SESSIONS,
-} = process.env;
+const { BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, BUCKETS, RAFT_SESSIONS } = process.env;
 
 const VERBOSE = process.env.VERBOSE === '1';
 const TRACE = process.env.TRACE === '1';
@@ -28,15 +25,12 @@ if (TRACE) {
 }
 werelogs.configure({ level: logLevel, dump: 'error' });
 
-const LISTING_PAGE_SIZE = (
-    process.env.LISTING_PAGE_SIZE
-        && Number.parseInt(process.env.LISTING_PAGE_SIZE, 10))
-      || DEFAULT_LISTING_PAGE_SIZE;
+const LISTING_PAGE_SIZE =
+    (process.env.LISTING_PAGE_SIZE && Number.parseInt(process.env.LISTING_PAGE_SIZE, 10)) || DEFAULT_LISTING_PAGE_SIZE;
 
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
+const LOG_PROGRESS_INTERVAL =
+    (process.env.LOG_PROGRESS_INTERVAL && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10)) ||
+    DEFAULT_LOG_PROGRESS_INTERVAL;
 
 const USAGE = `
 cleanupMpuOrphans.js
@@ -161,18 +155,19 @@ async function raftSessionsToBuckets() {
         return;
     }
     const rsList = RAFT_SESSIONS.split(',');
-    await Promise.all(rsList.map(async rs => {
-        const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
-        const res = await httpRequest('GET', url, RETRY_PARAMS);
-        if (res.statusCode !== 200) {
-            throw new Error(`GET ${url} returned status ${res.statusCode}`);
-        }
-        const resp = JSON.parse(res.body);
-        remainingBuckets = remainingBuckets.concat(resp.filter(
-            bucket => !bucket.startsWith('mpuShadowBucket')
-                && bucket !== 'users..bucket',
-        ));
-    }));
+    await Promise.all(
+        rsList.map(async rs => {
+            const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
+            const res = await httpRequest('GET', url, RETRY_PARAMS);
+            if (res.statusCode !== 200) {
+                throw new Error(`GET ${url} returned status ${res.statusCode}`);
+            }
+            const resp = JSON.parse(res.body);
+            remainingBuckets = remainingBuckets.concat(
+                resp.filter(bucket => !bucket.startsWith('mpuShadowBucket') && bucket !== 'users..bucket'),
+            );
+        }),
+    );
 }
 
 const OVERVIEW_KEY_PREFIX = 'overview..|..';
@@ -194,10 +189,11 @@ async function getUploadIdsWithOverview(bucketdHostport, shadowBucket, uploadIds
     let marker = '';
     let isTruncated = true;
     while (isTruncated) {
-        const url = `http://${bucketdHostport}/default/bucket/${shadowBucket}`
-            + `?prefix=${encodeURIComponent(OVERVIEW_KEY_PREFIX)}&maxKeys=${pageSize}`
-            + `&marker=${encodeURIComponent(marker)}`;
-         
+        const url =
+            `http://${bucketdHostport}/default/bucket/${shadowBucket}` +
+            `?prefix=${encodeURIComponent(OVERVIEW_KEY_PREFIX)}&maxKeys=${pageSize}` +
+            `&marker=${encodeURIComponent(marker)}`;
+
         const res = await httpRequest('GET', url, retry);
         if (res.statusCode === 404) {
             break;
@@ -233,15 +229,21 @@ async function getUploadIdsWithOverview(bucketdHostport, shadowBucket, uploadIds
  * @returns {Promise<object>} map of the form
  *   { [uploadId]: { partKeys: string[], sproxydKeys: Set<string> } }
  */
-async function collectOrphanParts(bucketdHostport, shadowBucket, uploadIdsWithOverview, { pageSize = 1000, retry } = {}) {
+async function collectOrphanParts(
+    bucketdHostport,
+    shadowBucket,
+    uploadIdsWithOverview,
+    { pageSize = 1000, retry } = {},
+) {
     const orphanMap = {};
     let partsMarker = '';
     let isTruncated = true;
     while (isTruncated) {
-        const url = `http://${bucketdHostport}/default/bucket/${shadowBucket}`
-            + `?maxKeys=${pageSize}`
-            + `&marker=${encodeURIComponent(partsMarker)}`;
-         
+        const url =
+            `http://${bucketdHostport}/default/bucket/${shadowBucket}` +
+            `?maxKeys=${pageSize}` +
+            `&marker=${encodeURIComponent(partsMarker)}`;
+
         const res = await httpRequest('GET', url, retry);
         if (res.statusCode === 404) {
             break;
@@ -258,7 +260,8 @@ async function collectOrphanParts(bucketdHostport, shadowBucket, uploadIdsWithOv
             const sepPos = item.key.indexOf('..|..');
             if (sepPos === -1) {
                 log.warn('unexpected key format in MPU shadow bucket', {
-                    shadowBucket, key: item.key,
+                    shadowBucket,
+                    key: item.key,
                 });
                 continue;
             }
@@ -285,7 +288,9 @@ async function collectOrphanParts(bucketdHostport, shadowBucket, uploadIdsWithOv
             const { partLocations } = md;
             if (!partLocations || partLocations.length === 0) {
                 log.warn('part key has no partLocations', {
-                    shadowBucket, uploadId, key: item.key,
+                    shadowBucket,
+                    uploadId,
+                    key: item.key,
                 });
                 continue;
             }
@@ -320,29 +325,17 @@ async function buildOrphanMap(bucketdHostport, shadowBucket, { pageSize = 1000, 
     const uploadIdsWithOverview = new Set();
 
     // Step 1: collect upload IDs that have an overview key
-    await getUploadIdsWithOverview(
-        bucketdHostport,
-        shadowBucket,
-        uploadIdsWithOverview,
-        { pageSize, retry },
-    );
+    await getUploadIdsWithOverview(bucketdHostport, shadowBucket, uploadIdsWithOverview, { pageSize, retry });
 
     // Step 2: list all parts, build orphan map
-    const orphanMap = await collectOrphanParts(
-        bucketdHostport,
-        shadowBucket,
-        uploadIdsWithOverview,
-        { pageSize, retry },
-    );
+    const orphanMap = await collectOrphanParts(bucketdHostport, shadowBucket, uploadIdsWithOverview, {
+        pageSize,
+        retry,
+    });
 
     // Step 3: re-check overview keys to eliminate upload IDs that gained an
     // overview key between step 1 and step 2 (race condition)
-    await getUploadIdsWithOverview(
-        bucketdHostport,
-        shadowBucket,
-        uploadIdsWithOverview,
-        { pageSize, retry },
-    );
+    await getUploadIdsWithOverview(bucketdHostport, shadowBucket, uploadIdsWithOverview, { pageSize, retry });
     for (const uploadId of Object.keys(orphanMap)) {
         if (uploadIdsWithOverview.has(uploadId)) {
             delete orphanMap[uploadId];
@@ -365,14 +358,23 @@ async function buildOrphanMap(bucketdHostport, shadowBucket, { pageSize = 1000, 
  * @param {object} [retry] - retry parameters forwarded to httpRequest
  * @returns {Promise<void>} resolves when all deletions have been attempted
  */
-async function cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, shadowBucket, orphanEntry, keysToDelete, retry) {
+async function cleanupOrphanEntry(
+    reqLogger,
+    bucketdHostport,
+    sproxydHostport,
+    shadowBucket,
+    orphanEntry,
+    keysToDelete,
+    retry,
+) {
     for (const sproxydKey of keysToDelete) {
         const sproxydUrl = `http://${sproxydHostport}/${sproxydAlias}/${sproxydKey}`;
         try {
-            const res = await httpRequest('DELETE', sproxydUrl, retry);  
+            const res = await httpRequest('DELETE', sproxydUrl, retry);
             if (res.statusCode !== 200) {
                 reqLogger.error('failed to delete orphaned sproxyd key', {
-                    sproxydKey, error: { statusCode: res.statusCode },
+                    sproxydKey,
+                    error: { statusCode: res.statusCode },
                 });
             } else {
                 reqLogger.debug('deleted orphaned sproxyd key', { sproxydKey });
@@ -380,18 +382,19 @@ async function cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, s
             }
         } catch (err) {
             reqLogger.error('failed to delete orphaned sproxyd key', {
-                sproxydKey, error: { message: err.message },
+                sproxydKey,
+                error: { message: err.message },
             });
         }
     }
     for (const partKey of orphanEntry.partKeys) {
-        const partUrl = `http://${bucketdHostport}/default/bucket/${shadowBucket}/${
-            encodeURIComponent(partKey)}`;
+        const partUrl = `http://${bucketdHostport}/default/bucket/${shadowBucket}/${encodeURIComponent(partKey)}`;
         try {
-            const res = await httpRequest('DELETE', partUrl, retry);  
+            const res = await httpRequest('DELETE', partUrl, retry);
             if (res.statusCode !== 200 && res.statusCode !== 404) {
                 reqLogger.error('failed to delete orphaned part metadata', {
-                    partKey, error: { statusCode: res.statusCode },
+                    partKey,
+                    error: { statusCode: res.statusCode },
                 });
             } else {
                 reqLogger.debug('deleted orphaned part metadata', { partKey });
@@ -399,7 +402,8 @@ async function cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, s
             }
         } catch (err) {
             reqLogger.error('failed to delete orphaned part metadata', {
-                partKey, error: { message: err.message },
+                partKey,
+                error: { message: err.message },
             });
         }
     }
@@ -422,15 +426,21 @@ async function cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, s
  *   (e.g. { times: 100, interval: 5000 })
  * @returns {Promise<void>} resolves when all orphans have been processed
  */
-async function cleanupOrphans(bucketdHostport, sproxydHostport, bucket, shadowBucket, orphanMap, { pageSize = 1000, retry } = {}) {
+async function cleanupOrphans(
+    bucketdHostport,
+    sproxydHostport,
+    bucket,
+    shadowBucket,
+    orphanMap,
+    { pageSize = 1000, retry } = {},
+) {
     for await (const { value: resolvedMd } of listVersions(bucketdHostport, bucket, {
         pageSize,
         retry,
     })) {
         status.versionsScanned += 1;
         // Common case: skip version if not an MPU that has orphaned parts
-        if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId]
-            || !Array.isArray(resolvedMd.location)) {
+        if (!resolvedMd.uploadId || !orphanMap[resolvedMd.uploadId] || !Array.isArray(resolvedMd.location)) {
             continue;
         }
         const { uploadId } = resolvedMd;
@@ -444,14 +454,21 @@ async function cleanupOrphans(bucketdHostport, sproxydHostport, bucket, shadowBu
         const keysToDelete = new Set();
         for (const sproxydKey of orphanEntry.sproxydKeys) {
             if (locationKeys.has(sproxydKey)) {
-                reqLogger.debug('not deleting sproxyd key used by completed MPU',
-                    { sproxydKey });
+                reqLogger.debug('not deleting sproxyd key used by completed MPU', { sproxydKey });
             } else {
                 keysToDelete.add(sproxydKey);
             }
         }
-         
-        await cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, shadowBucket, orphanEntry, keysToDelete, retry);
+
+        await cleanupOrphanEntry(
+            reqLogger,
+            bucketdHostport,
+            sproxydHostport,
+            shadowBucket,
+            orphanEntry,
+            keysToDelete,
+            retry,
+        );
         // eslint-disable-next-line no-param-reassign
         delete orphanMap[uploadId];
     }
@@ -462,8 +479,16 @@ async function cleanupOrphans(bucketdHostport, sproxydHostport, bucket, shadowBu
         reqLogger.addDefaultFields({ bucket, uploadId });
 
         const orphanEntry = orphanMap[uploadId];
-         
-        await cleanupOrphanEntry(reqLogger, bucketdHostport, sproxydHostport, shadowBucket, orphanEntry, orphanEntry.sproxydKeys, retry);
+
+        await cleanupOrphanEntry(
+            reqLogger,
+            bucketdHostport,
+            sproxydHostport,
+            shadowBucket,
+            orphanEntry,
+            orphanEntry.sproxydKeys,
+            retry,
+        );
         // eslint-disable-next-line no-param-reassign
         delete orphanMap[uploadId];
     }
@@ -481,11 +506,10 @@ async function processBucket(bucket) {
     status.orphanPartsDeleted = 0;
     status.sproxydKeysDeleted = 0;
 
-    const orphanMap = await buildOrphanMap(
-        BUCKETD_HOSTPORT,
-        shadowBucket,
-        { pageSize: LISTING_PAGE_SIZE, retry: RETRY_PARAMS },
-    );
+    const orphanMap = await buildOrphanMap(BUCKETD_HOSTPORT, shadowBucket, {
+        pageSize: LISTING_PAGE_SIZE,
+        retry: RETRY_PARAMS,
+    });
     const orphanCount = Object.keys(orphanMap).length;
     status.orphanedUploadIds = orphanCount;
     logProgress('discovery phase complete');
@@ -505,27 +529,21 @@ async function processBucket(bucket) {
     log.info('starting cleanup phase: scanning bucket', { bucket });
 
     status.phase = 'cleanup';
-    await cleanupOrphans(
-        BUCKETD_HOSTPORT,
-        SPROXYD_HOSTPORT,
-        bucket,
-        shadowBucket,
-        orphanMap,
-        { pageSize: LISTING_PAGE_SIZE, retry: RETRY_PARAMS },
-    );
+    await cleanupOrphans(BUCKETD_HOSTPORT, SPROXYD_HOSTPORT, bucket, shadowBucket, orphanMap, {
+        pageSize: LISTING_PAGE_SIZE,
+        retry: RETRY_PARAMS,
+    });
     logProgress('cleanup phase complete');
 }
 
 async function main() {
     if (!BUCKETS && !RAFT_SESSIONS) {
-        console.error('ERROR: either BUCKETS or RAFT_SESSIONS environment '
-                      + 'variable must be defined');
+        console.error('ERROR: either BUCKETS or RAFT_SESSIONS environment ' + 'variable must be defined');
         console.error(USAGE);
         process.exit(1);
     }
     if (BUCKETS && RAFT_SESSIONS) {
-        console.error('ERROR: only one of BUCKETS or RAFT_SESSIONS environment '
-                      + 'variables can be defined');
+        console.error('ERROR: only one of BUCKETS or RAFT_SESSIONS environment ' + 'variables can be defined');
         console.error(USAGE);
         process.exit(1);
     }
@@ -540,10 +558,7 @@ async function main() {
         process.exit(1);
     }
 
-    progressInterval = setInterval(
-        () => logProgress('progress update'),
-        LOG_PROGRESS_INTERVAL * 1000,
-    );
+    progressInterval = setInterval(() => logProgress('progress update'), LOG_PROGRESS_INTERVAL * 1000);
     try {
         await getSproxydAlias();
         await raftSessionsToBuckets();
@@ -574,4 +589,11 @@ if (require.main === module) {
     process.on('SIGQUIT', stop);
 }
 
-module.exports = { getSproxydAlias, getUploadIdsWithOverview, collectOrphanParts, buildOrphanMap, cleanupOrphanEntry, cleanupOrphans };
+module.exports = {
+    getSproxydAlias,
+    getUploadIdsWithOverview,
+    collectOrphanParts,
+    buildOrphanMap,
+    cleanupOrphanEntry,
+    cleanupOrphans,
+};

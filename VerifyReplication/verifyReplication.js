@@ -18,61 +18,66 @@ let statusObj = {};
 let skipOlderThan = null;
 
 function skipObjectByLastModified(lastModifiedString) {
-    return skipOlderThan ? (new Date(lastModifiedString) < skipOlderThan) : false;
+    return skipOlderThan ? new Date(lastModifiedString) < skipOlderThan : false;
 }
 
 function verifyObjects(objectList, cb) {
     statusObj.srcListedCount += objectList.length;
-    return async.eachLimit(objectList, mdRequestWorkers, (object, done) => {
-        const { Key: key, Size: size, LastModified: srcLastModified } = object;
-        const dstKey = bucketMatch ? key : `${statusObj.srcBucket}/${key}`;
-        const params = {
-            client: destinationClient,
-            bucket: statusObj.dstBucket,
-            key: dstKey,
-        };
+    return async.eachLimit(
+        objectList,
+        mdRequestWorkers,
+        (object, done) => {
+            const { Key: key, Size: size, LastModified: srcLastModified } = object;
+            const dstKey = bucketMatch ? key : `${statusObj.srcBucket}/${key}`;
+            const params = {
+                client: destinationClient,
+                bucket: statusObj.dstBucket,
+                key: dstKey,
+            };
 
-        // skip if date filter is satisfied
-        const skipObject = skipObjectByLastModified(srcLastModified);
-        if (skipObject) {
-            ++statusObj.skippedByDate;
-            return process.nextTick(done);
-        }
+            // skip if date filter is satisfied
+            const skipObject = skipObjectByLastModified(srcLastModified);
+            if (skipObject) {
+                ++statusObj.skippedByDate;
+                return process.nextTick(done);
+            }
 
-        return destinationStorage.getObjMd(params, (err, dstMd) => {
-            ++statusObj.dstProcessedCount;
-            if (err) {
-                if (err instanceof NotFound) {
-                    ++statusObj.missingInDstCount;
-                } else {
-                    ++statusObj.dstFailedMdRetrievalsCount;
-                    logger.error('error getting metadata', {
-                        error: err,
-                        bucket: statusObj.dstBucket,
-                        key: dstKey,
-                        srcLastModified,
-                    });
+            return destinationStorage.getObjMd(params, (err, dstMd) => {
+                ++statusObj.dstProcessedCount;
+                if (err) {
+                    if (err instanceof NotFound) {
+                        ++statusObj.missingInDstCount;
+                    } else {
+                        ++statusObj.dstFailedMdRetrievalsCount;
+                        logger.error('error getting metadata', {
+                            error: err,
+                            bucket: statusObj.dstBucket,
+                            key: dstKey,
+                            srcLastModified,
+                        });
+                    }
+                    // log the error and continue processing objects
+                    return done();
                 }
-                // log the error and continue processing objects
+                const srcSize = Number.parseInt(size, 10);
+                const dstSize = Number.parseInt(dstMd.size, 10);
+                if (compareSize && srcSize !== dstSize) {
+                    ++statusObj.sizeMismatchCount;
+                    logger.info('object size does not match in destination', {
+                        key,
+                        srcSize,
+                        dstSize,
+                        srcLastModified,
+                        dstLastModified: dstMd.lastModified,
+                    });
+                } else {
+                    ++statusObj.replicatedCount;
+                }
                 return done();
-            }
-            const srcSize = Number.parseInt(size, 10);
-            const dstSize = Number.parseInt(dstMd.size, 10);
-            if (compareSize && (srcSize !== dstSize)) {
-                ++statusObj.sizeMismatchCount;
-                logger.info('object size does not match in destination', {
-                    key,
-                    srcSize,
-                    dstSize,
-                    srcLastModified,
-                    dstLastModified: dstMd.lastModified,
-                });
-            } else {
-                ++statusObj.replicatedCount;
-            }
-            return done();
-        });
-    }, cb);
+            });
+        },
+        cb,
+    );
 }
 
 function handlePrefixes(prefixList, cb) {
@@ -80,15 +85,20 @@ function handlePrefixes(prefixList, cb) {
         return process.nextTick(cb);
     }
     const prefixes = prefixList.map(p => p.Prefix);
-    return async.eachLimit(prefixes, listingWorkers, (prefix, done) => {
-        const params = {
-            client: sourceClient,
-            bucket: statusObj.srcBucket,
-            prefix,
-            listingLimit,
-        };
-        return listAndCompare(params, done);
-    }, cb);
+    return async.eachLimit(
+        prefixes,
+        listingWorkers,
+        (prefix, done) => {
+            const params = {
+                client: sourceClient,
+                bucket: statusObj.srcBucket,
+                prefix,
+                listingLimit,
+            };
+            return listAndCompare(params, done);
+        },
+        cb,
+    );
 }
 
 function listAndCompare(params, cb) {
@@ -102,40 +112,29 @@ function listAndCompare(params, cb) {
             });
             return cb(err);
         }
-        const {
-            IsTruncated,
-            NextContinuationToken,
-            Contents,
-            CommonPrefixes,
-        } = data;
-        return async.parallel([
-            done => verifyObjects(Contents, done),
-            done => handlePrefixes(CommonPrefixes, done),
-        ], error => {
-            if (error) {
-                return cb(error);
-            }
-            if (IsTruncated) {
-                const listingParams = { ...params, nextContinuationToken: NextContinuationToken };
-                return listAndCompare(listingParams, cb);
-            }
-            logger.info('completed listing and compare', {
-                bucket: params.bucket,
-                prefix: params.prefix,
-            });
-            return cb();
-        });
+        const { IsTruncated, NextContinuationToken, Contents, CommonPrefixes } = data;
+        return async.parallel(
+            [done => verifyObjects(Contents, done), done => handlePrefixes(CommonPrefixes, done)],
+            error => {
+                if (error) {
+                    return cb(error);
+                }
+                if (IsTruncated) {
+                    const listingParams = { ...params, nextContinuationToken: NextContinuationToken };
+                    return listAndCompare(listingParams, cb);
+                }
+                logger.info('completed listing and compare', {
+                    bucket: params.bucket,
+                    prefix: params.prefix,
+                });
+                return cb();
+            },
+        );
     });
 }
 
 function verifyReplication(params, cb) {
-    const {
-        source,
-        destination,
-        verification,
-        status,
-        log,
-    } = params;
+    const { source, destination, verification, status, log } = params;
 
     logger = log;
     statusObj = status;
@@ -165,10 +164,15 @@ function verifyReplication(params, cb) {
     if (prefixFilters.length > 0) {
         // include the prefix filters used in the result/summary
         status.prefixFilters = prefixFilters;
-        return async.eachLimit(prefixFilters, listingWorkers, (prefix, done) => {
-            const listParam = { ...listingParams, prefix };
-            return listAndCompare(listParam, done);
-        }, cb);
+        return async.eachLimit(
+            prefixFilters,
+            listingWorkers,
+            (prefix, done) => {
+                const listParam = { ...listingParams, prefix };
+                return listAndCompare(listParam, done);
+            },
+            cb,
+        );
     }
     return listAndCompare({ ...listingParams, delimiter: source.delimiter }, cb);
 }

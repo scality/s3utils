@@ -79,14 +79,12 @@ class FindDuplicateSproxydKeys {
     _shiftVersionsWindow() {
         this.versionsWindowSeq += 1;
         // cleanup oldest sproxyd keys and window entry (if it exists)
-        const oldestKeys = this.versionsWindow[
-            this.versionsWindowSeq - this.windowSize];
+        const oldestKeys = this.versionsWindow[this.versionsWindowSeq - this.windowSize];
         if (oldestKeys) {
             oldestKeys.forEach(key => {
                 delete this.sproxydKeys[key];
             });
-            delete this.versionsWindow[
-                this.versionsWindowSeq - this.windowSize];
+            delete this.versionsWindow[this.versionsWindowSeq - this.windowSize];
         }
     }
 }

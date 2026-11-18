@@ -21,12 +21,16 @@ const ERR_INVALID_REPLICATION_STATUS = `invalid REPLICATION_STATUS: must be a co
  * @private
  */
 function _listObjectVersions(s3, bucket, VersionIdMarker, KeyMarker, cb) {
-    s3.send(new ListObjectVersionsCommand({
-        Bucket: bucket,
-        MaxKeys: LISTING_LIMIT,
-        VersionIdMarker,
-        KeyMarker,
-    })).then(data => cb(null, data)).catch(cb);
+    s3.send(
+        new ListObjectVersionsCommand({
+            Bucket: bucket,
+            MaxKeys: LISTING_LIMIT,
+            VersionIdMarker,
+            KeyMarker,
+        }),
+    )
+        .then(data => cb(null, data))
+        .catch(cb);
 }
 
 /**
@@ -51,68 +55,69 @@ function _listBucket(s3, log, replicationStatusToProcess, bucket, cb) {
     let KeyMarker = null;
     log.info('listing objects by replication status from bucket', {
         bucket,
-        replicationStatus: replicationStatusToProcess.join(',')
+        replicationStatus: replicationStatusToProcess.join(','),
     });
     async.doWhilst(
-        done => _listObjectVersions(
-            s3,
-            bucketName,
-            VersionIdMarker,
-            KeyMarker,
-            (err, data) => {
+        done =>
+            _listObjectVersions(s3, bucketName, VersionIdMarker, KeyMarker, (err, data) => {
                 if (err) {
                     log.error('error occured while listing', { error: err, bucketName });
                     return done(err);
                 }
                 const keys = _getKeys(data.Versions || []);
-                return async.mapLimit(keys, 10, (k, next) => {
-                    const { Key, VersionId, IsLatest } = k;
-                    s3.send(new HeadObjectCommand({
-                        Bucket: bucketName,
-                        Key,
-                        VersionId,
-                    })).then(res => {
-                        if (replicationStatusToProcess.includes(res.ReplicationStatus)) {
-                            log.info('object with matching replication status found', {
+                return async.mapLimit(
+                    keys,
+                    10,
+                    (k, next) => {
+                        const { Key, VersionId, IsLatest } = k;
+                        s3.send(
+                            new HeadObjectCommand({
+                                Bucket: bucketName,
                                 Key,
                                 VersionId,
-                                IsLatest,
-                                ReplicationStatus: res.ReplicationStatus,
-                                ...res,
-                                bucketName
+                            }),
+                        )
+                            .then(res => {
+                                if (replicationStatusToProcess.includes(res.ReplicationStatus)) {
+                                    log.info('object with matching replication status found', {
+                                        Key,
+                                        VersionId,
+                                        IsLatest,
+                                        ReplicationStatus: res.ReplicationStatus,
+                                        ...res,
+                                        bucketName,
+                                    });
+                                }
+                                return next();
+                            })
+                            .catch(err => {
+                                log.error('error getting object metadata', {
+                                    bucketName,
+                                    Key,
+                                    VersionId,
+                                    IsLatest,
+                                    error: err,
+                                });
+                                return next();
                             });
+                    },
+                    err => {
+                        if (err) {
+                            log.error('error processing batch of objects', {
+                                error: err,
+                                bucketName,
+                            });
+                            return done(err);
                         }
-                        return next();
-                    }).catch(err => {
-                        log.error('error getting object metadata', {
-                            bucketName,
-                            Key,
-                            VersionId,
-                            IsLatest,
-                            error: err
-                        });
-                        return next();
-                    });
-                }, err => {
-                    if (err) {
-                        log.error('error processing batch of objects', {
-                            error: err,
-                            bucketName
-                        });
-                        return done(err);
-                    }
-                    VersionIdMarker = data.NextVersionIdMarker;
-                    KeyMarker = data.NextKeyMarker;
-                    return done();
-                });
-            },
-        ),
+                        VersionIdMarker = data.NextVersionIdMarker;
+                        KeyMarker = data.NextKeyMarker;
+                        return done();
+                    },
+                );
+            }),
         async () => {
             if (!VersionIdMarker || !KeyMarker) {
-                log.debug(
-                    'completed listing objects by replication status for bucket',
-                    { bucket },
-                );
+                log.debug('completed listing objects by replication status for bucket', { bucket });
                 return false;
             }
             return true;
@@ -133,14 +138,7 @@ function _listBucket(s3, log, replicationStatusToProcess, bucket, cb) {
  * @returns {Promise<void>}
  */
 function listObjectsByReplicationStatus(options) {
-    const {
-        buckets,
-        accessKey,
-        secretKey,
-        endpoint,
-        replicationStatus,
-        logger,
-    } = options;
+    const { buckets, accessKey, secretKey, endpoint, replicationStatus, logger } = options;
 
     const log = logger || new Logger('s3utils:listObjectsByReplicationStatus');
 
@@ -171,8 +169,7 @@ function listObjectsByReplicationStatus(options) {
         }
     }
 
-    log.info('Objects with replication status '
-        + `${replicationStatusToProcess.join(' or ')} will be listed`);
+    log.info('Objects with replication status ' + `${replicationStatusToProcess.join(' or ')} will be listed`);
 
     const s3 = new S3Client({
         region: 'us-east-1',
@@ -230,11 +227,13 @@ if (require.main === module) {
         endpoint: ENDPOINT,
         replicationStatus: REPLICATION_STATUS,
         logger: log,
-    }).then(() => {
-        log.info('Completed successfully');
-        process.exit(0);
-    }).catch(err => {
-        log.error('Failed with error', { error: err.message });
-        process.exit(1);
-    });
+    })
+        .then(() => {
+            log.info('Completed successfully');
+            process.exit(0);
+        })
+        .catch(err => {
+            log.error('Failed with error', { error: err.message });
+            process.exit(1);
+        });
 }

@@ -118,17 +118,23 @@ const objectMd = {
     'x-amz-server-side-encryption-customer-algorithm': '',
     'x-amz-website-redirect-location': '',
     'acl': {
-        Canned: 'private', FULL_CONTROL: [], WRITE_ACP: [], READ: [], READ_ACP: [],
+        Canned: 'private',
+        FULL_CONTROL: [],
+        WRITE_ACP: [],
+        READ: [],
+        READ_ACP: [],
     },
     'key': '',
-    'location': [{
-        key: '7751DDF49AA3B289C2D261ED1FD09A596D5D3F20',
-        size: 3263,
-        start: 0,
-        dataStoreName: 'us-east-1',
-        dataStoreType: 'scality',
-        dataStoreETag: '1:dabcc341ecab339daf766e1cddd5d1bb',
-    }],
+    'location': [
+        {
+            key: '7751DDF49AA3B289C2D261ED1FD09A596D5D3F20',
+            size: 3263,
+            start: 0,
+            dataStoreName: 'us-east-1',
+            dataStoreType: 'scality',
+            dataStoreETag: '1:dabcc341ecab339daf766e1cddd5d1bb',
+        },
+    ],
     'isDeleteMarker': false,
     'tags': {},
     'replicationInfo': {
@@ -190,7 +196,7 @@ const getBucketReplicationV2Res = {
  *
  * This function creates an instance of the ReplicationStatusUpdater class using the provided configuration.
  * It then replaces certain methods of this instance with Jest mock functions. These mocked methods include
- * the S3 client's generic `send` method for 'listObjectVersions' and 'getBucketReplication', as well as 
+ * the S3 client's generic `send` method for 'listObjectVersions' and 'getBucketReplication', as well as
  * `getMetadata`, `putMetadata` for the Backbeat client.
  * These mock functions are designed to simulate the behavior of the actual AWS S3 and Backbeat
  * clients without making real API calls, which is useful for isolated testing of the ReplicationStatusUpdater

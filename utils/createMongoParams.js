@@ -48,8 +48,7 @@ function createMongoParams(log, customParams) {
         logger: log,
     };
 
-    if (process.env.MONGODB_AUTH_USERNAME
-        && process.env.MONGODB_AUTH_PASSWORD) {
+    if (process.env.MONGODB_AUTH_USERNAME && process.env.MONGODB_AUTH_PASSWORD) {
         params.authCredentials = {
             username: process.env.MONGODB_AUTH_USERNAME,
             password: process.env.MONGODB_AUTH_PASSWORD,

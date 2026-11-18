@@ -1,13 +1,8 @@
 const crypto = require('crypto');
-const {
-    doWhilst, eachSeries, eachLimit, waterfall,
-} = require('async');
+const { doWhilst, eachSeries, eachLimit, waterfall } = require('async');
 const { ObjectMD, ReplicationConfiguration } = require('@scality/arsenal').models;
 const { replicationBackends } = require('@scality/arsenal').constants;
-const { 
-    ListObjectVersionsCommand, 
-    GetBucketReplicationCommand 
-} = require('@aws-sdk/client-s3');
+const { ListObjectVersionsCommand, GetBucketReplicationCommand } = require('@aws-sdk/client-s3');
 const CloudserverClient = require('../Clients/CloudserverClient');
 const createS3Client = require('../Clients/s3Client');
 
@@ -107,11 +102,14 @@ class ReplicationStatusUpdater {
      * @returns {void} This method does not return a value; instead, it sets the S3 and Cloudserver clients.
      */
     _setupClients() {
-        this.s3 = createS3Client({
-            accessKey: this.accessKey,
-            secretKey: this.secretKey,
-            endpoint: this.endpoint,
-        }, this.log);
+        this.s3 = createS3Client(
+            {
+                accessKey: this.accessKey,
+                secretKey: this.secretKey,
+                endpoint: this.endpoint,
+            },
+            this.log,
+        );
         this.cloudserverclient = new CloudserverClient(this.endpoint, this.accessKey, this.secretKey);
     }
 
@@ -131,7 +129,6 @@ class ReplicationStatusUpdater {
         });
     }
 
-
     /**
      * Tells if TARGET_REPLICATION_STATUS picks a backend with this status.
      * @private
@@ -140,8 +137,7 @@ class ReplicationStatusUpdater {
      * @returns {boolean} True if we must copy the object to this site and bucket again.
      */
     _statusShouldBeProcessed(status) {
-        return this.replicationStatusToProcess.some(filter =>
-            (filter === 'NEW' ? !status : status === filter));
+        return this.replicationStatusToProcess.some(filter => (filter === 'NEW' ? !status : status === filter));
     }
 
     /**
@@ -159,9 +155,10 @@ class ReplicationStatusUpdater {
      * @returns {boolean} True if both are the same.
      */
     _isSameBackend(existing, candidate) {
-        return existing.site === candidate.site
-            && (!existing.destination || this._isCloud(existing.site)
-                || existing.destination === candidate.destination);
+        return (
+            existing.site === candidate.site &&
+            (!existing.destination || this._isCloud(existing.site) || existing.destination === candidate.destination)
+        );
     }
 
     /**
@@ -267,57 +264,74 @@ class ReplicationStatusUpdater {
     _updateObjectMD(bucket, key, versionId, mutate, cb) {
         let objMD;
         let skip = false;
-        return waterfall([
-            next => this.cloudserverclient.getMetadata({
-                Bucket: bucket,
-                Key: key,
-                VersionId: versionId,
-            }, next),
-            (mdRes, next) => {
-                const originalMD = JSON.parse(mdRes.Body);
-                const originalMDVersion = originalMD['md-model-version'];
-                objMD = new ObjectMD(originalMD);
-                const newMDVersion = objMD.getModelVersion();
+        return waterfall(
+            [
+                next =>
+                    this.cloudserverclient.getMetadata(
+                        {
+                            Bucket: bucket,
+                            Key: key,
+                            VersionId: versionId,
+                        },
+                        next,
+                    ),
+                (mdRes, next) => {
+                    const originalMD = JSON.parse(mdRes.Body);
+                    const originalMDVersion = originalMD['md-model-version'];
+                    objMD = new ObjectMD(originalMD);
+                    const newMDVersion = objMD.getModelVersion();
 
-                if (newMDVersion < originalMDVersion) {
-                    this.log.error('model version regression: newMDVersion < originalMDVersion', {
-                        bucket, key, versionId, newMDVersion, originalMDVersion,
+                    if (newMDVersion < originalMDVersion) {
+                        this.log.error('model version regression: newMDVersion < originalMDVersion', {
+                            bucket,
+                            key,
+                            versionId,
+                            newMDVersion,
+                            originalMDVersion,
+                        });
+                        return next(new Error('model version regression: refusing to overwrite newer metadata'));
+                    }
+
+                    const result = mutate(objMD);
+                    if (result?.skip) {
+                        skip = true;
+                        return process.nextTick(next);
+                    }
+
+                    objMD.updateMicroVersionId(this.instanceId, this.replicationGroupId);
+                    const md = objMD.getSerialized();
+                    return this.cloudserverclient.putMetadata(
+                        {
+                            Bucket: bucket,
+                            Key: key,
+                            VersionId: versionId,
+                            Body: md,
+                        },
+                        next,
+                    );
+                },
+            ],
+            err => {
+                ++this._nProcessed;
+                if (err) {
+                    ++this._nErrors;
+                    this.log.error('error updating object', {
+                        bucket,
+                        key,
+                        versionId,
+                        error: err.message,
                     });
-                    return next(new Error('model version regression: refusing to overwrite newer metadata'));
+                    cb();
+                    return;
                 }
-
-                const result = mutate(objMD);
-                if (result?.skip) {
-                    skip = true;
-                    return process.nextTick(next);
+                if (skip) {
+                    ++this._nSkipped;
+                } else {
+                    ++this._nUpdated;
                 }
-
-                objMD.updateMicroVersionId(this.instanceId, this.replicationGroupId);
-                const md = objMD.getSerialized();
-                return this.cloudserverclient.putMetadata({
-                    Bucket: bucket,
-                    Key: key,
-                    VersionId: versionId,
-                    Body: md,
-                }, next);
-            },
-        ], err => {
-            ++this._nProcessed;
-            if (err) {
-                ++this._nErrors;
-                this.log.error('error updating object', {
-                    bucket, key, versionId, error: err.message,
-                });
                 cb();
-                return;
-            }
-            if (skip) {
-                ++this._nSkipped;
-            } else {
-                ++this._nUpdated;
-            }
-            cb();
-        });
+            },
+        );
     }
 
     /**
@@ -376,23 +390,26 @@ class ReplicationStatusUpdater {
         }
         if (!this._unknownSite) {
             this._unknownSite = { bucket, key, versionId };
-            this.log.error('unknown replication site, run stopped. SITE_NAME is not a site '
-                + 'of this object or of the bucket rules. Expected for the S3C default site '
-                + '(rules without StorageClass), e.g. DR failback or renamed DR site. '
-                + 'Objects processed before this point may already have this SITE_NAME: '
-                + 'if SITE_NAME is wrong, run removeReplicationSite (dry run) with '
-                + `SITE_TO_REMOVE=${this.siteName} on these buckets to find and remove it. `
-                + 'If it reset objects, re-run with the right SITE_NAME from the start of '
-                + 'this run (same bucket list and markers): the reset objects are before '
-                + 'the resume point. Otherwise re-run from the resume point with the right '
-                + 'SITE_NAME, or with ALLOW_NEW_SITE=true', {
-                bucket,
-                key,
-                versionId,
-                site: this.siteName,
-                ruleSites: this._getConfiguredSites(rules),
-                objectSites: this._getObjectSites(objMD),
-            });
+            this.log.error(
+                'unknown replication site, run stopped. SITE_NAME is not a site ' +
+                    'of this object or of the bucket rules. Expected for the S3C default site ' +
+                    '(rules without StorageClass), e.g. DR failback or renamed DR site. ' +
+                    'Objects processed before this point may already have this SITE_NAME: ' +
+                    'if SITE_NAME is wrong, run removeReplicationSite (dry run) with ' +
+                    `SITE_TO_REMOVE=${this.siteName} on these buckets to find and remove it. ` +
+                    'If it reset objects, re-run with the right SITE_NAME from the start of ' +
+                    'this run (same bucket list and markers): the reset objects are before ' +
+                    'the resume point. Otherwise re-run from the resume point with the right ' +
+                    'SITE_NAME, or with ALLOW_NEW_SITE=true',
+                {
+                    bucket,
+                    key,
+                    versionId,
+                    site: this.siteName,
+                    ruleSites: this._getConfiguredSites(rules),
+                    objectSites: this._getObjectSites(objMD),
+                },
+            );
         }
         return true;
     }
@@ -470,13 +487,15 @@ class ReplicationStatusUpdater {
      * selected }. existing is the matching object backend, if any.
      */
     _buildPlan(key, existingBackends, repConfig) {
-
         // 1. We take the destinations from the rules, like cloudserver on a PUT: site,
         //    bucket and role. We use them for every status, not only NEW: a requeue must
         //    use the current bucket and role (S3UTILS-208). resolveBackends sets them all
         //    PENDING: step 4 decides which ones we really send.
         let candidates = ReplicationConfiguration.resolveBackends(
-            this._buildArsenalConfig(repConfig), key, site => this._isCloud(site), existingBackends,
+            this._buildArsenalConfig(repConfig),
+            key,
+            site => this._isCloud(site),
+            existingBackends,
         );
 
         // 2. When SITE_NAME is set, we keep only that site, to requeue it without touching
@@ -593,24 +612,29 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _markObjectPending(bucket, key, versionId, repConfig, cb) {
-        this._updateObjectMD(bucket, key, versionId, objMD => {
-            const prev = objMD.getReplicationInfo();
-            const existingBackends = this._upgradeBackends(prev);
-            const plan = this._buildPlan(key, existingBackends, repConfig);
-            if (!plan.some(t => t.selected)) {
-                return { skip: true };
-            }
-            // We check only the objects we write: an object we skip gets no backend, so a
-            // wrong SITE_NAME can't hurt it.
-            if (this._stopOnUnknownSite(objMD, bucket, key, versionId, repConfig.Rules)) {
-                return { skip: true };
-            }
-            // _updateObjectMD then gives the object a new microVersionId, so the destination
-            // accepts this update as newer than what it has.
-            objMD.setReplicationInfo(
-                this._buildReplicationInfo(prev, existingBackends, plan, repConfig, objMD));
-            return { skip: false };
-        }, cb);
+        this._updateObjectMD(
+            bucket,
+            key,
+            versionId,
+            objMD => {
+                const prev = objMD.getReplicationInfo();
+                const existingBackends = this._upgradeBackends(prev);
+                const plan = this._buildPlan(key, existingBackends, repConfig);
+                if (!plan.some(t => t.selected)) {
+                    return { skip: true };
+                }
+                // We check only the objects we write: an object we skip gets no backend, so a
+                // wrong SITE_NAME can't hurt it.
+                if (this._stopOnUnknownSite(objMD, bucket, key, versionId, repConfig.Rules)) {
+                    return { skip: true };
+                }
+                // _updateObjectMD then gives the object a new microVersionId, so the destination
+                // accepts this update as newer than what it has.
+                objMD.setReplicationInfo(this._buildReplicationInfo(prev, existingBackends, plan, repConfig, objMD));
+                return { skip: false };
+            },
+            cb,
+        );
     }
 
     /**
@@ -623,13 +647,16 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
-        this.s3.send(new ListObjectVersionsCommand({
-            Bucket: bucket,
-            MaxKeys: this.listingLimit,
-            Prefix: this.targetPrefix,
-            VersionIdMarker,
-            KeyMarker,
-        }))
+        this.s3
+            .send(
+                new ListObjectVersionsCommand({
+                    Bucket: bucket,
+                    MaxKeys: this.listingLimit,
+                    Prefix: this.targetPrefix,
+                    VersionIdMarker,
+                    KeyMarker,
+                }),
+            )
             .then(data => cb(null, data))
             .catch(cb);
     }
@@ -643,72 +670,85 @@ class ReplicationStatusUpdater {
      * @returns {void}
      */
     _markPending(bucket, versions, cb) {
-        waterfall([
-            async () => {
-                try {
-                    const res = await this.s3.send(new GetBucketReplicationCommand({ Bucket: bucket }));
-                    return res.ReplicationConfiguration;
-                } catch (err) {
-                    this.log.error('error getting bucket replication', { error: err });
-                    throw err;
-                }
-            },
-            (repConfig, next) => {
-                const { Rules } = repConfig;
+        waterfall(
+            [
+                async () => {
+                    try {
+                        const res = await this.s3.send(new GetBucketReplicationCommand({ Bucket: bucket }));
+                        return res.ReplicationConfiguration;
+                    } catch (err) {
+                        this.log.error('error getting bucket replication', { error: err });
+                        throw err;
+                    }
+                },
+                (repConfig, next) => {
+                    const { Rules } = repConfig;
 
-                // A rule without StorageClass needs SITE_NAME as its site (see
-                // _buildArsenalConfig).
-                const hasRuleWithoutSite = Rules.some(r =>
-                    r.Status === 'Enabled' && !r.Destination.StorageClass
-                );
-                if (!this.siteName && hasRuleWithoutSite) {
-                    const errMsg = 'missing SITE_NAME environment variable, must be set to'
-                        + ' the value of "site" property in the CRR configuration';
-                    this.log.error(errMsg);
-                    return next(new Error(errMsg));
-                }
-                // When no rule sends objects to SITE_NAME, we only requeue the objects that
-                // already have a backend for it. We warn once per bucket, so the user knows why
-                // few objects are updated.
-                // Example: the rules name sf and dr2, and SITE_NAME=dr3.
-                const ruleSites = this._getConfiguredSites(Rules);
-                if (this.siteName && !hasRuleWithoutSite && !ruleSites.includes(this.siteName)
-                    && this._siteWarnedBucket !== bucket) {
-                    this._siteWarnedBucket = bucket;
-                    this.log.warn('SITE_NAME is not a site of the bucket rules: only objects that '
-                        + 'already replicate to it are requeued, the other objects are skipped', {
-                        bucket,
-                        site: this.siteName,
-                        ruleSites,
-                    });
-                }
-                return eachLimit(versions, this.workers, (i, apply) => {
-                    const { Key, VersionId, IsLatest } = i;
-                    if (this._unknownSite) {
-                        // The run stopped on an unknown site: we don't start new objects.
-                        apply();
-                        return;
+                    // A rule without StorageClass needs SITE_NAME as its site (see
+                    // _buildArsenalConfig).
+                    const hasRuleWithoutSite = Rules.some(r => r.Status === 'Enabled' && !r.Destination.StorageClass);
+                    if (!this.siteName && hasRuleWithoutSite) {
+                        const errMsg =
+                            'missing SITE_NAME environment variable, must be set to' +
+                            ' the value of "site" property in the CRR configuration';
+                        this.log.error(errMsg);
+                        return next(new Error(errMsg));
                     }
-                    if (this.currentVersionOnly && !IsLatest) {
-                        ++this._nSkipped;
-                        apply();
-                        return;
+                    // When no rule sends objects to SITE_NAME, we only requeue the objects that
+                    // already have a backend for it. We warn once per bucket, so the user knows why
+                    // few objects are updated.
+                    // Example: the rules name sf and dr2, and SITE_NAME=dr3.
+                    const ruleSites = this._getConfiguredSites(Rules);
+                    if (
+                        this.siteName &&
+                        !hasRuleWithoutSite &&
+                        !ruleSites.includes(this.siteName) &&
+                        this._siteWarnedBucket !== bucket
+                    ) {
+                        this._siteWarnedBucket = bucket;
+                        this.log.warn(
+                            'SITE_NAME is not a site of the bucket rules: only objects that ' +
+                                'already replicate to it are requeued, the other objects are skipped',
+                            {
+                                bucket,
+                                site: this.siteName,
+                                ruleSites,
+                            },
+                        );
                     }
-                    // We skip a key that no enabled rule covers: backbeat refuses it anyway
-                    // ("replication disabled for object").
-                    const hasMatchingRule = Rules.some(r =>
-                        r.Status === 'Enabled' &&
-                        Key.startsWith(r.Filter?.Prefix ?? r.Prefix ?? '')
+                    return eachLimit(
+                        versions,
+                        this.workers,
+                        (i, apply) => {
+                            const { Key, VersionId, IsLatest } = i;
+                            if (this._unknownSite) {
+                                // The run stopped on an unknown site: we don't start new objects.
+                                apply();
+                                return;
+                            }
+                            if (this.currentVersionOnly && !IsLatest) {
+                                ++this._nSkipped;
+                                apply();
+                                return;
+                            }
+                            // We skip a key that no enabled rule covers: backbeat refuses it anyway
+                            // ("replication disabled for object").
+                            const hasMatchingRule = Rules.some(
+                                r => r.Status === 'Enabled' && Key.startsWith(r.Filter?.Prefix ?? r.Prefix ?? ''),
+                            );
+                            if (!hasMatchingRule) {
+                                ++this._nSkipped;
+                                apply();
+                                return;
+                            }
+                            this._markObjectPending(bucket, Key, VersionId, repConfig, apply);
+                        },
+                        next,
                     );
-                    if (!hasMatchingRule) {
-                        ++this._nSkipped;
-                        apply();
-                        return;
-                    }
-                    this._markObjectPending(bucket, Key, VersionId, repConfig, apply);
-                }, next);
-            },
-        ], cb);
+                },
+            ],
+            cb,
+        );
     }
 
     /**
@@ -728,15 +768,14 @@ class ReplicationStatusUpdater {
             this._VersionIdMarker = this.inputVersionIdMarker;
             this.inputKeyMarker = undefined;
             this.inputVersionIdMarker = undefined;
-            this.log.info(`resuming bucket: ${bucket} at: KeyMarker=${this._KeyMarker} `
-                + `VersionIdMarker=${this._VersionIdMarker}`);
+            this.log.info(
+                `resuming bucket: ${bucket} at: KeyMarker=${this._KeyMarker} ` +
+                    `VersionIdMarker=${this._VersionIdMarker}`,
+            );
         }
         return doWhilst(
-            done => this._listObjectVersions(
-                bucket,
-                this._VersionIdMarker,
-                this._KeyMarker,
-                (err, data) => {
+            done =>
+                this._listObjectVersions(bucket, this._VersionIdMarker, this._KeyMarker, (err, data) => {
                     if (err) {
                         this.log.error('error listing object versions', { error: err });
                         return done(err);
@@ -754,8 +793,7 @@ class ReplicationStatusUpdater {
                         this._KeyMarker = data.NextKeyMarker;
                         return done();
                     });
-                },
-            ),
+                }),
             async () => {
                 if (this._unknownSite) {
                     return false;
@@ -765,24 +803,24 @@ class ReplicationStatusUpdater {
                     let remainingBuckets;
                     if (this._VersionIdMarker || this._KeyMarker) {
                         // next bucket to process is still the current one
-                        remainingBuckets = this.buckets.slice(
-                            this.buckets.findIndex(bucket => bucket === bucketName),
-                        );
+                        remainingBuckets = this.buckets.slice(this.buckets.findIndex(bucket => bucket === bucketName));
                     } else {
                         // next bucket to process is the next in bucket list
                         remainingBuckets = this.buckets.slice(
                             this.buckets.findIndex(bucket => bucket === bucketName) + 1,
                         );
                     }
-                    let message = 'reached '
-                        + `${this._nUpdated >= this.maxUpdates ? 'update' : 'scanned'} `
-                        + 'count limit, resuming from this '
-                        + 'point can be achieved by re-running the script with '
-                        + `the bucket list "${remainingBuckets.join(',')}"`;
+                    let message =
+                        'reached ' +
+                        `${this._nUpdated >= this.maxUpdates ? 'update' : 'scanned'} ` +
+                        'count limit, resuming from this ' +
+                        'point can be achieved by re-running the script with ' +
+                        `the bucket list "${remainingBuckets.join(',')}"`;
                     if (this._VersionIdMarker || this._KeyMarker) {
-                        message += ' and the following environment variables set: '
-                            + `KEY_MARKER=${this._KeyMarker} `
-                            + `VERSION_ID_MARKER=${this._VersionIdMarker}`;
+                        message +=
+                            ' and the following environment variables set: ' +
+                            `KEY_MARKER=${this._KeyMarker} ` +
+                            `VERSION_ID_MARKER=${this._VersionIdMarker}`;
                     }
                     this.log.info(message);
                     return false;
@@ -801,13 +839,15 @@ class ReplicationStatusUpdater {
                 }
                 this._logProgress();
                 if (this._unknownSite) {
-                    let message = 'stopped on an unknown replication site, resume by re-running '
-                        + 'the script with the bucket list '
-                        + `"${this.buckets.slice(this.buckets.indexOf(bucketName)).join(',')}"`;
+                    let message =
+                        'stopped on an unknown replication site, resume by re-running ' +
+                        'the script with the bucket list ' +
+                        `"${this.buckets.slice(this.buckets.indexOf(bucketName)).join(',')}"`;
                     if (this._VersionIdMarker || this._KeyMarker) {
-                        message += ' and the following environment variables set: '
-                            + `KEY_MARKER=${this._KeyMarker} `
-                            + `VERSION_ID_MARKER=${this._VersionIdMarker}`;
+                        message +=
+                            ' and the following environment variables set: ' +
+                            `KEY_MARKER=${this._KeyMarker} ` +
+                            `VERSION_ID_MARKER=${this._VersionIdMarker}`;
                     }
                     this.log.error(message);
                     cb(new Error('stopped on an unknown replication site'));

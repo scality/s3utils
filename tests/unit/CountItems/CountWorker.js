@@ -183,11 +183,8 @@ describe('CountItems::CountWorker', () => {
         w.getIsTransient = jest.fn((bucketInfo, cb) => cb(...tc.mock.getIsTransient));
         mongoMock.setup.mockImplementationOnce(cb => cb(...tc.mock.setup));
         mongoMock.close.mockImplementationOnce(cb => cb(...tc.mock.close));
-        mongoMock.client.isConnected
-            .mockImplementationOnce(() => tc.mock.isConnected);
-        mongoMock.getObjectMDStats.mockImplementationOnce(
-            (_a, _b, _c, _d, cb) => cb(...tc.mock.getObjectMDStats),
-        );
+        mongoMock.client.isConnected.mockImplementationOnce(() => tc.mock.isConnected);
+        mongoMock.getObjectMDStats.mockImplementationOnce((_a, _b, _c, _d, cb) => cb(...tc.mock.getObjectMDStats));
         w.handleMessage(tc.incomingMessage);
         setTimeout(() => {
             expect(testSendFn).toHaveBeenCalledWith(e.message);
@@ -283,7 +280,11 @@ describe('CountItems::CountWorker', () => {
             worker.getIsTransient(mockBucketInfo, (err, isTransient) => {
                 expect(err).toBeNull();
                 expect(isTransient).toBe(true);
-                expect(mongoMock.isLocationTransient).toHaveBeenCalledWith('test-location', worker.log, expect.any(Function));
+                expect(mongoMock.isLocationTransient).toHaveBeenCalledWith(
+                    'test-location',
+                    worker.log,
+                    expect.any(Function),
+                );
                 done();
             });
         });
@@ -315,9 +316,12 @@ describe('CountItems::CountWorker', () => {
             test('should fallback to pensieveLocationIsTransient and return true', done => {
                 mongoMock.getObject
                     .mockImplementationOnce((bucket, key, params, log, cb) => cb(null, 'v1')) // 1st call
-                    .mockImplementationOnce((bucket, key, params, log, cb) => cb(null, { // 2nd call
-                        locations: { 'test-location': { isTransient: true } },
-                    }));
+                    .mockImplementationOnce((bucket, key, params, log, cb) =>
+                        cb(null, {
+                            // 2nd call
+                            locations: { 'test-location': { isTransient: true } },
+                        }),
+                    );
                 worker.getIsTransient(mockBucketInfo, (err, isTransient) => {
                     expect(err).toBeNull();
                     expect(isTransient).toBe(true);
@@ -329,9 +333,11 @@ describe('CountItems::CountWorker', () => {
             test('should fallback to pensieveLocationIsTransient and return false', done => {
                 mongoMock.getObject
                     .mockImplementationOnce((bucket, key, params, log, cb) => cb(null, 'v1'))
-                    .mockImplementationOnce((bucket, key, params, log, cb) => cb(null, {
-                        locations: { 'test-location': { isTransient: false } },
-                    }));
+                    .mockImplementationOnce((bucket, key, params, log, cb) =>
+                        cb(null, {
+                            locations: { 'test-location': { isTransient: false } },
+                        }),
+                    );
                 worker.getIsTransient(mockBucketInfo, (err, isTransient) => {
                     expect(err).toBeNull();
                     expect(isTransient).toBe(false);
@@ -386,7 +392,9 @@ describe('CountItems::CountWorker', () => {
         test('should return false if location is not transient in Pensieve config', done => {
             mongoMock.getObject
                 .mockImplementationOnce((b, k, p, l, cb) => cb(null, 'v-p-2'))
-                .mockImplementationOnce((b, k, p, l, cb) => cb(null, { locations: { 'loc-B': { isTransient: false } } }));
+                .mockImplementationOnce((b, k, p, l, cb) =>
+                    cb(null, { locations: { 'loc-B': { isTransient: false } } }),
+                );
 
             worker.pensieveLocationIsTransient('loc-B', (err, isTransient) => {
                 expect(err).toBeNull();
@@ -434,7 +442,9 @@ describe('CountItems::CountWorker', () => {
         test('should handle case when locConstraint is not in locations', done => {
             mongoMock.getObject
                 .mockImplementationOnce((b, k, p, l, cb) => cb(null, 'v-p-5'))
-                .mockImplementationOnce((b, k, p, l, cb) => cb(null, { locations: { 'other-loc': { isTransient: true } } }));
+                .mockImplementationOnce((b, k, p, l, cb) =>
+                    cb(null, { locations: { 'other-loc': { isTransient: true } } }),
+                );
 
             worker.pensieveLocationIsTransient('loc-F-not-in-response', (err, isTransient) => {
                 expect(err).toBeNull();

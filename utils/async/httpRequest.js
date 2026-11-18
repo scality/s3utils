@@ -1,5 +1,3 @@
-
-
 const http = require('http');
 const async = require('async');
 const { http: httpArsn } = require('httpagent');
@@ -26,29 +24,29 @@ function httpRequest(method, url, retryParams) {
     async function attempt() {
         const res = await new Promise((resolve, reject) => {
             const urlObj = new URL(url);
-            const req = http.request({
-                hostname: urlObj.hostname,
-                port: urlObj.port,
-                path: `${urlObj.pathname}${urlObj.search}`,
-                method,
-                agent: httpAgent,
-            }, r => {
-                const chunks = [];
-                r.on('data', chunk => chunks.push(chunk));
-                r.once('end', () => {
-                    // eslint-disable-next-line no-param-reassign
-                    r.body = chunks.join('');
-                    log.trace('received HTTP response', { method, url, statusCode: r.statusCode });
-                    resolve(r);
-                });
-                r.once('error', err => reject(new Error(
-                    'error reading response from HTTP request '
-                        + `to ${url}: ${err.message}`,
-                )));
-            });
-            req.once('error', err => reject(new Error(
-                `error sending HTTP request to ${url}: ${err.message}`,
-            )));
+            const req = http.request(
+                {
+                    hostname: urlObj.hostname,
+                    port: urlObj.port,
+                    path: `${urlObj.pathname}${urlObj.search}`,
+                    method,
+                    agent: httpAgent,
+                },
+                r => {
+                    const chunks = [];
+                    r.on('data', chunk => chunks.push(chunk));
+                    r.once('end', () => {
+                        // eslint-disable-next-line no-param-reassign
+                        r.body = chunks.join('');
+                        log.trace('received HTTP response', { method, url, statusCode: r.statusCode });
+                        resolve(r);
+                    });
+                    r.once('error', err =>
+                        reject(new Error('error reading response from HTTP request ' + `to ${url}: ${err.message}`)),
+                    );
+                },
+            );
+            req.once('error', err => reject(new Error(`error sending HTTP request to ${url}: ${err.message}`)));
             log.trace('sending HTTP request', { method, url });
             req.end();
         });

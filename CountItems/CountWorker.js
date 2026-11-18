@@ -21,8 +21,7 @@ class CountWorker {
     }
 
     clientSetup(callback) {
-        if (this.client.client
-            && this.client.client.isConnected()) {
+        if (this.client.client && this.client.client.isConnected()) {
             this.log.debug('mongoclient is connected...skipping setup');
             return callback();
         }
@@ -42,25 +41,27 @@ class CountWorker {
     pensieveLocationIsTransient(locConstraint, cb) {
         const overlayVersionId = 'configuration/overlay-version';
 
-        async.waterfall([
-            next => this.client.getObject(PENSIEVE, overlayVersionId, null, this.log, next),
-            (version, next) => {
-                const overlayConfigId = `configuration/overlay/${version}`;
-                return this.client.getObject(PENSIEVE, overlayConfigId, null, this.log, next);
-            },
-        ], (err, res) => {
-            if (err) {
-                this.log.error('error getting configuration overlay', {
-                    method: 'pensieveLocationIsTransient',
-                    error: err,
-                });
-                return cb(err);
-            }
-            const isTransient =
-                Boolean(res?.locations[locConstraint]?.isTransient);
+        async.waterfall(
+            [
+                next => this.client.getObject(PENSIEVE, overlayVersionId, null, this.log, next),
+                (version, next) => {
+                    const overlayConfigId = `configuration/overlay/${version}`;
+                    return this.client.getObject(PENSIEVE, overlayConfigId, null, this.log, next);
+                },
+            ],
+            (err, res) => {
+                if (err) {
+                    this.log.error('error getting configuration overlay', {
+                        method: 'pensieveLocationIsTransient',
+                        error: err,
+                    });
+                    return cb(err);
+                }
+                const isTransient = Boolean(res?.locations[locConstraint]?.isTransient);
 
-            return cb(null, isTransient);
-        });
+                return cb(null, isTransient);
+            },
+        );
     }
 
     countItems(bucketInfoObj, callback) {
@@ -79,13 +80,17 @@ class CountWorker {
         const bucketInfo = BucketInfo.fromObj(bucketInfoData);
         const bucketName = bucketInfo.getName();
         this.log.info(`${process.pid} handling ${bucketName}`);
-        return async.waterfall([
-            next => this.getIsTransient(bucketInfo, next),
-            (isTransient, next) => this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),
-        ], (err, results) => {
-            monitoring.bucketsCount.inc({ status: err ? 'error' : 'success' });
-            callback(err, results);
-        });
+        return async.waterfall(
+            [
+                next => this.getIsTransient(bucketInfo, next),
+                (isTransient, next) =>
+                    this.client.getObjectMDStats(bucketName, bucketInfo, isTransient, this.log, next),
+            ],
+            (err, results) => {
+                monitoring.bucketsCount.inc({ status: err ? 'error' : 'success' });
+                callback(err, results);
+            },
+        );
     }
 
     clientTeardown(callback) {
@@ -101,66 +106,66 @@ class CountWorker {
             return;
         }
         switch (data.type) {
-        case 'count':
-            this.countItems(deserializeBigInts(data.bucketInfo), (err, results) => {
-                if (err) {
+            case 'count':
+                this.countItems(deserializeBigInts(data.bucketInfo), (err, results) => {
+                    if (err) {
+                        return this._sendFn({
+                            id: data.id,
+                            owner: 'scality',
+                            type: 'count',
+                            status: 'failed',
+                            error: err.message,
+                        });
+                    }
                     return this._sendFn({
                         id: data.id,
                         owner: 'scality',
                         type: 'count',
-                        status: 'failed',
-                        error: err.message,
+                        status: 'passed',
+                        results: serializeBigInts(results),
                     });
-                }
-                return this._sendFn({
-                    id: data.id,
-                    owner: 'scality',
-                    type: 'count',
-                    status: 'passed',
-                    results: serializeBigInts(results),
                 });
-            });
-            break;
-        case 'setup':
-            this.clientSetup(err => {
-                if (err) {
+                break;
+            case 'setup':
+                this.clientSetup(err => {
+                    if (err) {
+                        return this._sendFn({
+                            id: data.id,
+                            owner: 'scality',
+                            type: 'setup',
+                            status: 'failed',
+                            error: err.message,
+                        });
+                    }
                     return this._sendFn({
                         id: data.id,
                         owner: 'scality',
                         type: 'setup',
-                        status: 'failed',
-                        error: err.message,
+                        status: 'passed',
                     });
-                }
-                return this._sendFn({
-                    id: data.id,
-                    owner: 'scality',
-                    type: 'setup',
-                    status: 'passed',
                 });
-            });
-            break;
-        case 'teardown':
-            this.clientTeardown(err => {
-                if (err) {
+                break;
+            case 'teardown':
+                this.clientTeardown(err => {
+                    if (err) {
+                        return this._sendFn({
+                            id: data.id,
+                            owner: 'scality',
+                            type: 'teardown',
+                            status: 'failed',
+                            error: err.message,
+                        });
+                    }
                     return this._sendFn({
                         id: data.id,
                         owner: 'scality',
                         type: 'teardown',
-                        status: 'failed',
-                        error: err.message,
+                        status: 'passed',
                     });
-                }
-                return this._sendFn({
-                    id: data.id,
-                    owner: 'scality',
-                    type: 'teardown',
-                    status: 'passed',
                 });
-            });
-            break;
-        default:
-            break;
+                break;
+            default:
+                break;
         }
     }
 }

@@ -19,7 +19,7 @@ class StalledRequestHandler {
     queueSetup() {
         this._queue = async.queue((task, done) => {
             const { batch, getNext } = task;
-            
+
             if (this.queueError !== null) {
                 return done();
             }
@@ -34,14 +34,17 @@ class StalledRequestHandler {
                 return done(new Error('invalid stalled handler client'));
             }
 
-            return this.client.retryFailedObjects({
-                Body: Buffer.from(JSON.stringify(batch.map(entry => entry.toObject()))),
-            }, err => {
-                if (err) {
-                    return done(err);
-                }
-                return getNext(done);
-            });
+            return this.client.retryFailedObjects(
+                {
+                    Body: Buffer.from(JSON.stringify(batch.map(entry => entry.toObject()))),
+                },
+                err => {
+                    if (err) {
+                        return done(err);
+                    }
+                    return getNext(done);
+                },
+            );
         }, this.concurrentRequests);
 
         this._queue.error((err, task) => {
@@ -61,7 +64,7 @@ class StalledRequestHandler {
             running: this._queue.running(),
             inQueue: this._queue.length(),
         });
-        return (this._queue.running() > 0 || this._queue.length() > 0);
+        return this._queue.running() > 0 || this._queue.length() > 0;
     }
 
     kill() {
@@ -71,7 +74,7 @@ class StalledRequestHandler {
 
     _waitForCompletion(cb) {
         async.whilst(
-            async () => (!this.killed && this.isInProgress()),
+            async () => !this.killed && this.isInProgress(),
             done => setTimeout(done, 1000),
             cb,
         );
@@ -88,9 +91,8 @@ class StalledRequestHandler {
         }
 
         const onceCB = jsutil.once(cb);
-        const nextBatch = cb => source.getBatch(
-            this.batchSize,
-            (err, batch) => {
+        const nextBatch = cb =>
+            source.getBatch(this.batchSize, (err, batch) => {
                 if (err) {
                     this.log.error('failed to retrieve batch', {
                         method: 'nextBatch',
@@ -108,8 +110,7 @@ class StalledRequestHandler {
                 }
 
                 return cb(null);
-            },
-        );
+            });
 
         return async.times(
             this.concurrentRequests,
@@ -145,4 +146,3 @@ class StalledRequestHandler {
 module.exports = {
     StalledRequestHandler,
 };
-

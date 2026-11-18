@@ -37,10 +37,9 @@ class DuplicateSproxydKeyFoundHandler {
         // if existing object has been visited, do not repair again
         const obj = params.objectKey;
         if (this.visitedObjects.has(obj)) {
-            log.info(
-                `Object ${obj} is repaired or has been scheduled for repair`,
-                { eventMessage: 'objectAlreadyVisited' },
-            );
+            log.info(`Object ${obj} is repaired or has been scheduled for repair`, {
+                eventMessage: 'objectAlreadyVisited',
+            });
         } else {
             this.visitedObjects.setAndUpdate(obj, true);
             needsRepair = true;
@@ -48,14 +47,14 @@ class DuplicateSproxydKeyFoundHandler {
 
         // The largest string is last (which is the older version).
         // Older version is chosen to repair.
-        const [newerVersionKey, olderVersionKey] = [params.objectKey, params.existingObjectKey]
-            .sort();
+        const [newerVersionKey, olderVersionKey] = [params.objectKey, params.existingObjectKey].sort();
 
         // remove older version, insert newer version into sproxyd key map
         params.context.sproxydKeys.set(params.sproxydKey, newerVersionKey);
 
-        const [objectUrl, objectUrl2] = [olderVersionKey, newerVersionKey]
-            .map(objectKey => this._getObjectURL(params.bucket, objectKey));
+        const [objectUrl, objectUrl2] = [olderVersionKey, newerVersionKey].map(objectKey =>
+            this._getObjectURL(params.bucket, objectKey),
+        );
 
         const objInfo = {
             objectUrl,

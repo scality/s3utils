@@ -44,12 +44,8 @@ describe('DBListStream', () => {
             {
                 desc: 'single master version',
                 dbName: 'storeDb42',
-                dbEntries: [
-                    { key: 'bucket/object', value: '{"foo":"bar"}' },
-                ],
-                listEntries: [
-                    { key: 'bucket/object', value: '{"foo":"bar"}' },
-                ],
+                dbEntries: [{ key: 'bucket/object', value: '{"foo":"bar"}' }],
+                listEntries: [{ key: 'bucket/object', value: '{"foo":"bar"}' }],
             },
             {
                 desc: 'single versioned entry',

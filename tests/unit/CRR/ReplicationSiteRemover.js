@@ -38,19 +38,23 @@ const brokenReplicationInfo = {
  * @returns {ReplicationSiteRemover} Remover with mocks.
  */
 function initRemover(params, opts) {
-    const remover = new ReplicationSiteRemover({
-        buckets: ['bucket0'],
-        siteToRemove: 'foo',
-        accessKey: 'ak',
-        secretKey: 'sk',
-        endpoint: 'http://dummyEndpoint:8000',
-        dryRun: false,
-        ...params,
-    }, logger);
+    const remover = new ReplicationSiteRemover(
+        {
+            buckets: ['bucket0'],
+            siteToRemove: 'foo',
+            accessKey: 'ak',
+            secretKey: 'sk',
+            endpoint: 'http://dummyEndpoint:8000',
+            dryRun: false,
+            ...params,
+        },
+        logger,
+    );
     const pages = [...opts.pages];
-    const rules = opts.rules === undefined
-        ? [{ Prefix: '', Status: 'Enabled', Destination: { Bucket: 'arn:aws:s3:::destination' } }]
-        : opts.rules;
+    const rules =
+        opts.rules === undefined
+            ? [{ Prefix: '', Status: 'Enabled', Destination: { Bucket: 'arn:aws:s3:::destination' } }]
+            : opts.rules;
     remover.s3.send = jest.fn(command => {
         if (command.constructor.name === 'GetBucketReplicationCommand') {
             if (rules === null) {
@@ -83,8 +87,7 @@ function page(versions, deleteMarkers = [], next = {}) {
 }
 
 function listCalls(remover) {
-    return remover.s3.send.mock.calls
-        .filter(([command]) => command.constructor.name === 'ListObjectVersionsCommand');
+    return remover.s3.send.mock.calls.filter(([command]) => command.constructor.name === 'ListObjectVersionsCommand');
 }
 
 function writtenReplicationInfo(remover, callIndex = 0) {
@@ -107,18 +110,24 @@ describe('ReplicationSiteRemover helpers', () => {
     });
 
     it('removeSiteFromLists: removes the site and its aligned storage type', () => {
-        expect(removeSiteFromLists('aws-location,foo', 'aws_s3,azure', 'foo'))
-            .toEqual({ storageClass: 'aws-location', storageType: 'aws_s3' });
+        expect(removeSiteFromLists('aws-location,foo', 'aws_s3,azure', 'foo')).toEqual({
+            storageClass: 'aws-location',
+            storageType: 'aws_s3',
+        });
     });
 
     it('removeSiteFromLists: removes a site tagged preferred_read', () => {
-        expect(removeSiteFromLists('foo:preferred_read,destination', '', 'foo'))
-            .toEqual({ storageClass: 'destination', storageType: '' });
+        expect(removeSiteFromLists('foo:preferred_read,destination', '', 'foo')).toEqual({
+            storageClass: 'destination',
+            storageType: '',
+        });
     });
 
     it('removeSiteFromLists: keeps storageType when lists are not aligned', () => {
-        expect(removeSiteFromLists('destination,foo', '', 'foo'))
-            .toEqual({ storageClass: 'destination', storageType: '' });
+        expect(removeSiteFromLists('destination,foo', '', 'foo')).toEqual({
+            storageClass: 'destination',
+            storageType: '',
+        });
     });
 
     it('getEmptyReplicationInfo: returns a fresh empty copy each time', () => {
@@ -130,27 +139,31 @@ describe('ReplicationSiteRemover helpers', () => {
     });
 
     it('removeSiteFromLists: no change when the site is absent', () => {
-        expect(removeSiteFromLists('destination', '', 'foo'))
-            .toEqual({ storageClass: 'destination', storageType: '' });
+        expect(removeSiteFromLists('destination', '', 'foo')).toEqual({ storageClass: 'destination', storageType: '' });
     });
 });
 
 describe('ReplicationSiteRemover', () => {
     it('should remove the site and set COMPLETED when the other sites are COMPLETED', async () => {
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+            },
+        );
         const stats = await remover.run();
         expect(stats).toEqual({
-            scanned: 1, updated: 1, reset: 0, skipped: 0, errors: 0,
+            scanned: 1,
+            updated: 1,
+            reset: 0,
+            skipped: 0,
+            errors: 0,
         });
         const repInfo = writtenReplicationInfo(remover);
         expect(repInfo.status).toBe('COMPLETED');
         expect(repInfo.storageClass).toBe('destination');
-        expect(repInfo.backends).toEqual([
-            { site: 'destination', status: 'COMPLETED', dataStoreVersionId: '' },
-        ]);
+        expect(repInfo.backends).toEqual([{ site: 'destination', status: 'COMPLETED', dataStoreVersionId: '' }]);
     });
 
     it('should keep REPLICA on a replica', async () => {
@@ -162,10 +175,13 @@ describe('ReplicationSiteRemover', () => {
                 brokenReplicationInfo.backends[1],
             ],
         };
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplica) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplica) },
+            },
+        );
         await remover.run();
         const repInfo = writtenReplicationInfo(remover);
         expect(repInfo.status).toBe('REPLICA');
@@ -184,10 +200,13 @@ describe('ReplicationSiteRemover', () => {
             ],
             storageClass: 'dr,primary,foo',
         };
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplica) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplica) },
+            },
+        );
         await remover.run();
         const repInfo = writtenReplicationInfo(remover);
         expect(repInfo.status).toBe('REPLICA');
@@ -201,29 +220,38 @@ describe('ReplicationSiteRemover', () => {
     it('should keep PENDING when another site is still PENDING', async () => {
         const repInfo = JSON.parse(JSON.stringify(brokenReplicationInfo));
         repInfo.backends[0].status = 'PENDING';
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(repInfo) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(repInfo) },
+            },
+        );
         await remover.run();
         expect(writtenReplicationInfo(remover).status).toBe('PENDING');
     });
 
     it('should write nothing in dry run', async () => {
-        const remover = initRemover({ dryRun: true }, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-        });
+        const remover = initRemover(
+            { dryRun: true },
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+            },
+        );
         const stats = await remover.run();
         expect(remover.cloudserverClient.putMetadata).not.toHaveBeenCalled();
         expect(stats.updated).toBe(1);
     });
 
     it('should default to dry run', async () => {
-        const remover = initRemover({ dryRun: undefined }, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-        });
+        const remover = initRemover(
+            { dryRun: undefined },
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+            },
+        );
         await remover.run();
         expect(remover.cloudserverClient.putMetadata).not.toHaveBeenCalled();
     });
@@ -235,10 +263,13 @@ describe('ReplicationSiteRemover', () => {
             backends: [brokenReplicationInfo.backends[0]],
             storageClass: 'destination',
         };
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(clean) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(clean) },
+            },
+        );
         const stats = await remover.run();
         expect(remover.cloudserverClient.putMetadata).not.toHaveBeenCalled();
         expect(stats.skipped).toBe(1);
@@ -251,10 +282,13 @@ describe('ReplicationSiteRemover', () => {
             backends: [brokenReplicationInfo.backends[1]],
             storageClass: 'foo',
         };
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(onlyFoo) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(onlyFoo) },
+            },
+        );
         const stats = await remover.run();
         expect(stats).toEqual(expect.objectContaining({ updated: 1, reset: 1 }));
         // same as an object never set up for replication, in the installed arsenal format
@@ -267,66 +301,83 @@ describe('ReplicationSiteRemover', () => {
             backends: [brokenReplicationInfo.backends[1]],
             storageClass: 'foo',
         };
-        const remover = initRemover({ dryRun: true }, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(onlyFoo) },
-        });
+        const remover = initRemover(
+            { dryRun: true },
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(onlyFoo) },
+            },
+        );
         const stats = await remover.run();
         expect(remover.cloudserverClient.putMetadata).not.toHaveBeenCalled();
         expect(stats).toEqual(expect.objectContaining({ updated: 1, reset: 1 }));
     });
 
     it('should process delete markers', async () => {
-        const remover = initRemover({}, {
-            pages: [page([], [['key0', 'dm0']])],
-            mds: { 'key0/dm0': makeMd(brokenReplicationInfo, { isDeleteMarker: true }) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([], [['key0', 'dm0']])],
+                mds: { 'key0/dm0': makeMd(brokenReplicationInfo, { isDeleteMarker: true }) },
+            },
+        );
         const stats = await remover.run();
         expect(stats.updated).toBe(1);
         expect(writtenReplicationInfo(remover).status).toBe('COMPLETED');
     });
 
     it('should count an error and keep going', async () => {
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0'], ['key1', 'v1']])],
-            mds: { 'key1/v1': makeMd(brokenReplicationInfo) },
-            failGet: new Set(['key0/v0']),
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [
+                    page([
+                        ['key0', 'v0'],
+                        ['key1', 'v1'],
+                    ]),
+                ],
+                mds: { 'key1/v1': makeMd(brokenReplicationInfo) },
+                failGet: new Set(['key0/v0']),
+            },
+        );
         const stats = await remover.run();
         expect(stats.errors).toBe(1);
         expect(stats.updated).toBe(1);
     });
 
     it('should list all pages', async () => {
-        const remover = initRemover({}, {
-            pages: [
-                page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }),
-                page([['key1', 'v1']]),
-            ],
-            mds: {
-                'key0/v0': makeMd(brokenReplicationInfo),
-                'key1/v1': makeMd(brokenReplicationInfo),
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }), page([['key1', 'v1']])],
+                mds: {
+                    'key0/v0': makeMd(brokenReplicationInfo),
+                    'key1/v1': makeMd(brokenReplicationInfo),
+                },
             },
-        });
+        );
         const stats = await remover.run();
         expect(listCalls(remover)).toHaveLength(2);
-        expect(listCalls(remover)[1][0].input).toEqual(expect.objectContaining({
-            KeyMarker: 'key0', VersionIdMarker: 'v0',
-        }));
+        expect(listCalls(remover)[1][0].input).toEqual(
+            expect.objectContaining({
+                KeyMarker: 'key0',
+                VersionIdMarker: 'v0',
+            }),
+        );
         expect(stats.updated).toBe(2);
     });
 
     it('should stop at MAX_UPDATES and keep the resume markers', async () => {
-        const remover = initRemover({ buckets: ['bucket0', 'bucket1'], maxUpdates: 1 }, {
-            pages: [
-                page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }),
-                page([['key1', 'v1']]),
-            ],
-            mds: {
-                'key0/v0': makeMd(brokenReplicationInfo),
-                'key1/v1': makeMd(brokenReplicationInfo),
+        const remover = initRemover(
+            { buckets: ['bucket0', 'bucket1'], maxUpdates: 1 },
+            {
+                pages: [page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }), page([['key1', 'v1']])],
+                mds: {
+                    'key0/v0': makeMd(brokenReplicationInfo),
+                    'key1/v1': makeMd(brokenReplicationInfo),
+                },
             },
-        });
+        );
         const stats = await remover.run();
         expect(listCalls(remover)).toHaveLength(1);
         expect(stats.updated).toBe(1);
@@ -341,16 +392,16 @@ describe('ReplicationSiteRemover', () => {
             backends: [brokenReplicationInfo.backends[0]],
             storageClass: 'destination',
         };
-        const remover = initRemover({ buckets: ['bucket0', 'bucket1'], maxScanned: 1 }, {
-            pages: [
-                page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }),
-                page([['key1', 'v1']]),
-            ],
-            mds: {
-                'key0/v0': makeMd(clean),
-                'key1/v1': makeMd(clean),
+        const remover = initRemover(
+            { buckets: ['bucket0', 'bucket1'], maxScanned: 1 },
+            {
+                pages: [page([['key0', 'v0']], [], { key: 'key0', versionId: 'v0' }), page([['key1', 'v1']])],
+                mds: {
+                    'key0/v0': makeMd(clean),
+                    'key1/v1': makeMd(clean),
+                },
             },
-        });
+        );
         const stats = await remover.run();
         expect(listCalls(remover)).toHaveLength(1);
         expect(stats).toEqual(expect.objectContaining({ scanned: 1, updated: 0 }));
@@ -359,19 +410,32 @@ describe('ReplicationSiteRemover', () => {
     });
 
     it('should resume from the input markers on the first bucket only', async () => {
-        const remover = initRemover({
-            buckets: ['bucket0', 'bucket1'], keyMarker: 'key0', versionIdMarker: 'v0',
-        }, {
-            pages: [page([]), page([])],
-            mds: {},
-        });
+        const remover = initRemover(
+            {
+                buckets: ['bucket0', 'bucket1'],
+                keyMarker: 'key0',
+                versionIdMarker: 'v0',
+            },
+            {
+                pages: [page([]), page([])],
+                mds: {},
+            },
+        );
         await remover.run();
-        expect(listCalls(remover)[0][0].input).toEqual(expect.objectContaining({
-            Bucket: 'bucket0', KeyMarker: 'key0', VersionIdMarker: 'v0',
-        }));
-        expect(listCalls(remover)[1][0].input).toEqual(expect.objectContaining({
-            Bucket: 'bucket1', KeyMarker: undefined, VersionIdMarker: undefined,
-        }));
+        expect(listCalls(remover)[0][0].input).toEqual(
+            expect.objectContaining({
+                Bucket: 'bucket0',
+                KeyMarker: 'key0',
+                VersionIdMarker: 'v0',
+            }),
+        );
+        expect(listCalls(remover)[1][0].input).toEqual(
+            expect.objectContaining({
+                Bucket: 'bucket1',
+                KeyMarker: undefined,
+                VersionIdMarker: undefined,
+            }),
+        );
     });
 
     it('should stop the run on a listing error', async () => {
@@ -387,10 +451,13 @@ describe('ReplicationSiteRemover', () => {
             storageClass: 'foo',
             isReplica: true,
         };
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(replicaWithOnlyFoo) },
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(replicaWithOnlyFoo) },
+            },
+        );
         const stats = await remover.run();
         expect(stats.reset).toBe(1);
         const repInfo = writtenReplicationInfo(remover);
@@ -400,35 +467,54 @@ describe('ReplicationSiteRemover', () => {
     });
 
     it('should refuse to remove a site named in the bucket rule', async () => {
-        const remover = initRemover({ siteToRemove: 'destination' }, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-            rules: [{ Prefix: '', Status: 'Enabled',
-                Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'destination' } }],
-        });
+        const remover = initRemover(
+            { siteToRemove: 'destination' },
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+                rules: [
+                    {
+                        Prefix: '',
+                        Status: 'Enabled',
+                        Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'destination' },
+                    },
+                ],
+            },
+        );
         await expect(remover.run()).rejects.toThrow('SITE_TO_REMOVE "destination" is a destination');
         expect(listCalls(remover)).toHaveLength(0);
         expect(remover.cloudserverClient.putMetadata).not.toHaveBeenCalled();
     });
 
     it('should remove a site named in the bucket rule with forceRemoveConfiguredSite', async () => {
-        const remover = initRemover({ siteToRemove: 'destination', forceRemoveConfiguredSite: true }, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-            rules: [{ Prefix: '', Status: 'Enabled',
-                Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'destination' } }],
-        });
+        const remover = initRemover(
+            { siteToRemove: 'destination', forceRemoveConfiguredSite: true },
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+                rules: [
+                    {
+                        Prefix: '',
+                        Status: 'Enabled',
+                        Destination: { Bucket: 'arn:aws:s3:::destination', StorageClass: 'destination' },
+                    },
+                ],
+            },
+        );
         const stats = await remover.run();
         expect(stats.updated).toBe(1);
         expect(writtenReplicationInfo(remover).backends.map(b => b.site)).toEqual(['foo']);
     });
 
     it('should process a bucket without replication configuration', async () => {
-        const remover = initRemover({}, {
-            pages: [page([['key0', 'v0']])],
-            mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
-            rules: null,
-        });
+        const remover = initRemover(
+            {},
+            {
+                pages: [page([['key0', 'v0']])],
+                mds: { 'key0/v0': makeMd(brokenReplicationInfo) },
+                rules: null,
+            },
+        );
         const stats = await remover.run();
         expect(stats.updated).toBe(1);
     });

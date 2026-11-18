@@ -8,21 +8,13 @@ const DEFAULT_WORKERS = 100;
 const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
 const DEFAULT_LISTING_LIMIT = 1000;
 
-const {
-    DST_BUCKETD_HOSTPORT,
-    SRC_BUCKETD_HOSTPORT,
-    SRC_BUCKET,
-    DST_BUCKET,
-} = process.env;
+const { DST_BUCKETD_HOSTPORT, SRC_BUCKETD_HOSTPORT, SRC_BUCKET, DST_BUCKET } = process.env;
 
-const WORKERS = (
-    process.env.WORKERS
-        && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
+const WORKERS = (process.env.WORKERS && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
 
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
+const LOG_PROGRESS_INTERVAL =
+    (process.env.LOG_PROGRESS_INTERVAL && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10)) ||
+    DEFAULT_LOG_PROGRESS_INTERVAL;
 
 const VERBOSE = process.env.VERBOSE === '1';
 const COMPARE_VERSION_ID = process.env.COMPARE_VERSION_ID === '1';
@@ -30,10 +22,8 @@ const COMPARE_OBJECT_SIZE = process.env.COMPARE_OBJECT_SIZE === '1';
 
 const KEY_MARKER = process.env.KEY_MARKER || '';
 
-const LISTING_LIMIT = (
-    process.env.LISTING_LIMIT
-        && Number.parseInt(process.env.LISTING_LIMIT, 10))
-      || DEFAULT_LISTING_LIMIT;
+const LISTING_LIMIT =
+    (process.env.LISTING_LIMIT && Number.parseInt(process.env.LISTING_LIMIT, 10)) || DEFAULT_LISTING_LIMIT;
 
 const USAGE = `
 compareBuckets.js
@@ -109,8 +99,7 @@ function logProgress(message, status) {
             objectsMissingInSource: status.missingInSrcCount,
             objectsScanned: status.dstProcessedCount,
         },
-        keyMarker: status.srcKeyMarker < status.dstKeyMarker
-            ? status.srcKeyMarker : status.dstKeyMarker,
+        keyMarker: status.srcKeyMarker < status.dstKeyMarker ? status.srcKeyMarker : status.dstKeyMarker,
     });
 }
 
@@ -137,18 +126,23 @@ function main() {
         compareObjectSize: COMPARE_OBJECT_SIZE,
         statusObj: status,
     };
-    compareBuckets(params, log, err => {
-        if (err) {
-            log.error('an error occurred during scan', {
-                error: { message: err.message },
-            });
-            logProgress('last status', status);
-            process.exit(1);
-        } else {
-            logProgress('completed scan', status);
-            process.exit(0);
-        }
-    }, status);
+    compareBuckets(
+        params,
+        log,
+        err => {
+            if (err) {
+                log.error('an error occurred during scan', {
+                    error: { message: err.message },
+                });
+                logProgress('last status', status);
+                process.exit(1);
+            } else {
+                logProgress('completed scan', status);
+                process.exit(0);
+            }
+        },
+        status,
+    );
 }
 
 main();

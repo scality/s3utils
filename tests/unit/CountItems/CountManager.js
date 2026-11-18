@@ -966,7 +966,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 10,
-            bucketInfos: Array(10).fill()
+            bucketInfos: Array(10)
+                .fill()
                 .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
@@ -983,7 +984,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 10,
-            bucketInfos: Array(10).fill()
+            bucketInfos: Array(10)
+                .fill()
                 .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
@@ -1005,7 +1007,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 1,
-            bucketInfos: Array(1).fill()
+            bucketInfos: Array(1)
+                .fill()
                 .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
@@ -1029,7 +1032,8 @@ describe('CountItems::CountManager', () => {
         });
         const bucketList = {
             bucketCount: 1,
-            bucketInfos: Array(1).fill()
+            bucketInfos: Array(1)
+                .fill()
                 .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
         };
         m.addWork(bucketList);
@@ -1044,32 +1048,30 @@ describe('CountItems::CountManager', () => {
         }, 100);
     });
 
-    test(
-        'should remove/queue worker for each count task',
-        done => {
-            const workers = createWorkers(1);
-            const m = new CountManager({
-                log: new DummyLogger(),
-                workers,
-                maxConcurrent: 2,
-            });
-            const bucketList = {
-                bucketCount: 1,
-                bucketInfos: Array(1).fill()
-                    .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
-            };
-            m.addWork(bucketList);
-            m.start(err => {
-                expect(err).toBeFalsy();
-                expect(m.workerList.length).toEqual(2);
-                expect(m.q.paused).toBeTruthy();
-                done();
-            });
-            setTimeout(() => {
-                expect(m.workerList.length).toEqual(1);
-                expect(m.q.running()).toEqual(1);
-                workers[0].callbacks[0]();
-            }, 100);
-        },
-    );
+    test('should remove/queue worker for each count task', done => {
+        const workers = createWorkers(1);
+        const m = new CountManager({
+            log: new DummyLogger(),
+            workers,
+            maxConcurrent: 2,
+        });
+        const bucketList = {
+            bucketCount: 1,
+            bucketInfos: Array(1)
+                .fill()
+                .map(() => BucketInfo.deSerialize(stringifiedBucketMD)),
+        };
+        m.addWork(bucketList);
+        m.start(err => {
+            expect(err).toBeFalsy();
+            expect(m.workerList.length).toEqual(2);
+            expect(m.q.paused).toBeTruthy();
+            done();
+        });
+        setTimeout(() => {
+            expect(m.workerList.length).toEqual(1);
+            expect(m.q.running()).toEqual(1);
+            workers[0].callbacks[0]();
+        }, 100);
+    });
 });

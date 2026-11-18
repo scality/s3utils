@@ -1,4 +1,3 @@
-
 /**
  * parse environment variable as a integer number
  * @param {string} env - environment variable value
@@ -7,9 +6,7 @@
  * @returns {int} - return integer value
  */
 function parseEnvInt(env, defValue) {
-    return (env && !Number.isNaN(env))
-        ? Number.parseInt(env, 10)
-        : defValue;
+    return env && !Number.isNaN(env) ? Number.parseInt(env, 10) : defValue;
 }
 
 module.exports = {

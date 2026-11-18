@@ -23,15 +23,11 @@ const { ACCESS_KEY } = process.env;
 const { SECRET_KEY } = process.env;
 const { S3_ENDPOINT } = process.env;
 const { TARGET_PREFIX } = process.env;
-const MAX_DELETES = (process.env.MAX_DELETES
-    && Number.parseInt(process.env.MAX_DELETES, 10));
-const MAX_LISTED = (process.env.MAX_LISTED
-    && Number.parseInt(process.env.MAX_LISTED, 10));
+const MAX_DELETES = process.env.MAX_DELETES && Number.parseInt(process.env.MAX_DELETES, 10);
+const MAX_LISTED = process.env.MAX_LISTED && Number.parseInt(process.env.MAX_LISTED, 10);
 const { MARKER } = process.env;
-const OLDER_THAN = (process.env.OLDER_THAN
-    ? parseOlderThan(process.env.OLDER_THAN) : null);
-const DELETED_BEFORE = (process.env.DELETED_BEFORE
-    ? new Date(process.env.DELETED_BEFORE) : null);
+const OLDER_THAN = process.env.OLDER_THAN ? parseOlderThan(process.env.OLDER_THAN) : null;
+const DELETED_BEFORE = process.env.DELETED_BEFORE ? new Date(process.env.DELETED_BEFORE) : null;
 const ONLY_DELETED = _parseBoolean(process.env.ONLY_DELETED) || DELETED_BEFORE !== null;
 const { HTTPS_CA_PATH } = process.env;
 const { HTTPS_NO_VERIFY } = process.env;
@@ -92,8 +88,7 @@ Optional environment variables:
 // We accept console statements for usage purpose
 /* eslint-disable no-console */
 if (!BUCKETS || BUCKETS.length === 0) {
-    console.error('No buckets given as input, please provide '
-                  + 'a comma-separated list of buckets');
+    console.error('No buckets given as input, please provide ' + 'a comma-separated list of buckets');
     console.error(USAGE);
     process.exit(1);
 }
@@ -125,8 +120,7 @@ if (DELETED_BEFORE && Number.isNaN(DELETED_BEFORE.getTime())) {
 }
 
 function _encodeMarker(bucket, key, versionId) {
-    return `${encodeURI(bucket)}`
-        + `|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
+    return `${encodeURI(bucket)}` + `|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
 }
 
 function _parseMarker(marker) {
@@ -141,11 +135,7 @@ function _parseMarker(marker) {
     };
 }
 
-let {
-    bucket: MARKER_BUCKET,
-    key: MARKER_KEY,
-    versionId: MARKER_VERSION_ID,
-} = _parseMarker(MARKER);
+let { bucket: MARKER_BUCKET, key: MARKER_KEY, versionId: MARKER_VERSION_ID } = _parseMarker(MARKER);
 
 /* eslint-enable no-console */
 log.info('Start deleting noncurrent versions and delete markers', {
@@ -157,8 +147,8 @@ log.info('Start deleting noncurrent versions and delete markers', {
     startBucket: MARKER_BUCKET,
     startKey: MARKER_KEY,
     startVersionId: MARKER_VERSION_ID,
-    olderThan: (OLDER_THAN ? OLDER_THAN.toString() : 'N/A'),
-    deletedBefore: (DELETED_BEFORE ? DELETED_BEFORE.toString() : 'N/A'),
+    olderThan: OLDER_THAN ? OLDER_THAN.toString() : 'N/A',
+    deletedBefore: DELETED_BEFORE ? DELETED_BEFORE.toString() : 'N/A',
     onlyDeleted: ONLY_DELETED,
     excludeReplicatingVersions: EXCLUDE_REPLICATING_VERSIONS,
 });
@@ -192,19 +182,11 @@ const s3 = new S3Client({
         AWS_SDK_REQUEST_RETRIES,
         // Custom backoff with exponential delay capped at 1mn max
         // between retries, and a little added jitter
-        attempt => Math.min(
-            AWS_SDK_REQUEST_INITIAL_DELAY_MS * 2 ** attempt,
-            60000
-        ) * (0.9 + Math.random() * 0.2)
+        attempt => Math.min(AWS_SDK_REQUEST_INITIAL_DELAY_MS * 2 ** attempt, 60000) * (0.9 + Math.random() * 0.2),
     ),
 });
 
-const cloudserverclient = new CloudserverClient(
-    S3_ENDPOINT,
-    ACCESS_KEY,
-    SECRET_KEY,
-    agent,
-);
+const cloudserverclient = new CloudserverClient(S3_ENDPOINT, ACCESS_KEY, SECRET_KEY, agent);
 
 let nListed = 0;
 let nDeletesTriggered = 0;
@@ -234,10 +216,7 @@ function _logProgress(message) {
     });
 }
 
-const logProgressInterval = setInterval(
-    () => _logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL_MS,
-);
+const logProgressInterval = setInterval(() => _logProgress('progress update'), LOG_PROGRESS_INTERVAL_MS);
 
 function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
     const command = new ListObjectVersionsCommand({
@@ -247,29 +226,32 @@ function _listObjectVersions(bucket, VersionIdMarker, KeyMarker, cb) {
         KeyMarker,
         VersionIdMarker,
     });
-    
+
     s3.send(command)
         .then(data => cb(null, data))
         .catch(cb);
 }
 
 function _getMetadata(bucket, key, versionId, cb) {
-    return cloudserverclient.getMetadata({
-        Bucket: bucket,
-        Key: key,
-        VersionId: versionId,
-    }, (err, data) => {
-        if (err) {
-            return cb(err);
-        }
+    return cloudserverclient.getMetadata(
+        {
+            Bucket: bucket,
+            Key: key,
+            VersionId: versionId,
+        },
+        (err, data) => {
+            if (err) {
+                return cb(err);
+            }
 
-        const { result, error } = ObjectMD.createFromBlob(data.Body);
-        if (error) {
-            return cb(error);
-        }
+            const { result, error } = ObjectMD.createFromBlob(data.Body);
+            if (error) {
+                return cb(error);
+            }
 
-        return cb(null, result);
-    });
+            return cb(null, result);
+        },
+    );
 }
 
 function _lastModifiedIsEligible(lastModifiedString) {
@@ -277,7 +259,7 @@ function _lastModifiedIsEligible(lastModifiedString) {
     if (Number.isNaN(ts.getTime())) {
         return false;
     }
-    return !OLDER_THAN || (ts < OLDER_THAN);
+    return !OLDER_THAN || ts < OLDER_THAN;
 }
 
 function _deleteMarkerIsEligible(lastModifiedString) {
@@ -285,7 +267,7 @@ function _deleteMarkerIsEligible(lastModifiedString) {
     if (Number.isNaN(ts.getTime())) {
         return false;
     }
-    return !DELETED_BEFORE || (ts < DELETED_BEFORE);
+    return !DELETED_BEFORE || ts < DELETED_BEFORE;
 }
 
 let deleteQueue = [];
@@ -304,17 +286,19 @@ function _doBatchDelete(bucket) {
     s3.send(command)
         .then(() => {
             nDeleted += batchDeleteObjects.length;
-            batchDeleteObjects.forEach(v => log.info('object deleted', {
-                bucket,
-                key: v.Key,
-                versionId: v.VersionId,
-            }));
+            batchDeleteObjects.forEach(v =>
+                log.info('object deleted', {
+                    bucket,
+                    key: v.Key,
+                    versionId: v.VersionId,
+                }),
+            );
         })
         .catch(err => {
-            log.error('batch delete error', { error: err});
+            log.error('batch delete error', { error: err });
             nErrors += 1;
-            batchDeleteObjects.forEach(
-                v => log.error('object may not be deleted', {
+            batchDeleteObjects.forEach(v =>
+                log.error('object may not be deleted', {
                     bucket,
                     key: v.Key,
                     versionId: v.VersionId,
@@ -343,9 +327,7 @@ function _triggerDeletes(bucket, versionsToDelete, cb) {
     nDeletesTriggered += versionsToDelete.length;
     deleteQueue = deleteQueue.concat(versionsToDelete);
     if (nDeletesTriggered > MAX_DELETES) {
-        deleteQueue.splice(
-            deleteQueue.length - (nDeletesTriggered - MAX_DELETES),
-        );
+        deleteQueue.splice(deleteQueue.length - (nDeletesTriggered - MAX_DELETES));
         nDeletesTriggered = MAX_DELETES;
     }
     if (deleteQueue.length > 0) {
@@ -371,8 +353,9 @@ function decVersionId(versionId) {
     if (!versionId) {
         return versionId;
     }
-    return versionId.slice(0, versionId.length - 1)
-        + String.fromCharCode(versionId.charCodeAt(versionId.length - 1) - 1);
+    return (
+        versionId.slice(0, versionId.length - 1) + String.fromCharCode(versionId.charCodeAt(versionId.length - 1) - 1)
+    );
 }
 
 function _filterEligibleVersions(bucket, versionsToDelete, cb) {
@@ -380,46 +363,45 @@ function _filterEligibleVersions(bucket, versionsToDelete, cb) {
         return process.nextTick(cb, versionsToDelete);
     }
 
-    return filterLimit(versionsToDelete, 10, (v, next) => {
-        _getMetadata(bucket, v.Key, v.VersionId, (err, objMD) => {
-            if (err) {
-                nErrors += 1;
-                log.error('version not deleted because get metadata failed', {
-                    bucketName: bucket,
-                    key: v.Key,
-                    versionId: v.VersionId,
-                    error: err,
-                });
+    return filterLimit(
+        versionsToDelete,
+        10,
+        (v, next) => {
+            _getMetadata(bucket, v.Key, v.VersionId, (err, objMD) => {
+                if (err) {
+                    nErrors += 1;
+                    log.error('version not deleted because get metadata failed', {
+                        bucketName: bucket,
+                        key: v.Key,
+                        versionId: v.VersionId,
+                        error: err,
+                    });
 
-                return next(null, false);
-            }
+                    return next(null, false);
+                }
 
-            const replicationStatus = objMD.getReplicationStatus();
+                const replicationStatus = objMD.getReplicationStatus();
 
-            if (replicationStatus && replicationStatus !== 'COMPLETED') {
-                nSkippedReplicating += 1;
-                log.info('version not deleted because being replicated', {
-                    bucketName: bucket,
-                    key: v.Key,
-                    versionId: v.VersionId,
-                    error: err,
-                });
+                if (replicationStatus && replicationStatus !== 'COMPLETED') {
+                    nSkippedReplicating += 1;
+                    log.info('version not deleted because being replicated', {
+                        bucketName: bucket,
+                        key: v.Key,
+                        versionId: v.VersionId,
+                        error: err,
+                    });
 
-                return next(null, false);
-            }
+                    return next(null, false);
+                }
 
-            return next(null, true);
-        });
-    }, (err, eligibleVersions) => cb(eligibleVersions));
+                return next(null, true);
+            });
+        },
+        (err, eligibleVersions) => cb(eligibleVersions),
+    );
 }
 
-function _triggerDeletesOnEligibleObjects(
-    bucket,
-    versions,
-    deleteMarkers,
-    endOfListing,
-    cb,
-) {
+function _triggerDeletesOnEligibleObjects(bucket, versions, deleteMarkers, endOfListing, cb) {
     const versionsToDelete = [];
     let matchingDeleteMarkerIndex = 0;
     versions.forEach(version => {
@@ -432,17 +414,19 @@ function _triggerDeletesOnEligibleObjects(
             // are shadowed by a current delete marker
 
             // position to first delete marker with same or higher object key
-            while (matchingDeleteMarkerIndex < deleteMarkers.length
-                   && deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key) {
+            while (
+                matchingDeleteMarkerIndex < deleteMarkers.length &&
+                deleteMarkers[matchingDeleteMarkerIndex].Key < version.Key
+            ) {
                 ++matchingDeleteMarkerIndex;
             }
-            const isDeleted = matchingDeleteMarkerIndex < deleteMarkers.length
-                && deleteMarkers[matchingDeleteMarkerIndex].Key === version.Key
-                && deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true;
+            const isDeleted =
+                matchingDeleteMarkerIndex < deleteMarkers.length &&
+                deleteMarkers[matchingDeleteMarkerIndex].Key === version.Key &&
+                deleteMarkers[matchingDeleteMarkerIndex].IsLatest === true;
 
-            const isEligible = isDeleted && _deleteMarkerIsEligible(
-                deleteMarkers[matchingDeleteMarkerIndex].LastModified,
-            );
+            const isEligible =
+                isDeleted && _deleteMarkerIsEligible(deleteMarkers[matchingDeleteMarkerIndex].LastModified);
 
             if (isEligible) {
                 // the version is shadowed by a current delete marker
@@ -493,18 +477,16 @@ function _triggerDeletesOnEligibleObjects(
             // noncurrent versions. In such case, we continue listing
             // from that DM key and versionId at next iteration,
             // instead of the returned next key/versionId markers.
-            if (deleteMarker.IsLatest === false
-                || (deleteMarkers[deleteMarkers.length - 1].Key
-                    > deleteMarker.Key)
-                || (versions.length > 0
-                    && (versions[versions.length - 1].Key
-                        > deleteMarker.Key))
-                || endOfListing) {
+            if (
+                deleteMarker.IsLatest === false ||
+                deleteMarkers[deleteMarkers.length - 1].Key > deleteMarker.Key ||
+                (versions.length > 0 && versions[versions.length - 1].Key > deleteMarker.Key) ||
+                endOfListing
+            ) {
                 // if ONLY_DELETED option is set, make sure the delete
                 // marker to delete is shadowed by another current
                 // delete marker with the same object key
-                const isDeleted = lastCurrentDeleteMarker
-                    && lastCurrentDeleteMarker.Key === deleteMarker.Key;
+                const isDeleted = lastCurrentDeleteMarker && lastCurrentDeleteMarker.Key === deleteMarker.Key;
                 const isEligible = isDeleted && _deleteMarkerIsEligible(lastCurrentDeleteMarker.LastModified);
                 if (!ONLY_DELETED || isEligible) {
                     versionsToDelete.push({
@@ -524,7 +506,9 @@ function _triggerDeletesOnEligibleObjects(
             }
         }
     });
-    _filterEligibleVersions(bucket, versionsToDelete, eligibleVersions => _triggerDeletes(bucket, eligibleVersions, cb));
+    _filterEligibleVersions(bucket, versionsToDelete, eligibleVersions =>
+        _triggerDeletes(bucket, eligibleVersions, cb),
+    );
     return ret;
 }
 
@@ -551,8 +535,9 @@ function triggerDeletesOnBucket(bucketName, cb) {
         MARKER_BUCKET = undefined;
         MARKER_KEY = undefined;
         MARKER_VERSION_ID = undefined;
-        log.info(`resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} `
-                 + `VersionIdMarker=${NextVersionIdMarker}`);
+        log.info(
+            `resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} ` + `VersionIdMarker=${NextVersionIdMarker}`,
+        );
     }
     bucketInProgress = bucket;
     log.info(`starting task for bucket: ${bucket}`);
@@ -616,12 +601,13 @@ function triggerDeletesOnBucket(bucketName, cb) {
                 if (nDeletesTriggered >= MAX_DELETES || nListed >= MAX_LISTED) {
                     _logProgress('final summary');
                     const marker = _encodeMarker(bucket, KeyMarker, VersionIdMarker);
-                    const message = 'reached '
-                        + `${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} `
-                        + 'count limit, resuming from this point can be '
-                        + 'achieved by re-running the script with the same '
-                        + 'bucket list and the following environment variable '
-                        + `set: MARKER='${marker}'`;
+                    const message =
+                        'reached ' +
+                        `${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} ` +
+                        'count limit, resuming from this point can be ' +
+                        'achieved by re-running the script with the same ' +
+                        'bucket list and the following environment variable ' +
+                        `set: MARKER='${marker}'`;
                     log.info(message);
                     process.exit(0);
                 }

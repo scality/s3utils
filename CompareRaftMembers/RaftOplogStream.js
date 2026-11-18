@@ -90,11 +90,12 @@ class RaftOplogStream extends stream.Readable {
         const maxRetryDelayMs = userMaxRetryDelayMs || DEFAULT_MAX_RETRY_DELAY_MS;
         this.retryParams = {
             times: 20,
-            interval: retryCount => Math.min(
-                // the first retry comes as "retryCount=2", hence substract 2
-                retryDelayMs * (2 ** (retryCount - 2)),
-                maxRetryDelayMs,
-            ),
+            interval: retryCount =>
+                Math.min(
+                    // the first retry comes as "retryCount=2", hence substract 2
+                    retryDelayMs * 2 ** (retryCount - 2),
+                    maxRetryDelayMs,
+                ),
         };
         this.fetchMoreTimer = null;
         this.canPush = false;
@@ -112,37 +113,37 @@ class RaftOplogStream extends stream.Readable {
     }
 
     _requestWrapper(reqParams, cb) {
-        const req = http.request({
-            hostname: this.bucketdHost,
-            port: this.bucketdPort,
-            agent: httpAgent,
-            ...reqParams,
-        }, res => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.once('end', () => {
-                if (res.statusCode === 416) {
-                    // log tail reached
-                    return cb();
-                }
-                if (res.statusCode !== 200) {
-                    return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
-                }
-                const body = chunks.join('');
-                return cb(null, { statusCode: res.statusCode, body });
-            });
-            res.once('error', err => cb(err));
-        });
+        const req = http.request(
+            {
+                hostname: this.bucketdHost,
+                port: this.bucketdPort,
+                agent: httpAgent,
+                ...reqParams,
+            },
+            res => {
+                const chunks = [];
+                res.on('data', chunk => chunks.push(chunk));
+                res.once('end', () => {
+                    if (res.statusCode === 416) {
+                        // log tail reached
+                        return cb();
+                    }
+                    if (res.statusCode !== 200) {
+                        return cb(new Error(`GET ${reqParams.path} returned status ${res.statusCode}`));
+                    }
+                    const body = chunks.join('');
+                    return cb(null, { statusCode: res.statusCode, body });
+                });
+                res.once('error', err => cb(err));
+            },
+        );
         req.once('error', err => cb(err));
         req.end();
     }
 
     _onOplogTail() {
         this.push({ entry: null });
-        this.fetchMoreTimer = setTimeout(
-            () => this._fetchMoreOplogEntries(),
-            this.refreshPeriodMs,
-        );
+        this.fetchMoreTimer = setTimeout(() => this._fetchMoreOplogEntries(), this.refreshPeriodMs);
     }
 
     _fetchMoreOplogEntries() {
@@ -155,11 +156,16 @@ class RaftOplogStream extends stream.Readable {
         }
         return async.retry(
             this.retryParams,
-            done => this._requestWrapper({
-                method: 'GET',
-                path: `/_/raft_sessions/${this.raftSessionId}/log`
-                    + `?begin=${this.nextSeq}&limit=${this.maxRecordsPerRequest}`,
-            }, done),
+            done =>
+                this._requestWrapper(
+                    {
+                        method: 'GET',
+                        path:
+                            `/_/raft_sessions/${this.raftSessionId}/log` +
+                            `?begin=${this.nextSeq}&limit=${this.maxRecordsPerRequest}`,
+                    },
+                    done,
+                ),
             (err, response) => {
                 if (err) {
                     // error after retries: emit a stream error

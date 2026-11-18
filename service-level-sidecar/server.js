@@ -28,7 +28,6 @@ function makeError(statusCode, httpMessage, httpDesc) {
     return err;
 }
 
-
 // Middleware to add request logger
 app.use((req, res, next) => {
     const reqUids = [];
@@ -78,10 +77,7 @@ app.use('/api', (req, res, next) => {
     // timingSafeEquals requires Buffers of equal length for comparison
     // We hash the header value to normalize the length
     // and get a Buffer as a bonus
-    const suppliedKeyHash = crypto
-        .createHash('sha512')
-        .update(req.headers.authorization)
-        .digest();
+    const suppliedKeyHash = crypto.createHash('sha512').update(req.headers.authorization).digest();
 
     // Use timing safe equals to avoid timing attacks
     const valid = crypto.timingSafeEqual(suppliedKeyHash, actualKeyHash);

@@ -1,5 +1,31 @@
-const { S3Client, CreateBucketCommand, ListBucketsCommand, ListObjectVersionsCommand, DeleteObjectsCommand, DeleteBucketCommand, PutBucketVersioningCommand, PutBucketReplicationCommand, DeleteBucketReplicationCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { IAMClient, CreateUserCommand, CreatePolicyCommand, CreateRoleCommand, AttachRolePolicyCommand, DetachRolePolicyCommand, DeleteRoleCommand, DeletePolicyCommand, DeleteUserCommand, ListRolesCommand, ListAttachedRolePoliciesCommand, ListUsersCommand, ListAttachedUserPoliciesCommand, DetachUserPolicyCommand } = require('@aws-sdk/client-iam');
+const {
+    S3Client,
+    CreateBucketCommand,
+    ListBucketsCommand,
+    ListObjectVersionsCommand,
+    DeleteObjectsCommand,
+    DeleteBucketCommand,
+    PutBucketVersioningCommand,
+    PutBucketReplicationCommand,
+    DeleteBucketReplicationCommand,
+    PutObjectCommand,
+} = require('@aws-sdk/client-s3');
+const {
+    IAMClient,
+    CreateUserCommand,
+    CreatePolicyCommand,
+    CreateRoleCommand,
+    AttachRolePolicyCommand,
+    DetachRolePolicyCommand,
+    DeleteRoleCommand,
+    DeletePolicyCommand,
+    DeleteUserCommand,
+    ListRolesCommand,
+    ListAttachedRolePoliciesCommand,
+    ListUsersCommand,
+    ListAttachedUserPoliciesCommand,
+    DetachUserPolicyCommand,
+} = require('@aws-sdk/client-iam');
 const { promisify } = require('util');
 const { Logger } = require('werelogs');
 const admincredentials = require('vaultclient/tests/utils/admincredentials.json');
@@ -16,7 +42,6 @@ const adminAccessKeyId = process.env.ADMIN_ACCESS_KEY_ID || Object.keys(admincre
 const adminSecretAccessKey = process.env.ADMIN_SECRET_ACCESS_KEY || admincredentials[adminAccessKeyId];
 const region = 'us-east-1';
 
-
 async function createTestAccount(vaultClient) {
     const iamEndpoint = `http://${iamHost}:${iamPort}`;
     const s3Endpoint = `http://${s3Host}:${s3Port}`;
@@ -26,19 +51,17 @@ async function createTestAccount(vaultClient) {
     const bucketName = accountName;
     const iamUser = `${accountName}-user`;
     // Create account with vaultclient
-    const account = await promisify(vaultClient.createAccount.bind(vaultClient))(
-        accountName, { email: accountEmail });
+    const account = await promisify(vaultClient.createAccount.bind(vaultClient))(accountName, { email: accountEmail });
     const accountId = account.account.id;
     // Create account access key
-    const credentials = await promisify(vaultClient.generateAccountAccessKey.bind(
-        vaultClient))(accountName);
+    const credentials = await promisify(vaultClient.generateAccountAccessKey.bind(vaultClient))(accountName);
     const accountAccessKey = credentials.id;
     const accountSecretKey = credentials.value;
 
     const iamClient = new IAMClient({
         credentials: {
             accessKeyId: accountAccessKey,
-            secretAccessKey: accountSecretKey
+            secretAccessKey: accountSecretKey,
         },
         endpoint: iamEndpoint,
         region,
@@ -47,7 +70,7 @@ async function createTestAccount(vaultClient) {
     const s3Client = new S3Client({
         credentials: {
             accessKeyId: accountAccessKey,
-            secretAccessKey: accountSecretKey
+            secretAccessKey: accountSecretKey,
         },
         region,
         endpoint: s3Endpoint,
@@ -69,14 +92,12 @@ async function createTestAccount(vaultClient) {
         iamClient,
         s3Client,
     };
-
 }
-
 
 async function deleteTestAccount(vaultClient, account) {
     // Delete all buckets in the account
     const bucketsResp = await account.s3Client.send(new ListBucketsCommand({}));
-    for (const bucket of (bucketsResp.Buckets || [])) {
+    for (const bucket of bucketsResp.Buckets || []) {
         log.info('Deleting bucket', { bucket: bucket.Name });
         // empty bucket - need to delete all versions and delete markers for versioned buckets
         // Note: no pagination — silently misses objects beyond 1000. Fine for test cleanup.
@@ -97,10 +118,12 @@ async function deleteTestAccount(vaultClient, account) {
         }
 
         if (objectsToDelete.length > 0) {
-            await account.s3Client.send(new DeleteObjectsCommand({
-                Bucket: bucket.Name,
-                Delete: { Objects: objectsToDelete },
-            }));
+            await account.s3Client.send(
+                new DeleteObjectsCommand({
+                    Bucket: bucket.Name,
+                    Delete: { Objects: objectsToDelete },
+                }),
+            );
         }
 
         await account.s3Client.send(new DeleteBucketCommand({ Bucket: bucket.Name }));
@@ -114,32 +137,47 @@ async function deleteTestAccount(vaultClient, account) {
             for (const user of listUsersResp.Users) {
                 // Detach all attached managed policies and delete the policies
                 try {
-                    const attachedPolicyResp = await account.iamClient.send(new ListAttachedUserPoliciesCommand({
-                        UserName: user.UserName
-                    }));
+                    const attachedPolicyResp = await account.iamClient.send(
+                        new ListAttachedUserPoliciesCommand({
+                            UserName: user.UserName,
+                        }),
+                    );
                     if (attachedPolicyResp.AttachedPolicies) {
                         for (const pol of attachedPolicyResp.AttachedPolicies) {
                             // Detach the managed policy from the user
-                            await account.iamClient.send(new DetachUserPolicyCommand({
-                                UserName: user.UserName,
-                                PolicyArn: pol.PolicyArn
-                            }));
-                            log.info('Detached managed policy from IAM user', { iamUser: user.UserName, PolicyArn: pol.PolicyArn });
+                            await account.iamClient.send(
+                                new DetachUserPolicyCommand({
+                                    UserName: user.UserName,
+                                    PolicyArn: pol.PolicyArn,
+                                }),
+                            );
+                            log.info('Detached managed policy from IAM user', {
+                                iamUser: user.UserName,
+                                PolicyArn: pol.PolicyArn,
+                            });
 
                             // Try to delete the managed policy (ignore errors if others still attached)
                             try {
-                                await account.iamClient.send(new DeletePolicyCommand({
-                                    PolicyArn: pol.PolicyArn
-                                }));
+                                await account.iamClient.send(
+                                    new DeletePolicyCommand({
+                                        PolicyArn: pol.PolicyArn,
+                                    }),
+                                );
                                 log.info('Deleted managed policy', { PolicyArn: pol.PolicyArn });
                             } catch (delPolErr) {
                                 // Policy might be attached to another user or resource, or policy is AWS managed
-                                log.info('Could not delete managed policy', { PolicyArn: pol.PolicyArn, error: delPolErr && delPolErr.message });
+                                log.info('Could not delete managed policy', {
+                                    PolicyArn: pol.PolicyArn,
+                                    error: delPolErr && delPolErr.message,
+                                });
                             }
                         }
                     }
                 } catch (err) {
-                    log.error('Error detaching/deleting managed policies from user', { iamUser: user.UserName, error: err });
+                    log.error('Error detaching/deleting managed policies from user', {
+                        iamUser: user.UserName,
+                        error: err,
+                    });
                 }
 
                 // Do not remove inline policies
@@ -162,31 +200,33 @@ async function deleteTestAccount(vaultClient, account) {
                 try {
                     // Before deleting, need to detach all policies from the role
                     const attachedPolicies = await account.iamClient.send(
-                        new ListAttachedRolePoliciesCommand({ RoleName: role.RoleName })
+                        new ListAttachedRolePoliciesCommand({ RoleName: role.RoleName }),
                     );
                     if (attachedPolicies.AttachedPolicies) {
                         for (const policy of attachedPolicies.AttachedPolicies) {
                             await account.iamClient.send(
                                 new DetachRolePolicyCommand({
                                     RoleName: role.RoleName,
-                                    PolicyArn: policy.PolicyArn
-                                })
+                                    PolicyArn: policy.PolicyArn,
+                                }),
                             );
-                            log.info('Detached policy from role', { RoleName: role.RoleName, PolicyArn: policy.PolicyArn });
+                            log.info('Detached policy from role', {
+                                RoleName: role.RoleName,
+                                PolicyArn: policy.PolicyArn,
+                            });
                             try {
-                                await account.iamClient.send(
-                                    new DeletePolicyCommand({ PolicyArn: policy.PolicyArn })
-                                );
+                                await account.iamClient.send(new DeletePolicyCommand({ PolicyArn: policy.PolicyArn }));
                                 log.info('Deleted policy', { PolicyArn: policy.PolicyArn });
                             } catch (delPolErr) {
                                 // Policy may still be attached to another role
-                                log.info('Could not delete policy', { PolicyArn: policy.PolicyArn, error: delPolErr && delPolErr.message });
+                                log.info('Could not delete policy', {
+                                    PolicyArn: policy.PolicyArn,
+                                    error: delPolErr && delPolErr.message,
+                                });
                             }
                         }
                     }
-                    await account.iamClient.send(
-                        new DeleteRoleCommand({ RoleName: role.RoleName })
-                    );
+                    await account.iamClient.send(new DeleteRoleCommand({ RoleName: role.RoleName }));
                     log.info('Deleted role', { RoleName: role.RoleName });
                 } catch (roleErr) {
                     log.error('Error deleting IAM role', { RoleName: role.RoleName, error: roleErr });
@@ -201,7 +241,6 @@ async function deleteTestAccount(vaultClient, account) {
     await promisify(vaultClient.deleteAccount.bind(vaultClient))(account.accountName);
     log.info('Deleted account', { account: account.accountName });
 }
-
 
 /**
  * Configure CRR between a source and a destination test account.
@@ -219,15 +258,19 @@ async function deleteTestAccount(vaultClient, account) {
  */
 async function configureCrr(accountSource, accountDest, opts = {}) {
     log.info('Enabling bucket versioning on source and destination buckets');
-    await accountSource.s3Client.send(new PutBucketVersioningCommand({
-        Bucket: accountSource.bucketName,
-        VersioningConfiguration: { Status: 'Enabled' },
-    }));
+    await accountSource.s3Client.send(
+        new PutBucketVersioningCommand({
+            Bucket: accountSource.bucketName,
+            VersioningConfiguration: { Status: 'Enabled' },
+        }),
+    );
 
-    await accountDest.s3Client.send(new PutBucketVersioningCommand({
-        Bucket: accountDest.bucketName,
-        VersioningConfiguration: { Status: 'Enabled' },
-    }));
+    await accountDest.s3Client.send(
+        new PutBucketVersioningCommand({
+            Bucket: accountDest.bucketName,
+            VersioningConfiguration: { Status: 'Enabled' },
+        }),
+    );
 
     log.info('Creating IAM policies and roles for CRR');
     const policy = {
@@ -235,11 +278,7 @@ async function configureCrr(accountSource, accountDest, opts = {}) {
         Statement: [
             {
                 Effect: 'Allow',
-                Action: [
-                    's3:GetObjectVersion',
-                    's3:GetObjectVersionAcl',
-                    's3:ReplicateObject',
-                ],
+                Action: ['s3:GetObjectVersion', 's3:GetObjectVersionAcl', 's3:ReplicateObject'],
                 Resource: [`arn:aws:s3:::${accountSource.bucketName}/*`],
             },
             {
@@ -254,42 +293,56 @@ async function configureCrr(accountSource, accountDest, opts = {}) {
             },
         ],
     };
-    await accountSource.iamClient.send(new CreatePolicyCommand({
-        PolicyName: 'crr-policy',
-        PolicyDocument: JSON.stringify(policy),
-    }));
-    await accountDest.iamClient.send(new CreatePolicyCommand({
-        PolicyName: 'crr-policy',
-        PolicyDocument: JSON.stringify(policy),
-    }));
+    await accountSource.iamClient.send(
+        new CreatePolicyCommand({
+            PolicyName: 'crr-policy',
+            PolicyDocument: JSON.stringify(policy),
+        }),
+    );
+    await accountDest.iamClient.send(
+        new CreatePolicyCommand({
+            PolicyName: 'crr-policy',
+            PolicyDocument: JSON.stringify(policy),
+        }),
+    );
 
     log.info('Creating IAM roles');
     const trust = {
         Version: '2012-10-17',
-        Statement: [{
-            Effect: 'Allow',
-            Principal: { Service: 'backbeat' },
-            Action: 'sts:AssumeRole',
-        }],
+        Statement: [
+            {
+                Effect: 'Allow',
+                Principal: { Service: 'backbeat' },
+                Action: 'sts:AssumeRole',
+            },
+        ],
     };
-    await accountSource.iamClient.send(new CreateRoleCommand({
-        RoleName: 'crr-trust-role',
-        AssumeRolePolicyDocument: JSON.stringify(trust),
-    }));
-    await accountDest.iamClient.send(new CreateRoleCommand({
-        RoleName: 'crr-trust-role',
-        AssumeRolePolicyDocument: JSON.stringify(trust),
-    }));
+    await accountSource.iamClient.send(
+        new CreateRoleCommand({
+            RoleName: 'crr-trust-role',
+            AssumeRolePolicyDocument: JSON.stringify(trust),
+        }),
+    );
+    await accountDest.iamClient.send(
+        new CreateRoleCommand({
+            RoleName: 'crr-trust-role',
+            AssumeRolePolicyDocument: JSON.stringify(trust),
+        }),
+    );
 
     log.info('Attaching policies to roles');
-    await accountSource.iamClient.send(new AttachRolePolicyCommand({
-        RoleName: 'crr-trust-role',
-        PolicyArn: `arn:aws:iam::${accountSource.accountId}:policy/crr-policy`,
-    }));
-    await accountDest.iamClient.send(new AttachRolePolicyCommand({
-        RoleName: 'crr-trust-role',
-        PolicyArn: `arn:aws:iam::${accountDest.accountId}:policy/crr-policy`,
-    }));
+    await accountSource.iamClient.send(
+        new AttachRolePolicyCommand({
+            RoleName: 'crr-trust-role',
+            PolicyArn: `arn:aws:iam::${accountSource.accountId}:policy/crr-policy`,
+        }),
+    );
+    await accountDest.iamClient.send(
+        new AttachRolePolicyCommand({
+            RoleName: 'crr-trust-role',
+            PolicyArn: `arn:aws:iam::${accountDest.accountId}:policy/crr-policy`,
+        }),
+    );
 
     log.info('Setting bucket replication configuration on source bucket');
     const destination = { Bucket: `arn:aws:s3:::${accountDest.bucketName}` };
@@ -297,14 +350,17 @@ async function configureCrr(accountSource, accountDest, opts = {}) {
         destination.StorageClass = opts.storageClass;
     }
     const replication = {
-        Role: `arn:aws:iam::${accountSource.accountId}:role/crr-trust-role,`
-            + `arn:aws:iam::${accountDest.accountId}:role/crr-trust-role`,
+        Role:
+            `arn:aws:iam::${accountSource.accountId}:role/crr-trust-role,` +
+            `arn:aws:iam::${accountDest.accountId}:role/crr-trust-role`,
         Rules: [{ Prefix: '', Status: 'Enabled', Destination: destination }],
     };
-    await accountSource.s3Client.send(new PutBucketReplicationCommand({
-        Bucket: accountSource.bucketName,
-        ReplicationConfiguration: replication,
-    }));
+    await accountSource.s3Client.send(
+        new PutBucketReplicationCommand({
+            Bucket: accountSource.bucketName,
+            ReplicationConfiguration: replication,
+        }),
+    );
 }
 
 /**
@@ -326,10 +382,12 @@ async function removeCrrConfiguration(account) {
 
     log.info('Cleaning up IAM resources', { account: account.accountName });
     try {
-        await account.iamClient.send(new DetachRolePolicyCommand({
-            RoleName: 'crr-trust-role',
-            PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
-        }));
+        await account.iamClient.send(
+            new DetachRolePolicyCommand({
+                RoleName: 'crr-trust-role',
+                PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
+            }),
+        );
         log.info('Detached policy from role');
     } catch (err) {
         log.error('Error detaching policy from role', { error: err.message });
@@ -343,9 +401,11 @@ async function removeCrrConfiguration(account) {
     }
 
     try {
-        await account.iamClient.send(new DeletePolicyCommand({
-            PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
-        }));
+        await account.iamClient.send(
+            new DeletePolicyCommand({
+                PolicyArn: `arn:aws:iam::${account.accountId}:policy/crr-policy`,
+            }),
+        );
         log.info('Deleted IAM policy');
     } catch (err) {
         log.error('Error deleting policy', { error: err.message });
@@ -367,15 +427,18 @@ async function removeCrrConfiguration(account) {
  * @returns {Promise<string>} version ID
  */
 async function putObject(account, key, body = `data of ${key}`) {
-    const res = await account.s3Client.send(new PutObjectCommand({
-        Bucket: account.bucketName, Key: key, Body: body,
-    }));
+    const res = await account.s3Client.send(
+        new PutObjectCommand({
+            Bucket: account.bucketName,
+            Key: key,
+            Body: body,
+        }),
+    );
     return res.VersionId;
 }
 
 function cloudserverClientFor(account) {
-    return new CloudserverClient(`http://${s3Host}:${s3Port}`,
-        account.accountAccessKey, account.accountSecretKey);
+    return new CloudserverClient(`http://${s3Host}:${s3Port}`, account.accountAccessKey, account.accountSecretKey);
 }
 
 /**
@@ -388,7 +451,9 @@ function cloudserverClientFor(account) {
 async function getReplicationInfo(account, key, versionId) {
     const client = cloudserverClientFor(account);
     const res = await promisify(client.getMetadata.bind(client))({
-        Bucket: account.bucketName, Key: key, VersionId: versionId,
+        Bucket: account.bucketName,
+        Key: key,
+        VersionId: versionId,
     });
     return JSON.parse(res.Body).replicationInfo;
 }

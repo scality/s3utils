@@ -69,11 +69,7 @@ Optional environment variables:
     BUCKETD_HOSTPORT: ip:port of bucketd endpoint, needed when EXCLUDE_FROM_CSEQS is set
 `;
 
-for (const envVar of [
-    'DATABASES1',
-    'DATABASES2',
-    'DIFF_OUTPUT_FILE',
-]) {
+for (const envVar of ['DATABASES1', 'DATABASES2', 'DIFF_OUTPUT_FILE']) {
     if (!process.env[envVar]) {
         console.error(`ERROR: ${envVar} not defined`);
         console.error(USAGE);
@@ -81,30 +77,19 @@ for (const envVar of [
     }
 }
 
-const {
-    DATABASES1,
-    DATABASES2,
-    DIFF_OUTPUT_FILE,
-} = process.env;
+const { DATABASES1, DATABASES2, DIFF_OUTPUT_FILE } = process.env;
 
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
+const LOG_PROGRESS_INTERVAL =
+    (process.env.LOG_PROGRESS_INTERVAL && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10)) ||
+    DEFAULT_LOG_PROGRESS_INTERVAL;
 
-const PARALLEL_SCANS = (
-    process.env.PARALLEL_SCANS
-        && Number.parseInt(process.env.PARALLEL_SCANS, 10))
-      || DEFAULT_PARALLEL_SCANS;
+const PARALLEL_SCANS =
+    (process.env.PARALLEL_SCANS && Number.parseInt(process.env.PARALLEL_SCANS, 10)) || DEFAULT_PARALLEL_SCANS;
 
-const EXCLUDE_FROM_CSEQS = process.env.EXCLUDE_FROM_CSEQS
-      && JSON.parse(process.env.EXCLUDE_FROM_CSEQS);
+const EXCLUDE_FROM_CSEQS = process.env.EXCLUDE_FROM_CSEQS && JSON.parse(process.env.EXCLUDE_FROM_CSEQS);
 
-const DATABASE_LISTS = [
-    DATABASES1,
-    DATABASES2,
-].map(
-    databases => databases
+const DATABASE_LISTS = [DATABASES1, DATABASES2].map(databases =>
+    databases
         .split(' ')
         .filter(dbPath => {
             const dbName = path.basename(dbPath);
@@ -120,10 +105,7 @@ if (DATABASE_LISTS[0].length !== DATABASE_LISTS[1].length) {
 
 const DATABASE_COMPARISON_PAIRS = [];
 for (let i = 0; i < DATABASE_LISTS[0].length; ++i) {
-    DATABASE_COMPARISON_PAIRS.push([
-        DATABASE_LISTS[0][i],
-        DATABASE_LISTS[1][i],
-    ]);
+    DATABASE_COMPARISON_PAIRS.push([DATABASE_LISTS[0][i], DATABASE_LISTS[1][i]]);
 }
 
 const DIFF_OUTPUT_STREAM = fs.createWriteStream(DIFF_OUTPUT_FILE, { flags: 'wx' });
@@ -141,10 +123,7 @@ function logProgress(message) {
     log.info(message, status);
 }
 
-setInterval(
-    () => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000,
-);
+setInterval(() => logProgress('progress update'), LOG_PROGRESS_INTERVAL * 1000);
 
 // Output a byte stream of newline-separated JSON entries from input
 // streamed objects + update metrics
@@ -190,32 +169,33 @@ if (EXCLUDE_FROM_CSEQS) {
         bucketdPort: BUCKETD_PORT,
         excludeFromCseqs: EXCLUDE_FROM_CSEQS,
     });
-    diffStreamsSink
-        .pipe(new JSONLStream())
-        .pipe(DIFF_OUTPUT_STREAM);
+    diffStreamsSink.pipe(new JSONLStream()).pipe(DIFF_OUTPUT_STREAM);
 } else {
     diffStreamsSink = new JSONLStream();
-    diffStreamsSink
-        .pipe(DIFF_OUTPUT_STREAM);
+    diffStreamsSink.pipe(DIFF_OUTPUT_STREAM);
 }
 
 // classic-level opens lazily: open explicitly so that a missing database fails the scan
 function openDb(dbPath, cb) {
     const db = new ClassicLevel(dbPath, { createIfMissing: false });
-    db.open().then(() => cb(null, db), err => {
-        log.error('unable to open database', { dbPath, error: (err.cause || err).message });
-        cb(err);
-    });
+    db.open().then(
+        () => cb(null, db),
+        err => {
+            log.error('unable to open database', { dbPath, error: (err.cause || err).message });
+            cb(err);
+        },
+    );
 }
 
 function streamDbsDiff(dbs, dbPair, cb) {
     // .pipe() does not forward errors: report the first one from any stream
     const done = jsutil.once(err => {
         if (err) {
-            log.error(
-                'error during comparison of database pair',
-                { db1: dbPair[0], db2: dbPair[1], error: err.message },
-            );
+            log.error('error during comparison of database pair', {
+                db1: dbPair[0],
+                db2: dbPair[1],
+                error: err.message,
+            });
         } else {
             log.info('completed scan of database pair', { db1: dbPair[0], db2: dbPair[1] });
         }
@@ -225,16 +205,12 @@ function streamDbsDiff(dbs, dbPair, cb) {
         const dbPath = dbPair[i];
         const dbRawStream = levelReadStream(db);
         const dbListStream = new DBListStream({ dbName: path.basename(dbPath) });
-        dbRawStream
-            .on('error', done)
-            .pipe(dbListStream)
-            .on('error', done);
+        dbRawStream.on('error', done).pipe(dbListStream).on('error', done);
         return dbListStream;
     });
-    dbListStreams[0]
-        .on('data', () => {
-            status.keysScanned += 1;
-        });
+    dbListStreams[0].on('data', () => {
+        status.keysScanned += 1;
+    });
 
     const diffStream = new KeyValueStreamDiff(dbListStreams[0], dbListStreams[1]);
     diffStream
@@ -251,40 +227,42 @@ function streamDbsDiff(dbs, dbPair, cb) {
 }
 
 function compareDbs(dbPair, cb) {
-    log.info(
-        'starting comparison of pair of databases',
-        { db1: dbPair[0], db2: dbPair[1] },
-    );
+    log.info('starting comparison of pair of databases', { db1: dbPair[0], db2: dbPair[1] });
     async.map(dbPair, openDb, (err, dbs) => {
         if (err) {
             return cb(err);
         }
-        return streamDbsDiff(dbs, dbPair, streamErr => Promise.all(dbs.map(db => db.close())).then(
-            () => cb(streamErr),
-            closeErr => cb(streamErr || closeErr),
-        ));
+        return streamDbsDiff(dbs, dbPair, streamErr =>
+            Promise.all(dbs.map(db => db.close())).then(
+                () => cb(streamErr),
+                closeErr => cb(streamErr || closeErr),
+            ),
+        );
     });
 }
 
 function main() {
     log.info('starting scan');
-    async.series([
-        done => async.eachLimit(DATABASE_COMPARISON_PAIRS, PARALLEL_SCANS, compareDbs, done),
-        done => {
-            diffStreamsSink.end();
-            diffStreamsSink.on('finish', done);
+    async.series(
+        [
+            done => async.eachLimit(DATABASE_COMPARISON_PAIRS, PARALLEL_SCANS, compareDbs, done),
+            done => {
+                diffStreamsSink.end();
+                diffStreamsSink.on('finish', done);
+            },
+        ],
+        err => {
+            if (err) {
+                logProgress('error during scan');
+                process.exit(1);
+            }
+            logProgress('completed scan');
+            DIFF_OUTPUT_STREAM.end();
+            DIFF_OUTPUT_STREAM.on('finish', () => {
+                process.exit(0);
+            });
         },
-    ], err => {
-        if (err) {
-            logProgress('error during scan');
-            process.exit(1);
-        }
-        logProgress('completed scan');
-        DIFF_OUTPUT_STREAM.end();
-        DIFF_OUTPUT_STREAM.on('finish', () => {
-            process.exit(0);
-        });
-    });
+    );
 }
 
 main();

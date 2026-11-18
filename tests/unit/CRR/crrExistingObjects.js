@@ -18,10 +18,12 @@ jest.mock('werelogs', () => ({
 const mockCrrRun = jest.fn(cb => cb(null)); // Simulate successful run
 const mockCrrStop = jest.fn();
 
-jest.mock('../../../CRR/ReplicationStatusUpdater', () => jest.fn().mockImplementation(() => ({
-    run: mockCrrRun,
-    stop: mockCrrStop,
-})));
+jest.mock('../../../CRR/ReplicationStatusUpdater', () =>
+    jest.fn().mockImplementation(() => ({
+        run: mockCrrRun,
+        stop: mockCrrStop,
+    })),
+);
 
 describe('crrExistingObjects', () => {
     let originalEnv;
@@ -88,23 +90,26 @@ describe('crrExistingObjects', () => {
         const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
 
         expect(ReplicationStatusUpdater).toHaveBeenCalledTimes(1);
-        expect(ReplicationStatusUpdater).toHaveBeenCalledWith({
-            buckets: ['bucket1', 'bucket2'],
-            replicationStatusToProcess: ['NEW', 'PENDING'],
-            workers: 10,
-            accessKey: 'testAccessKey',
-            secretKey: 'testSecretKey',
-            endpoint: 'http://fake.endpoint',
-            siteName: 'testSite',
-            targetPrefix: 'testPrefix',
-            listingLimit: 2000,
-            maxUpdates: 100, // or a more specific expectation
-            maxScanned: 1000,
-            keyMarker: 'testKeyMarker',
-            versionIdMarker: 'testVersionIdMarker',
-            currentVersionOnly: true,
-            allowNewSite: false,
-        }, expect.anything());
+        expect(ReplicationStatusUpdater).toHaveBeenCalledWith(
+            {
+                buckets: ['bucket1', 'bucket2'],
+                replicationStatusToProcess: ['NEW', 'PENDING'],
+                workers: 10,
+                accessKey: 'testAccessKey',
+                secretKey: 'testSecretKey',
+                endpoint: 'http://fake.endpoint',
+                siteName: 'testSite',
+                targetPrefix: 'testPrefix',
+                listingLimit: 2000,
+                maxUpdates: 100, // or a more specific expectation
+                maxScanned: 1000,
+                keyMarker: 'testKeyMarker',
+                versionIdMarker: 'testVersionIdMarker',
+                currentVersionOnly: true,
+                allowNewSite: false,
+            },
+            expect.anything(),
+        );
         // FORCE_USING_CONFIGURATION and STORAGE_TYPE are set: we ignore them and warn.
         expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('FORCE_USING_CONFIGURATION is ignored'));
         expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('STORAGE_TYPE is ignored'));
@@ -132,22 +137,25 @@ describe('crrExistingObjects', () => {
 
         expect(mockWarn).not.toHaveBeenCalled();
         expect(ReplicationStatusUpdater).toHaveBeenCalledTimes(1);
-        expect(ReplicationStatusUpdater).toHaveBeenCalledWith({
-            buckets: ['bucket1', 'bucket2'],
-            replicationStatusToProcess: ['NEW'],
-            workers: 10,
-            accessKey: 'testAccessKey',
-            secretKey: 'testSecretKey',
-            endpoint: 'http://fake.endpoint',
-            targetPrefix: undefined,
-            listingLimit: 1000,
-            maxUpdates: undefined,
-            maxScanned: undefined,
-            keyMarker: undefined,
-            versionIdMarker: undefined,
-            currentVersionOnly: false,
-            allowNewSite: false,
-        }, expect.anything());
+        expect(ReplicationStatusUpdater).toHaveBeenCalledWith(
+            {
+                buckets: ['bucket1', 'bucket2'],
+                replicationStatusToProcess: ['NEW'],
+                workers: 10,
+                accessKey: 'testAccessKey',
+                secretKey: 'testSecretKey',
+                endpoint: 'http://fake.endpoint',
+                targetPrefix: undefined,
+                listingLimit: 1000,
+                maxUpdates: undefined,
+                maxScanned: undefined,
+                keyMarker: undefined,
+                versionIdMarker: undefined,
+                currentVersionOnly: false,
+                allowNewSite: false,
+            },
+            expect.anything(),
+        );
 
         expect(mockFatal).not.toHaveBeenCalled();
         expect(mockError).not.toHaveBeenCalled();
@@ -167,7 +175,9 @@ describe('crrExistingObjects', () => {
         const ReplicationStatusUpdater = require('../../../CRR/ReplicationStatusUpdater');
         const expected = JSON.parse(fs.readFileSync('tests/conf/locationConfig.json'));
         expect(ReplicationStatusUpdater).toHaveBeenCalledWith(
-            expect.objectContaining({ locationConfig: expected }), expect.anything());
+            expect.objectContaining({ locationConfig: expected }),
+            expect.anything(),
+        );
         expect(mockFatal).not.toHaveBeenCalled();
         expect(process.exit).not.toHaveBeenCalled();
     });
@@ -181,8 +191,9 @@ describe('crrExistingObjects', () => {
 
         require('../../../crrExistingObjects');
 
-        expect(mockFatal).toHaveBeenCalledWith('LOCATION_CONFIG_FILE is missing or is not valid JSON',
-            { file: 'tests/conf/missing.json' });
+        expect(mockFatal).toHaveBeenCalledWith('LOCATION_CONFIG_FILE is missing or is not valid JSON', {
+            file: 'tests/conf/missing.json',
+        });
         expect(process.exit).toHaveBeenCalledWith(1);
     });
 
@@ -194,7 +205,9 @@ describe('crrExistingObjects', () => {
 
         require('../../../crrExistingObjects');
 
-        expect(mockFatal).toHaveBeenCalledWith('No buckets given as input! Please provide a comma-separated list of buckets');
+        expect(mockFatal).toHaveBeenCalledWith(
+            'No buckets given as input! Please provide a comma-separated list of buckets',
+        );
         expect(process.exit).toHaveBeenCalledWith(1);
     });
 

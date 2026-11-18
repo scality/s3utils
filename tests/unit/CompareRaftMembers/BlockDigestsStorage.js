@@ -6,22 +6,24 @@ describe('BlockDigestsStorage', () => {
             const keysRemainingToWrite = {};
             let closeDone = false;
             const dbMock = {
-                batch: array => new Promise(resolve => {
-                    setTimeout(() => {
-                        array.forEach(item => {
-                            expect(item.type).toEqual('put');
-                            expect(item.value).toEqual(keysRemainingToWrite[item.key]);
-                            delete keysRemainingToWrite[item.key];
-                        });
-                        resolve();
-                    }, 10);
-                }),
-                close: () => new Promise(resolve => {
-                    setTimeout(() => {
-                        closeDone = true;
-                        resolve();
-                    }, 10);
-                }),
+                batch: array =>
+                    new Promise(resolve => {
+                        setTimeout(() => {
+                            array.forEach(item => {
+                                expect(item.type).toEqual('put');
+                                expect(item.value).toEqual(keysRemainingToWrite[item.key]);
+                                delete keysRemainingToWrite[item.key];
+                            });
+                            resolve();
+                        }, 10);
+                    }),
+                close: () =>
+                    new Promise(resolve => {
+                        setTimeout(() => {
+                            closeDone = true;
+                            resolve();
+                        }, 10);
+                    }),
             };
             const levelStream = new BlockDigestsStorage({ db: dbMock });
             for (let i = 0; i < nKeysToWrite; ++i) {

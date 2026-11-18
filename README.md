@@ -1,7 +1,9 @@
 # s3utils
+
 S3 Connector and Zenko Utilities
 
 Run the Docker container as (replace `<tag>` with the tag of s3utils image to be used)
+
 ```
 docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' -e 'REPLICATION_GROUP_ID=RG001'
 ghcr.io/scality/s3utils:<tag> node scriptName bucket1[,bucket2...]
@@ -11,17 +13,18 @@ ghcr.io/scality/s3utils:<tag> node scriptName bucket1[,bucket2...]
 
 1. Enable versioning and set up replication on the bucket.
 2. Run script as
+
 ```
 node crrExistingObjects.js testbucket1,testbucket2
 ```
 
 ### Mandatory environment variables,
 
-* **REPLICATION_GROUP_ID**
+- **REPLICATION_GROUP_ID**
 
 ### Optional environment variables,
 
-* **DEBUG**: set to 1 to output debug level information.
+- **DEBUG**: set to 1 to output debug level information.
 
 ### Extra environment variables
 
@@ -33,18 +36,18 @@ to the script to modify its behavior:
 Comma-separated list of replication statuses to target for CRR
 requeueing. The recognized statuses are:
 
-* **NEW**: No replication status is attached to the object. This is
-   the state of objects written without any CRR policy attached to
-   the bucket that would have triggered CRR on them.
+- **NEW**: No replication status is attached to the object. This is
+  the state of objects written without any CRR policy attached to
+  the bucket that would have triggered CRR on them.
 
-* **PENDING**: The object replication status is PENDING.
+- **PENDING**: The object replication status is PENDING.
 
-* **COMPLETED**: The object replication status is COMPLETED.
+- **COMPLETED**: The object replication status is COMPLETED.
 
-* **FAILED**: The object replication status is FAILED.
+- **FAILED**: The object replication status is FAILED.
 
-* **REPLICA**: The object replication status is REPLICA (objects that
-   were put to a target site via CRR have this status).
+- **REPLICA**: The object replication status is REPLICA (objects that
+  were put to a target site via CRR have this status).
 
 The default script behavior is to affect objects that have no
 replication status attached (so equivalent to
@@ -86,8 +89,8 @@ object for this site, and leaves the other sites as they are.
 
 Examples, with these bucket rules:
 
-* r1: no prefix, `StorageClass` sf, bucket D1
-* r2: prefix `docs/`, `StorageClass` dr2, bucket D2
+- r1: no prefix, `StorageClass` sf, bucket D1
+- r2: prefix `docs/`, `StorageClass` dr2, bucket D2
 
 `SITE_NAME=dr2`
 
@@ -111,9 +114,9 @@ A rule without `StorageClass` sends the objects to the S3C default site,
 set in the federation config (`env_replication_endpoints`). The script
 can't read it, so it uses `SITE_NAME` as that site:
 
-* `SITE_NAME` is required. Without it, the script fails with "missing
+- `SITE_NAME` is required. Without it, the script fails with "missing
   SITE_NAME environment variable".
-* Except when another rule names `SITE_NAME` in its `StorageClass`: then
+- Except when another rule names `SITE_NAME` in its `StorageClass`: then
   the script assumes the default site is another site, and skips the rule
   without `StorageClass`.
 
@@ -160,11 +163,11 @@ The default is unlimited (will process the complete listing of buckets
 passed on the command line).
 
 **If the script queues too many objects and Backbeat cannot
- process them quickly enough, Kafka may drop the oldest entries**,
- and the associated objects will stay in the **PENDING** state
- permanently without being replicated. When the number of objects
- is large, it is a good idea to limit the batch size and wait
- for CRR to complete between invocations.
+process them quickly enough, Kafka may drop the oldest entries**,
+and the associated objects will stay in the **PENDING** state
+permanently without being replicated. When the number of objects
+is large, it is a good idea to limit the batch size and wait
+for CRR to complete between invocations.
 
 Examples:
 
@@ -245,11 +248,11 @@ right site are skipped.
 Set `ALLOW_NEW_SITE=true` to skip the check when the object must get a
 site it doesn't know yet and that is the S3C default site:
 
-* a DR failback (re-sync the replicas of the DR site back to the primary
+- a DR failback (re-sync the replicas of the DR site back to the primary
   site with `SITE_NAME=<primary site>`), for replicas written by S3C 9.5,
   also on clusters later upgraded: a replica keeps the replication info of
   its source, so it only knows the DR site itself
-* a new DR site with a new name, when the bucket rules use the default
+- a new DR site with a new name, when the bucket rules use the default
   replication endpoint (no `StorageClass`)
 
 Example:
@@ -274,17 +277,16 @@ Example:
 
 #### Notes on S3C versions
 
-* s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16
+- s3utils 1.19.3 and later run on S3C 10.1 and later, and on Zenko 2.16
   and later, only. They write the object metadata like S3C 10.1 does: each
   backend has its own destination bucket and role, whatever the bucket
   rule format (`Prefix` or `Filter`). When they update an object that
   still has backends written by S3C 9.5, they rewrite these backends in
   this format too, with the bucket and role of the object. On S3C 9.5, use
   s3utils 1.18.
-* S3C 10.1: requeueing objects that already exist at the destination can
+- S3C 10.1: requeueing objects that already exist at the destination can
   leave them PENDING, because of the microVersionId format written by
   s3utils 1.18 (S3C-11591).
-
 
 ### Example use cases
 
@@ -384,11 +386,11 @@ with a wrong `SITE_NAME`. The script removes the site from the object
 replication info (backends, storageClass, storageType) and recomputes
 the global replication status from the remaining sites:
 
-* all remaining sites COMPLETED -> COMPLETED, nothing is replicated again
-* a remaining site PENDING -> PENDING, the object is requeued for that site
-* a remaining site FAILED -> FAILED
-* a replica site left -> REPLICA, the object stays a replica
-* the site was the only site -> replication info reset to empty (never
+- all remaining sites COMPLETED -> COMPLETED, nothing is replicated again
+- a remaining site PENDING -> PENDING, the object is requeued for that site
+- a remaining site FAILED -> FAILED
+- a replica site left -> REPLICA, the object stays a replica
+- the site was the only site -> replication info reset to empty (never
   replicated), a replica keeps `isReplica`. Run `crrExistingObjects.js`
   with the right `SITE_NAME` to replicate the object.
 
@@ -404,28 +406,28 @@ node removeReplicationSite.js bucket1[,bucket2...]
 
 ## Mandatory environment variables
 
-* **ENDPOINT**, **ACCESS_KEY**, **SECRET_KEY**
-* **SITE_TO_REMOVE**: the wrong site name to remove
+- **ENDPOINT**, **ACCESS_KEY**, **SECRET_KEY**
+- **SITE_TO_REMOVE**: the wrong site name to remove
 
 ## Optional environment variables
 
-* **DRY_RUN**: `true` by default, only logs what would change. Set
+- **DRY_RUN**: `true` by default, only logs what would change. Set
   `DRY_RUN=false` to write the changes.
-* **TARGET_PREFIX**: only process keys with this prefix
-* **WORKERS**: parallel metadata updates (default 10)
-* **LISTING_LIMIT**: listing page size (default 1000)
-* **MAX_UPDATES**: stop once this many updates are reached, at the end of
+- **TARGET_PREFIX**: only process keys with this prefix
+- **WORKERS**: parallel metadata updates (default 10)
+- **LISTING_LIMIT**: listing page size (default 1000)
+- **MAX_UPDATES**: stop once this many updates are reached, at the end of
   the current listing page (so up to `LISTING_LIMIT` more), and log the
   bucket list, `KEY_MARKER` and `VERSION_ID_MARKER` to resume. Use it to
   limit the number of objects requeued at once.
-* **MAX_SCANNED**: same, on the number of scanned versions. Use it to split
+- **MAX_SCANNED**: same, on the number of scanned versions. Use it to split
   a large bucket into batches: the script reads the metadata of every
   version, even when few of them need a change.
-* **KEY_MARKER**, **VERSION_ID_MARKER**: resume where an earlier run stopped
-* **FORCE_REMOVE_CONFIGURED_SITE**: by default, the script refuses to remove
+- **KEY_MARKER**, **VERSION_ID_MARKER**: resume where an earlier run stopped
+- **FORCE_REMOVE_CONFIGURED_SITE**: by default, the script refuses to remove
   a site that a bucket replication rule names in `StorageClass`, since it is
   a real destination, and stops. Set it to `true` to remove it anyway.
-* **DEBUG**: set to 1 for debug logs
+- **DEBUG**: set to 1 for debug logs
 
 ## Procedure
 
@@ -438,14 +440,14 @@ node removeReplicationSite.js bucket1[,bucket2...]
 
 ## Notes
 
-* S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
+- S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
   After a run with a wrong `SITE_NAME`, the real site re-sends the objects
   under the `sourceCheckIfSizeGreaterThanMB` limit of the Backbeat config
   (100 MB by default), and their replicas on the destination carry the
   wrong site (`dr=REPLICA, foo=PENDING`). It is harmless while they are
   replicas, but run the script on the destination buckets too, at least
   before using them as a source (DR failback). Replicas stay REPLICA.
-* S3C 10.1: an object left PENDING by the script is requeued. If it
+- S3C 10.1: an object left PENDING by the script is requeued. If it
   already exists at the destination, it can stay PENDING because of the
   microVersionId format written by s3utils 1.18 (S3C-11591). Check those
   objects after the run.
@@ -456,6 +458,7 @@ This script deletes all versions of objects in the bucket, including delete mark
 and aborts any ongoing multipart uploads to prepare the bucket for deletion.
 
 **Note: This deletes the data associated with objects and is not recoverable**
+
 ```
 node cleanupBuckets.js testbucket1,testbucket2
 ```
@@ -488,11 +491,11 @@ The following environment variable is **required** for `listObjectsByReplication
 
 Comma-separated list of replication statuses to list. The recognized statuses are:
 
-* **NEW**: No replication status is attached to the object.
-* **PENDING**: The object replication status is PENDING.
-* **COMPLETED**: The object replication status is COMPLETED.
-* **FAILED**: The object replication status is FAILED.
-* **REPLICA**: The object replication status is REPLICA.
+- **NEW**: No replication status is attached to the object.
+- **PENDING**: The object replication status is PENDING.
+- **COMPLETED**: The object replication status is COMPLETED.
+- **FAILED**: The object replication status is FAILED.
+- **REPLICA**: The object replication status is REPLICA.
 
 Examples:
 
@@ -528,68 +531,68 @@ node verifyBucketSproxydKeys.js
 
 ## Mandatory environment variables:
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+- **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+- **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
-* One of:
+- One of:
 
-  * **BUCKETS**: comma-separated list of buckets to scan
-  * Example : `BUCKETS=bucket1,bucket2,bucket3`
+    - **BUCKETS**: comma-separated list of buckets to scan
+    - Example : `BUCKETS=bucket1,bucket2,bucket3`
 
-* or:
+- or:
 
-  * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
-  * Example :
-    ```
-    docker run --net=host \
-    -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
-    -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
-    -e 'RAFT_SESSIONS=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js
-    ```
+    - **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
+    - Example :
+        ```
+        docker run --net=host \
+        -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+        -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
+        -e 'RAFT_SESSIONS=1' \
+        ghcr.io/scality/s3utils:1.12.5 \
+        node verifyBucketSproxydKeys.js
+        ```
 
-* or:
+- or:
 
-  * **KEYS_FROM_STDIN**: reads objects to scan from stdin if this
-    environment variable is set, where the input is a stream of JSON
-    objects, each of the form:
-    `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
-    **note**: if `\u0000objectversion` is not present, it checks the master key
-  * Example :
-    ```
-    cat raft_session_1_output.txt | docker run -i --net=host --rm \
-    -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
-    -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
-    -e 'KEYS_FROM_STDIN=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
-    ```
+    - **KEYS_FROM_STDIN**: reads objects to scan from stdin if this
+      environment variable is set, where the input is a stream of JSON
+      objects, each of the form:
+      `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
+      **note**: if `\u0000objectversion` is not present, it checks the master key
+    - Example :
+        ```
+        cat raft_session_1_output.txt | docker run -i --net=host --rm \
+        -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
+        -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+        -e 'KEYS_FROM_STDIN=1' \
+        ghcr.io/scality/s3utils:1.12.5 \
+        node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
+        ```
 
 ## Optional environment variables:
 
-* **WORKERS**: concurrency value for sproxyd requests (default 100)
+- **WORKERS**: concurrency value for sproxyd requests (default 100)
 
-* **FROM_URL**: URL from which to resume scanning ("s3://bucket[/key]")
+- **FROM_URL**: URL from which to resume scanning ("s3://bucket[/key]")
 
-* **VERBOSE**: set to 1 for more verbose output (shows one line for every sproxyd key)
+- **VERBOSE**: set to 1 for more verbose output (shows one line for every sproxyd key)
 
-* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
 
-* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+- **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-* **MPU_ONLY**: only scan objects uploaded with multipart upload method
+- **MPU_ONLY**: only scan objects uploaded with multipart upload method
 
-* **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
-    keys, for a performance benefit - other checks like duplicate keys
-    and missing metadata are still done
+- **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
+  keys, for a performance benefit - other checks like duplicate keys
+  and missing metadata are still done
 
-* **LISTING_DIGESTS_OUTPUT_DIR**: output listing digests into the
-    specified directory (in the LevelDB format)
+- **LISTING_DIGESTS_OUTPUT_DIR**: output listing digests into the
+  specified directory (in the LevelDB format)
 
-* **LISTING_DIGESTS_BLOCK_SIZE**: number of keys in each listing
-    digest block (default 1000)
+- **LISTING_DIGESTS_BLOCK_SIZE**: number of keys in each listing
+  digest block (default 1000)
 
 ## Output
 
@@ -608,22 +611,22 @@ defined. It shows statistics about the scan in progress.
 
 Logged fields:
 
-* **scanned**: number of objects scanned
+- **scanned**: number of objects scanned
 
-* **skipped**: number of objects skipped (in case MPU_ONLY is set)
+- **skipped**: number of objects skipped (in case MPU_ONLY is set)
 
-* **haveMissingKeys**: number of object versions found with at least
-    one missing sproxyd key
+- **haveMissingKeys**: number of object versions found with at least
+  one missing sproxyd key
 
-* **haveDupKeys**: number of object versions found with at least one
-    sproxyd key shared with another object version
+- **haveDupKeys**: number of object versions found with at least one
+  sproxyd key shared with another object version
 
-* **haveEmptyMetadata**: number of objects found with an empty metadata
-    blob i.e. `{}`
+- **haveEmptyMetadata**: number of objects found with an empty metadata
+  blob i.e. `{}`
 
-* **url**: current URL `s3://bucket[/object]` for the current listing
-    iteration, can be used to resume a scan from this point passing
-    FROM_URL environment variable.
+- **url**: current URL `s3://bucket[/object]` for the current listing
+  iteration, can be used to resume a scan from this point passing
+  FROM_URL environment variable.
 
 Example:
 
@@ -645,10 +648,10 @@ object in case multiple sproxyd keys are missing.
 
 Logged fields:
 
-* **objectUrl**: URL of the affected object version:
-    `s3://bucket/object[%00UrlEncodedVersionId]`
+- **objectUrl**: URL of the affected object version:
+  `s3://bucket/object[%00UrlEncodedVersionId]`
 
-* **sproxydKey**: sproxyd key that is missing
+- **sproxydKey**: sproxyd key that is missing
 
 ```
 duplicate sproxyd key found
@@ -663,16 +666,16 @@ version to refer to deleted data in its location array.
 
 Logged fields:
 
-* **objectUrl**: URL of the first affected object version with an
-    sproxyd key shared with the second affected object:
-    `s3://bucket/object[%00UrlEncodedVersionId]`
+- **objectUrl**: URL of the first affected object version with an
+  sproxyd key shared with the second affected object:
+  `s3://bucket/object[%00UrlEncodedVersionId]`
 
-* **objectUrl2**: URL of the second affected object version with an
-    sproxyd key shared with the first affected object:
-    `s3://bucket/object[%00UrlEncodedVersionId]`
+- **objectUrl2**: URL of the second affected object version with an
+  sproxyd key shared with the first affected object:
+  `s3://bucket/object[%00UrlEncodedVersionId]`
 
-* **sproxydKey**: sproxyd key that is duplicated between the two
-    object versions
+- **sproxydKey**: sproxyd key that is duplicated between the two
+  object versions
 
 ```
 object with empty metadata found
@@ -693,11 +696,11 @@ that was aborted, and it was the last state of this object (otherwise
 it would have been updated by non-empty metadata).
 
 **Note**: even on versioned buckets, the affected keys are always
-  non-versioned.
+non-versioned.
 
 Logged fields:
 
-* **objectUrl**: URL of the affected object: `s3://bucket/object`
+- **objectUrl**: URL of the affected object: `s3://bucket/object`
 
 **How to delete all such objects**:
 
@@ -717,7 +720,6 @@ jq -r "${JQ_SCRIPT}" verifyBucketSproxydKeys.log | while read url; do
     } || true
 done
 ```
-
 
 # Compare follower's databases against leader view
 
@@ -756,20 +758,20 @@ node followerDiff.js
 
 ## Mandatory environment variables
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+- **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-* **DATABASES**: space-separated list of databases to scan
+- **DATABASES**: space-separated list of databases to scan
 
-* **DIFF_OUTPUT_FILE**: file path where diff output will be stored
+- **DIFF_OUTPUT_FILE**: file path where diff output will be stored
 
 ## Optional environment variables
 
-* **LISTING_DIGESTS_INPUT_DIR**: read listing digests from the
+- **LISTING_DIGESTS_INPUT_DIR**: read listing digests from the
   specified LevelDB database
 
-* **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
+- **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
 
-* **EXCLUDE_FROM_CSEQS**: mapping of raft sessions to filter on, where
+- **EXCLUDE_FROM_CSEQS**: mapping of raft sessions to filter on, where
   keys are raft session IDs and values are the cseq value for that
   raft session. Filtering will be based on all oplog records more
   recent than the given "cseq" for the raft session. Input diff
@@ -777,27 +779,27 @@ node followerDiff.js
   discarded from the output. The value must be in the following JSON
   format:
 
-  * `{"rsId":cseq[,"rsId":cseq...]}`
+    - `{"rsId":cseq[,"rsId":cseq...]}`
 
-  * Example: `{"1":1234,"4":4567,"6":6789}`
+    - Example: `{"1":1234,"4":4567,"6":6789}`
 
-  * This configuration would cause diff entries of which bucket/key
-    appear in one of the following to be discarded from the output:
+    - This configuration would cause diff entries of which bucket/key
+      appear in one of the following to be discarded from the output:
 
-    * oplog of raft session 1 after cseq=1234
+        - oplog of raft session 1 after cseq=1234
 
-    * or oplog of raft session 4 after cseq=4567
+        - or oplog of raft session 4 after cseq=4567
 
-    * or oplog of raft session 6 after cseq=6789
+        - or oplog of raft session 6 after cseq=6789
 
-    * or any other raft session's oplog at any cseq
+        - or any other raft session's oplog at any cseq
 
 ## Scan Procedure with Stable Leader
 
 **Note**: you may use this procedure when leaders are stable,
-  i.e. leader changes are rare in normal circumstances. When leaders
-  are unstable, use the [unstable
-  leader](#scan-procedure-with-unstable-leader) procedure instead.
+i.e. leader changes are rare in normal circumstances. When leaders
+are unstable, use the [unstable
+leader](#scan-procedure-with-unstable-leader) procedure instead.
 
 In order to scan a set of raft sessions to detect discrepancies
 between raft members, you may use the following procedure involving
@@ -1038,6 +1040,7 @@ Note that the container must mount all metadata databases mountpoints
 in order to have access to all databases.
 
 Example command:
+
 ```
 DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
@@ -1060,10 +1063,9 @@ docker run --net=host --rm \
 
 ```
 
-
 **Note**: the tool will refuse to override an existing diff output
-  file. If you need to re-run the command, first delete the output
-  file or give another path as DIFF_OUTPUT_FILE.
+file. If you need to re-run the command, first delete the output
+file or give another path as DIFF_OUTPUT_FILE.
 
 ### Step Scan-5: Restart all stopped repd processes
 
@@ -1133,7 +1135,6 @@ summary](#compare-followers-databases-against-leader-view).
 - The current version of the script does not support internal TLS
   feature
 
-
 # Compare two followers database sets
 
 The **CompareRaftMembers/compareFollowerDbs** tool compares two sets
@@ -1163,19 +1164,19 @@ node compareFollowerDbs.js
 
 ## Mandatory environment variables
 
-* **DATABASES1**: space-separated list of databases of follower #1 to
+- **DATABASES1**: space-separated list of databases of follower #1 to
   compare against follower #2
 
-* **DATABASES2**: space-separated list of databases of follower #2 to
+- **DATABASES2**: space-separated list of databases of follower #2 to
   compare against follower #1
 
-* **DIFF_OUTPUT_FILE**: file path where diff output will be stored
+- **DIFF_OUTPUT_FILE**: file path where diff output will be stored
 
 ## Optional environment variables
 
-* **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
+- **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
 
-* **EXCLUDE_FROM_CSEQS**: mapping of raft sessions to filter on, where
+- **EXCLUDE_FROM_CSEQS**: mapping of raft sessions to filter on, where
   keys are raft session IDs and values are the cseq value for that
   raft session. Filtering will be based on all oplog records more
   recent than the given "cseq" for the raft session. Input diff
@@ -1183,22 +1184,22 @@ node compareFollowerDbs.js
   discarded from the output. The value must be in the following JSON
   format:
 
-  * `{"rsId":cseq[,"rsId":cseq...]}`
+    - `{"rsId":cseq[,"rsId":cseq...]}`
 
-  * Example: `{"1":1234,"4":4567,"6":6789}`
+    - Example: `{"1":1234,"4":4567,"6":6789}`
 
-  * This configuration would cause diff entries of which bucket/key
-    appear in one of the following to be discarded from the output:
+    - This configuration would cause diff entries of which bucket/key
+      appear in one of the following to be discarded from the output:
 
-    * oplog of raft session 1 after cseq=1234
+        - oplog of raft session 1 after cseq=1234
 
-    * or oplog of raft session 4 after cseq=4567
+        - or oplog of raft session 4 after cseq=4567
 
-    * or oplog of raft session 6 after cseq=6789
+        - or oplog of raft session 6 after cseq=6789
 
-    * or any other raft session's oplog at any cseq
+        - or any other raft session's oplog at any cseq
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint, needed when
+- **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint, needed when
   EXCLUDE_FROM_CSEQS is set (in order to read the Raft oplog)
 
 ## Scan Procedure with Unstable Leader
@@ -1221,7 +1222,6 @@ stopped at some point to copy or read its databases set, then
 restarted. Stopping the leader can have a small temporary impact on
 the traffic.
 
-
 ### Define global configuration values
 
 - Choose one node on the system that will be the source from which we
@@ -1229,31 +1229,31 @@ the traffic.
   can be shared with other nodes later on. It can be any one of the
   Metadata active nodes.
 
-  We will call this node **SourceNode** in the rest of this procedure,
-  and its hostname stored in the environment variable ``SOURCE_NODE``
-  in the provided commands.
+    We will call this node **SourceNode** in the rest of this procedure,
+    and its hostname stored in the environment variable `SOURCE_NODE`
+    in the provided commands.
 
 - Choose a list of Raft Sessions to scan
 
-  Decide on which raft sessions will be scanned during this run of the
-  procedure. It may be all data Raft Sessions (usually 8 with IDs 1
-  through 8), or a subset.
+    Decide on which raft sessions will be scanned during this run of the
+    procedure. It may be all data Raft Sessions (usually 8 with IDs 1
+    through 8), or a subset.
 
-  We will store this set as a space-separated list of raft session
-  IDs, for example `1 2 3 4 5 6 7 8`, in the environment variable
-  `RAFT_SESSIONS_TO_SCAN` in the provided commands.
+    We will store this set as a space-separated list of raft session
+    IDs, for example `1 2 3 4 5 6 7 8`, in the environment variable
+    `RAFT_SESSIONS_TO_SCAN` in the provided commands.
 
 - Choose a unique shared filesystem location that:
 
-  - has enough storage space to host Metadata databases of the raft
-    sessions being scanned (from a single node)
+    - has enough storage space to host Metadata databases of the raft
+      sessions being scanned (from a single node)
 
-  - will be network-accessible from each Metadata node (i.e. contents
-    can be `rsync` from/to Metadata hosts)
+    - will be network-accessible from each Metadata node (i.e. contents
+      can be `rsync` from/to Metadata hosts)
 
-  We will save this remote rsync location as
-  `REMOTE_DATABASES_HOST_PATH` environment variable in the provided
-  commands, for example `root@node-with-storage:/path/to/source-node-dbs`
+    We will save this remote rsync location as
+    `REMOTE_DATABASES_HOST_PATH` environment variable in the provided
+    commands, for example `root@node-with-storage:/path/to/source-node-dbs`
 
 - Choose a filesystem location on each stateful node that has enough
   storage space to host Metadata databases of the raft sessions being
@@ -1385,7 +1385,6 @@ done
 
 In case errors occur, restart the command.
 
-
 ### Step Prep-5: Restart repd processes
 
 It can be done with the following script:
@@ -1407,7 +1406,7 @@ done
 In case errors occur, restart the command.
 
 **Important**: Run the following Scan steps on each stateful node
-  except **SourceNode**.
+except **SourceNode**.
 
 ### Step Scan-1: SSH to next stateful host to scan
 
@@ -1452,7 +1451,6 @@ done
 
 In case errors occur, restart the command.
 
-
 ### Step Scan-4: Scan local databases
 
 Run the "CompareRaftMembers/compareFollowerDbs" tool to generate a
@@ -1465,6 +1463,7 @@ in order to have access to all local databases, as well as mount
 `LOCAL_DATABASES_PATH`.
 
 Example command:
+
 ```
 MY_DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
@@ -1488,8 +1487,8 @@ docker run --net=host --rm \
 ```
 
 **Note**: the tool will refuse to override an existing diff output
-  file. If you need to re-run the command, first delete the output
-  file or give another path as DIFF_OUTPUT_FILE.
+file. If you need to re-run the command, first delete the output
+file or give another path as DIFF_OUTPUT_FILE.
 
 ### Step Scan-5: Restart stopped repd processes
 
@@ -1545,7 +1544,6 @@ summary](#compare-followers-databases-against-leader-view).
 - The current version of the script does not support internal TLS
   feature
 
-
 # Repair objects affected by raft divergence
 
 The repair script provided here attempts to automatically repair the
@@ -1568,16 +1566,16 @@ ambiguity on what's the best way to repair.
 
 ## Mandatory environment variables
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+- **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+- **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
 ## Optional environment variables
 
-* **VERBOSE**: set to 1 for more verbose output (shows one line for
-every sproxyd key checked)
+- **VERBOSE**: set to 1 for more verbose output (shows one line for
+  every sproxyd key checked)
 
-* **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
+- **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
 
 ## Logs
 
@@ -1594,22 +1592,22 @@ succeeded.
 
 The status can be one of:
 
-* **AutoRepair**: the object can be repaired automatically
+- **AutoRepair**: the object can be repaired automatically
   (`repairSource` described the source metadata for the repair, either
   `Leader` or `Follower`).
 
-* **ManualRepair**: the object can be repaired but an operator needs
+- **ManualRepair**: the object can be repaired but an operator needs
   to decide on which version to repair from. This is normally when
   both versions are readable and the script is unable to take an
   automatic decision. There is currently no support to use
   `objectRepair` to help with those cases, but it can be done via the
   bucketd API.
 
-* **NotRepairable**: the object metadata is either absent or
+- **NotRepairable**: the object metadata is either absent or
   unreadable from both leader and follower (the message gives extra
   detail), so the script did not attempt any repair.
 
-* **UpdatedByClient**: this status is given when the repair script
+- **UpdatedByClient**: this status is given when the repair script
   detects that the current metadata does not match one of the leader
   or follower's entry in the current diff entry being processed. This
   normally means that the application has overwritten the object with
@@ -1687,25 +1685,25 @@ more versioning-suspended bucket(s).
 
 ## Mandatory environment variables
 
-* **ENDPOINT**: S3 endpoint
+- **ENDPOINT**: S3 endpoint
 
-* **ACCESS_KEY**: S3 account access key
+- **ACCESS_KEY**: S3 account access key
 
-* **SECRET_KEY**: S3 account secret key
+- **SECRET_KEY**: S3 account secret key
 
 ## Optional environment variables:
 
-* **TARGET_PREFIX**: only process a specific prefix in the bucket(s)
+- **TARGET_PREFIX**: only process a specific prefix in the bucket(s)
 
-* **WORKERS**: concurrency value for listing / batch delete requests (default 10)
+- **WORKERS**: concurrency value for listing / batch delete requests (default 10)
 
-* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
 
-* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+- **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-* **KEY_MARKER**: resume processing from a specific key
+- **KEY_MARKER**: resume processing from a specific key
 
-* **VERSION_ID_MARKER**: resume processing from a specific version ID
+- **VERSION_ID_MARKER**: resume processing from a specific version ID
 
 ## Output
 
@@ -1754,9 +1752,9 @@ and ignores other entries.
 
 ## Mandatory environment variables
 
-* **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+- **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-* **OBJECT_REPAIR_SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+- **OBJECT_REPAIR_SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
 ## Example
 
@@ -1789,14 +1787,14 @@ that it updates metadata for an object that is being updated at the
 exact same time by a client application, either through "PutObjectAcl"
 or "PutObjectTagging" operations which can modify existing
 versions. In such case, there is a risk that either:
-* the application update will be lost
-* or the script will not repair the item properly
+
+- the application update will be lost
+- or the script will not repair the item properly
 
 If this looks like a potential risk to a customer running the script,
 we suggest to disable those operations on the clients during the time
 the script is running (or alternatively, disable all writes), to avoid
 any such risk.
-
 
 # Repair object metadata with duplicate 'versionId' field
 
@@ -1826,7 +1824,7 @@ duplicate "versionId" field found' and ignores other entries.
 
 ## Mandatory environment variables
 
-* **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+- **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
 ## Example
 
@@ -1848,54 +1846,54 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 
 ## Mandatory environment variables
 
-* **S3_ENDPOINT**: S3 endpoint URL
+- **S3_ENDPOINT**: S3 endpoint URL
 
-* **ACCESS_KEY**: S3 account/user access key
+- **ACCESS_KEY**: S3 account/user access key
 
-* **SECRET_KEY**: S3 account/user secret key
+- **SECRET_KEY**: S3 account/user secret key
 
 ## Optional environment variables
 
-* **TARGET_PREFIX**: cleanup only inside this key prefix in each bucket
+- **TARGET_PREFIX**: cleanup only inside this key prefix in each bucket
 
-* **MAX_LISTED**: maximum number of keys listed before exiting (default unlimited)
+- **MAX_LISTED**: maximum number of keys listed before exiting (default unlimited)
 
-* **MAX_DELETES**: maximum number of keys to delete before exiting (default unlimited)
+- **MAX_DELETES**: maximum number of keys to delete before exiting (default unlimited)
 
-* **MARKER**: marker from which to resume the cleanup, logged at the end
-of a previous invocation of the script, uses the format:
+- **MARKER**: marker from which to resume the cleanup, logged at the end
+  of a previous invocation of the script, uses the format:
 
-  ```
-  MARKER := encodeURI(bucketName)
-    "|" encodeURI(key)
-    "|" encodeURI(versionId)
-  ```
+    ```
+    MARKER := encodeURI(bucketName)
+      "|" encodeURI(key)
+      "|" encodeURI(versionId)
+    ```
 
-* **OLDER_THAN**: cleanup only objects which last modified date is older
-than this, as an ISO date or a number of days, e.g.:
+- **OLDER_THAN**: cleanup only objects which last modified date is older
+  than this, as an ISO date or a number of days, e.g.:
 
-  * setting to "2021-01-09T00:00:00Z" limits the cleanup to objects
-  created or modified before Jan 9th 2021
+    - setting to "2021-01-09T00:00:00Z" limits the cleanup to objects
+      created or modified before Jan 9th 2021
 
-  * setting to "30 days" limits the cleanup to objects created more
-  than 30 days ago
+    - setting to "30 days" limits the cleanup to objects created more
+      than 30 days ago
 
-* **ONLY_DELETED**: if set to "1" or "true" or "yes", only remove
-otherwise eligible noncurrent versions if the object's current version
-is a delete marker (also removes the delete marker)
+- **ONLY_DELETED**: if set to "1" or "true" or "yes", only remove
+  otherwise eligible noncurrent versions if the object's current version
+  is a delete marker (also removes the delete marker)
 
-* **DELETED_BEFORE**: cleanup only objects whose current version is a delete
-    marker older than this date, e.g. setting to "2021-01-09T00:00:00Z"
-    limits the cleanup to objects deleted before Jan 9th 2021.
-    Implies `ONLY_DELETED = true`
+- **DELETED_BEFORE**: cleanup only objects whose current version is a delete
+  marker older than this date, e.g. setting to "2021-01-09T00:00:00Z"
+  limits the cleanup to objects deleted before Jan 9th 2021.
+  Implies `ONLY_DELETED = true`
 
-* **HTTPS_CA_PATH**: path to a CA certificate bundle used to
-authentify the S3 endpoint
+- **HTTPS_CA_PATH**: path to a CA certificate bundle used to
+  authentify the S3 endpoint
 
-* **HTTPS_NO_VERIFY**: set to 1 to disable S3 endpoint certificate check
+- **HTTPS_NO_VERIFY**: set to 1 to disable S3 endpoint certificate check
 
-* **EXCLUDE_REPLICATING_VERSIONS**: if is set to '1,' 'true,' or 'yes,'
-    prevent the deletion of replicating versions
+- **EXCLUDE_REPLICATING_VERSIONS**: if is set to '1,' 'true,' or 'yes,'
+  prevent the deletion of replicating versions
 
 ## Example
 
@@ -1917,25 +1915,25 @@ noncurrent versions.
 
 ## Mandatory environment variables
 
-* **ENDPOINT**: S3 endpoint
+- **ENDPOINT**: S3 endpoint
 
-* **ACCESS_KEY**: S3 account access key
+- **ACCESS_KEY**: S3 account access key
 
-* **SECRET_KEY**: S3 account secret key
+- **SECRET_KEY**: S3 account secret key
 
-* **BUCKET**: S3 bucket name
+- **BUCKET**: S3 bucket name
 
 ## Optional environment variables:
 
-* **TARGET_PREFIX**: only process a specific prefix in the bucket
+- **TARGET_PREFIX**: only process a specific prefix in the bucket
 
-* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+- **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
 
-* **KEY_MARKER**: start counting from a specific key
+- **KEY_MARKER**: start counting from a specific key
 
-* **VERSION_ID_MARKER**: start counting from a specific version ID
+- **VERSION_ID_MARKER**: start counting from a specific version ID
 
 ## Output
 
@@ -1950,18 +1948,18 @@ The total counts may be possibly limited by the **TARGET_PREFIX**,
 
 - **stats** contains the output statistics:
 
-  - **current** refers to current versions of objects
+    - **current** refers to current versions of objects
 
-  - **noncurrent** refers to non-current versions of objects
+    - **noncurrent** refers to non-current versions of objects
 
-  - **total** is the sum of **current** and **noncurrent**
+    - **total** is the sum of **current** and **noncurrent**
 
 - in **stats.current** and **stats.noncurrent**:
 
-  - **count** is the number of objects pertaining to the section
+    - **count** is the number of objects pertaining to the section
 
-  - **size** is the cumulative size in bytes of the objects pertaining
-  to the section
+    - **size** is the cumulative size in bytes of the objects pertaining
+      to the section
 
 ### Example Progress Update
 
@@ -2039,55 +2037,54 @@ node VerifyReplication/index.js
 
 ## Mandatory environment variables
 
-* **SRC_ENDPOINT**: replication source s3 endpoint
+- **SRC_ENDPOINT**: replication source s3 endpoint
 
-* **SRC_BUCKET**: replication source bucket
+- **SRC_BUCKET**: replication source bucket
 
-* **SRC_ACCESS_KEY**: replication source s3 account access key
+- **SRC_ACCESS_KEY**: replication source s3 account access key
 
-* **SRC_SECRET_KEY**: replication source s3 account secret key
+- **SRC_SECRET_KEY**: replication source s3 account secret key
 
-* **DST_BUCKET**: replication destination bucket
+- **DST_BUCKET**: replication destination bucket
 
-* **DST_ACCESS_KEY**: replication destination s3 account access key
+- **DST_ACCESS_KEY**: replication destination s3 account access key
 
-* **DST_SECRET_KEY**: replication destination s3 account secret key
+- **DST_SECRET_KEY**: replication destination s3 account secret key
 
 ## Optional environment variables:
 
-* **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
+- **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
 
-* **SRC_DELIMITER**: delimiter used with prefixes in source (default '/')
+- **SRC_DELIMITER**: delimiter used with prefixes in source (default '/')
 
-* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
+- **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-* **LISTING_WORKERS**: number of concurrent workers to handle listing (default 10)
+- **LISTING_WORKERS**: number of concurrent workers to handle listing (default 10)
 
-* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
 
-* **BUCKET_MATCH**: set to 1 if bucket match is enabled with replication, when not enabled objects will be replicated with keyname pattern `sourceBucket/key`
+- **BUCKET_MATCH**: set to 1 if bucket match is enabled with replication, when not enabled objects will be replicated with keyname pattern `sourceBucket/key`
 
-* **COMPARE_OBJECT_SIZE**: set to 1 to compare source and destination object sizes
+- **COMPARE_OBJECT_SIZE**: set to 1 to compare source and destination object sizes
 
-* **DST_ENDPOINT**: replication destination s3 endpoint (only for storage type `aws_s3`)
+- **DST_ENDPOINT**: replication destination s3 endpoint (only for storage type `aws_s3`)
 
-* **DST_STORAGE_TYPE**: destination storage type, currently supports only `aws_s3`
+- **DST_STORAGE_TYPE**: destination storage type, currently supports only `aws_s3`
 
-* **DST_REGION**: destination s3 region (only for storage type `aws_s3`, default `us-east-1`)
+- **DST_REGION**: destination s3 region (only for storage type `aws_s3`, default `us-east-1`)
 
-* **DST_MD_REQUEST_WORKERS**: number of concurrent workers to handle destination metadata requests (default 50)
+- **DST_MD_REQUEST_WORKERS**: number of concurrent workers to handle destination metadata requests (default 50)
 
-* **HTTPS_CA_PATH**: path to a CA certificate bundle used to authentify the source S3 endpoint
+- **HTTPS_CA_PATH**: path to a CA certificate bundle used to authentify the source S3 endpoint
 
-* **HTTPS_NO_VERIFY**: set to 1 to disable source S3 endpoint certificate check
+- **HTTPS_NO_VERIFY**: set to 1 to disable source S3 endpoint certificate check
 
-* **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if available (enable only for debugging as it may produce a lot of log entries), this may be disregarded if the client (depending on storage type) does not support it
+- **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if available (enable only for debugging as it may produce a lot of log entries), this may be disregarded if the client (depending on storage type) does not support it
 
-* **SKIP_OLDER_THAN**: skip replication verification of objects whose last modified date is older than this, set this as an ISO date or a number of days e.g.,
+- **SKIP_OLDER_THAN**: skip replication verification of objects whose last modified date is older than this, set this as an ISO date or a number of days e.g.,
 
-  * setting to "2022-11-30T00:00:00Z" skips the verification of objects created or modified before Nov 30th 2022
-  * setting to "30 days" skips the verification of objects created or modified more than 30 days ago
-
+    - setting to "2022-11-30T00:00:00Z" skips the verification of objects created or modified before Nov 30th 2022
+    - setting to "30 days" skips the verification of objects created or modified more than 30 days ago
 
 ## Output
 
@@ -2099,14 +2096,15 @@ One log line is output for each missing object,
 
 ```json
 {
-  "name":"s3utils:verifyReplication",
-  "time":1670279729106,
-  "key":"rna-4/rna33",
-  "size":0,"srcLastModified":"2022-12-01T12:27:11.469Z",
-  "level":"info",
-  "message":"object missing in destination",
-  "hostname":"scality.local",
-  "pid":24601
+    "name": "s3utils:verifyReplication",
+    "time": 1670279729106,
+    "key": "rna-4/rna33",
+    "size": 0,
+    "srcLastModified": "2022-12-01T12:27:11.469Z",
+    "level": "info",
+    "message": "object missing in destination",
+    "hostname": "scality.local",
+    "pid": 24601
 }
 ```
 
@@ -2114,17 +2112,17 @@ and for each size mismatched object,
 
 ```json
 {
-  "name":"s3utils:verifyReplication",
-  "time":1670279723474,
-  "key":"rna-2/34",
-  "srcSize":1,
-  "dstSize":0,
-  "srcLastModified":"2022-12-01T11:31:27.528Z",
-  "dstLastModified":"2022-12-01T11:33:42.000Z",
-  "level":"info",
-  "message":"object size does not match in destination",
-  "hostname":"scality.local",
-  "pid":24601
+    "name": "s3utils:verifyReplication",
+    "time": 1670279723474,
+    "key": "rna-2/34",
+    "srcSize": 1,
+    "dstSize": 0,
+    "srcLastModified": "2022-12-01T11:31:27.528Z",
+    "dstLastModified": "2022-12-01T11:33:42.000Z",
+    "level": "info",
+    "message": "object size does not match in destination",
+    "hostname": "scality.local",
+    "pid": 24601
 }
 ```
 
@@ -2132,22 +2130,22 @@ and for each failed metadata retrieval (after retries),
 
 ```json
 {
-  "name":"s3utils:verifyReplication",
-  "time":1670887351694,
-  "error":{
-    "message":"socket hang up",
-    "code":"TimeoutError",
-    "time":"2022-12-12T23:22:31.694Z",
-    "region":"us-east-1",
-    "hostname":"localhost",
-    "retryable":true
+    "name": "s3utils:verifyReplication",
+    "time": 1670887351694,
+    "error": {
+        "message": "socket hang up",
+        "code": "TimeoutError",
+        "time": "2022-12-12T23:22:31.694Z",
+        "region": "us-east-1",
+        "hostname": "localhost",
+        "retryable": true
     },
-  "bucket":"src-bucket",
-  "key":"pref1/key404",
-  "level":"error",
-  "message":"error getting metadata",
-  "hostname":"scality.local",
-  "pid":11398
+    "bucket": "src-bucket",
+    "key": "pref1/key404",
+    "level": "error",
+    "message": "error getting metadata",
+    "hostname": "scality.local",
+    "pid": 11398
 }
 ```
 
@@ -2155,23 +2153,23 @@ The script also logs a progress update (a summary), every 10 seconds by default,
 
 ```json
 {
-  "name":"s3utils:verifyReplication",
-  "time":1670280035601,
-  "srcListedCount":492,
-  "dstProcessedCount":492,
-  "skippedByDate": 123,
-  "missingInDstCount":123,
-  "sizeMismatchCount":123,
-  "replicatedCount":120,
-  "dstFailedMdRetrievalsCount":3,
-  "dstBucket":"dst-bucket",
-  "srcBucket":"src-bucket",
-  "prefixFilters":["pref1","pref2"],
-  "skipOlderThan": "2022-11-30T00:00:00Z",
-  "level":"info",
-  "message":"completed replication verification",
-  "hostname":"scality.local",
-  "pid":24780
+    "name": "s3utils:verifyReplication",
+    "time": 1670280035601,
+    "srcListedCount": 492,
+    "dstProcessedCount": 492,
+    "skippedByDate": 123,
+    "missingInDstCount": 123,
+    "sizeMismatchCount": 123,
+    "replicatedCount": 120,
+    "dstFailedMdRetrievalsCount": 3,
+    "dstBucket": "dst-bucket",
+    "srcBucket": "src-bucket",
+    "prefixFilters": ["pref1", "pref2"],
+    "skipOlderThan": "2022-11-30T00:00:00Z",
+    "level": "info",
+    "message": "completed replication verification",
+    "hostname": "scality.local",
+    "pid": 24780
 }
 ```
 
@@ -2242,7 +2240,6 @@ REST API to provide service level reports for UtapiV2
 
 ## Usage
 
-
 **Using Warp 10 backend**
 
 ```shell
@@ -2255,6 +2252,7 @@ docker run -d \
 ```
 
 **Using Scuba backend**
+
 ```shell
 docker run -d \
   --network=host \
@@ -2266,6 +2264,7 @@ docker run -d \
 ```
 
 **Example output**
+
 ```shell
 curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report | jq
 {
@@ -2322,7 +2321,15 @@ curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/re
 By default a random API key is generated and logged to stdout at startup.
 
 ```json
-{"name":"s3utils::utapi-service-sidecar","time":1669677797644,"key":"c489cc0f5bec1c757be7aecd7cdd61dc9db5bfbc4e4f7bad","level":"info","message":"using random API key","hostname":"f2988d47e450","pid":1}
+{
+    "name": "s3utils::utapi-service-sidecar",
+    "time": 1669677797644,
+    "key": "c489cc0f5bec1c757be7aecd7cdd61dc9db5bfbc4e4f7bad",
+    "level": "info",
+    "message": "using random API key",
+    "hostname": "f2988d47e450",
+    "pid": 1
+}
 ```
 
 A custom static key can be set using the `SIDECAR_API_KEY` environment variable.
@@ -2385,6 +2392,7 @@ docker run -d \
 ```
 
 ### Backend addresses
+
 #### Vault
 
 Vault is configured using `SIDECAR_VAULT_ENDPOINT`

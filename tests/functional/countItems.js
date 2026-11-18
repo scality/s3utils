@@ -8,9 +8,7 @@ const CountMaster = require('../../CountItems/CountMaster');
 const CountManager = require('../../CountItems/CountManager');
 const createMongoParams = require('../../utils/createMongoParams');
 const createWorkers = require('../../CountItems/utils/createWorkers');
-const {
-    testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo,
-} = require('../constants');
+const { testBucketMD, testAccountCanonicalId, testBucketCreationDate, testUserBucketInfo } = require('../constants');
 
 const logger = new werelogs.Logger('CountItems::Test::Functional');
 const { MONGODB_REPLICASET } = process.env;
@@ -105,13 +103,16 @@ const expectedDataMetrics = {
         usedCapacity: { current: 0n, nonCurrent: 0n },
     },
     'location_secondary-location-1': {
-        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n }, usedCapacity: { current: 3000n, nonCurrent: 3000n },
+        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+        usedCapacity: { current: 3000n, nonCurrent: 3000n },
     },
     'location_secondary-location-2': {
-        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n }, usedCapacity: { current: 3000n, nonCurrent: 3000n },
+        objectCount: { current: 30n, deleteMarker: 0n, nonCurrent: 30n },
+        usedCapacity: { current: 3000n, nonCurrent: 3000n },
     },
     'location_us-east-1': {
-        objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n }, usedCapacity: { current: 9000n, nonCurrent: 6000n },
+        objectCount: { current: 90n, deleteMarker: 0n, nonCurrent: 60n },
+        usedCapacity: { current: 9000n, nonCurrent: 6000n },
     },
 };
 
@@ -129,97 +130,138 @@ const testBuckets = Array.from(Array(9)).map((_, n) => {
         ...testBucketMD,
         _name: bucketName,
     };
-    if (n < 3) { // non versioned buckets
+    if (n < 3) {
+        // non versioned buckets
         return BucketInfo.fromObj(bucketMD);
     }
-    if (n >= 3 && n < 6) { // versioned buckets
+    if (n >= 3 && n < 6) {
+        // versioned buckets
         return BucketInfo.fromObj({ ...bucketMD, _versioningConfiguration: { Status: 'Enabled' } });
     }
     return BucketInfo.fromObj({ ...bucketMD, _versioningConfiguration: { Status: 'Suspended' } }); // suspended buckets
 });
 
 function populateMongo(client, callback) {
-    return async.eachSeries(testBuckets, (testBucket, cb) => async.series([
-        next => client.createBucket(testBucket.getName(), testBucket, logger, next),
-        next => client.putObject(
-            USERSBUCKET,
-            `${testBucket.getOwner()}${constants.splitter}${testBucket.getName()}`,
-            testUserBucketInfo.value,
-            {
-                versioning: false,
-                versionId: null,
-            },
-            logger,
-            next,
-        ), // put bucket entry in __usersbucket
-        next => async.timesSeries(10, (m, done) => {
-            const objName = `test-object-${m}`;
-            const objMD = new ObjectMD()
-                .setKey(objName)
-                .setDataStoreName('us-east-1')
-                .setContentLength(100)
-                .setLastModified('2020-01-01T00:00:00.000Z')
-                .setOwnerId(testAccountCanonicalId);
-            if (testBucket.getVersioningConfiguration()
-                && testBucket.getVersioningConfiguration().Status === 'Enabled') {
-                objMD.setReplicationInfo({
-                    status: 'COMPLETED',
-                    backends: [
-                        {
-                            status: 'COMPLETED',
-                            site: 'secondary-location-1',
-                        },
-                        {
-                            status: 'COMPLETED',
-                            site: 'secondary-location-2',
-                        },
-                    ],
-                });
-                return async.timesSeries(2, (z, done2) => client.putObject(
-                    testBucket.getName(),
-                    objName,
-                    objMD.getValue(),
-                    {
-                        versionId: null,
-                        versioning: true,
-                    },
-                    logger,
-                    done2,
-                ), done);
-            }
-            if (testBucket.getVersioningConfiguration()
-                && testBucket.getVersioningConfiguration().Status === 'Suspended') {
-                return async.timesSeries(2, (z, done2) => client.putObject(
-                    testBucket.getName(),
-                    objName,
-                    z === 0 ? objMD.getValue() : { ...objMD.getValue(), isNull: true },
-                    z === 0 ? { versionId: null, versioning: true } : { versionId: null },
-                    logger,
-                    done2,
-                ), done);
-            }
-            return client.putObject(testBucket.getName(), objName, objMD.getValue(), null, logger, done);
-        }, next),
-    ], cb), callback);
+    return async.eachSeries(
+        testBuckets,
+        (testBucket, cb) =>
+            async.series(
+                [
+                    next => client.createBucket(testBucket.getName(), testBucket, logger, next),
+                    next =>
+                        client.putObject(
+                            USERSBUCKET,
+                            `${testBucket.getOwner()}${constants.splitter}${testBucket.getName()}`,
+                            testUserBucketInfo.value,
+                            {
+                                versioning: false,
+                                versionId: null,
+                            },
+                            logger,
+                            next,
+                        ), // put bucket entry in __usersbucket
+                    next =>
+                        async.timesSeries(
+                            10,
+                            (m, done) => {
+                                const objName = `test-object-${m}`;
+                                const objMD = new ObjectMD()
+                                    .setKey(objName)
+                                    .setDataStoreName('us-east-1')
+                                    .setContentLength(100)
+                                    .setLastModified('2020-01-01T00:00:00.000Z')
+                                    .setOwnerId(testAccountCanonicalId);
+                                if (
+                                    testBucket.getVersioningConfiguration() &&
+                                    testBucket.getVersioningConfiguration().Status === 'Enabled'
+                                ) {
+                                    objMD.setReplicationInfo({
+                                        status: 'COMPLETED',
+                                        backends: [
+                                            {
+                                                status: 'COMPLETED',
+                                                site: 'secondary-location-1',
+                                            },
+                                            {
+                                                status: 'COMPLETED',
+                                                site: 'secondary-location-2',
+                                            },
+                                        ],
+                                    });
+                                    return async.timesSeries(
+                                        2,
+                                        (z, done2) =>
+                                            client.putObject(
+                                                testBucket.getName(),
+                                                objName,
+                                                objMD.getValue(),
+                                                {
+                                                    versionId: null,
+                                                    versioning: true,
+                                                },
+                                                logger,
+                                                done2,
+                                            ),
+                                        done,
+                                    );
+                                }
+                                if (
+                                    testBucket.getVersioningConfiguration() &&
+                                    testBucket.getVersioningConfiguration().Status === 'Suspended'
+                                ) {
+                                    return async.timesSeries(
+                                        2,
+                                        (z, done2) =>
+                                            client.putObject(
+                                                testBucket.getName(),
+                                                objName,
+                                                z === 0 ? objMD.getValue() : { ...objMD.getValue(), isNull: true },
+                                                z === 0 ? { versionId: null, versioning: true } : { versionId: null },
+                                                logger,
+                                                done2,
+                                            ),
+                                        done,
+                                    );
+                                }
+                                return client.putObject(
+                                    testBucket.getName(),
+                                    objName,
+                                    objMD.getValue(),
+                                    null,
+                                    logger,
+                                    done,
+                                );
+                            },
+                            next,
+                        ),
+                ],
+                cb,
+            ),
+        callback,
+    );
 }
 
 const emptyBucket = BucketInfo.fromObj({ ...testBucketMD, _name: 'test-bucket-empty' });
 
 function populateEmptyBucket(client, callback) {
-    return async.series([
-        next => client.createBucket(emptyBucket.getName(), emptyBucket, logger, next),
-        next => client.putObject(
-            USERSBUCKET,
-            `${emptyBucket.getOwner()}${constants.splitter}${emptyBucket.getName()}`,
-            testUserBucketInfo.value,
-            {
-                versioning: false,
-                versionId: null,
-            },
-            logger,
-            next,
-        ),
-    ], callback);
+    return async.series(
+        [
+            next => client.createBucket(emptyBucket.getName(), emptyBucket, logger, next),
+            next =>
+                client.putObject(
+                    USERSBUCKET,
+                    `${emptyBucket.getOwner()}${constants.splitter}${emptyBucket.getName()}`,
+                    testUserBucketInfo.value,
+                    {
+                        versioning: false,
+                        versionId: null,
+                    },
+                    logger,
+                    next,
+                ),
+        ],
+        callback,
+    );
 }
 
 jest.setTimeout(120000);
@@ -242,64 +284,76 @@ describe('CountItems', () => {
             logger,
         };
         client = new S3UtilsMongoClient(opts);
-        async.series([
-            next => client.setup(next),
-            next => populateMongo(client, next),
-            next => populateEmptyBucket(client, next),
-        ], done);
+        async.series(
+            [
+                next => client.setup(next),
+                next => populateMongo(client, next),
+                next => populateEmptyBucket(client, next),
+            ],
+            done,
+        );
         setTimeoutSpy = jest.spyOn(global, 'setTimeout');
         setTimeoutSpy.mockImplementation(callback => callback());
     });
 
     afterAll(done => {
         setTimeoutSpy.mockRestore();
-        async.series([
-            next => client.db.dropDatabase().then(() => next()).catch(() => next()),
-            next => client.close(next),
-        ], done);
+        async.series(
+            [
+                next =>
+                    client.db
+                        .dropDatabase()
+                        .then(() => next())
+                        .catch(() => next()),
+                next => client.close(next),
+            ],
+            done,
+        );
     });
 
+    test.each([1, 4])('should successfully countItems with %i worker(s)', (cnt, done) => {
+        cluster.setupMaster({
+            exec: require.resolve('../../countItems.js'),
+        });
+        const countMaster = new CountMaster({
+            log: logger,
+            manager: new CountManager({
+                log: new werelogs.Logger('S3Utils::CountItems::Manager'),
+                workers: createWorkers(cnt),
+                maxConcurrent: 5,
+            }),
+            client: new S3UtilsMongoClient(createMongoParams(logger)),
+        });
 
-    test.each([1, 4])(
-        'should successfully countItems with %i worker(s)',
-        (cnt, done) => {
-            cluster.setupMaster({
-                exec: require.resolve('../../countItems.js'),
-            });
-            const countMaster = new CountMaster({
-                log: logger,
-                manager: new CountManager({
-                    log: new werelogs.Logger('S3Utils::CountItems::Manager'),
-                    workers: createWorkers(cnt),
-                    maxConcurrent: 5,
-                }),
-                client: new S3UtilsMongoClient(createMongoParams(logger)),
-            });
-
-            async.series([
-                next => countMaster.start(err => {
-                    expect(err).toBeFalsy();
-                    return next();
-                }),
-                next => client.readCountItems(logger, (err, res) => {
-                    expect(err).toBeFalsy();
-                    expect(res).toMatchObject(expectedCountItems);
-                    expect(res.bucketList)
-                        .toEqual(expect.arrayContaining(expectedBucketList));
-                    return next();
-                }),
-                next => async.eachSeries(
-                    Object.keys(expectedDataMetrics),
-                    (entity, cb) => client.readStorageConsumptionMetrics(entity, logger, (err, res) => {
+        async.series(
+            [
+                next =>
+                    countMaster.start(err => {
                         expect(err).toBeFalsy();
-                        expect(res.usedCapacity).toMatchObject(expectedDataMetrics[entity].usedCapacity);
-                        expect(res.objectCount).toMatchObject(expectedDataMetrics[entity].objectCount);
-                        expect(res.measuredOn).not.toBeNull();
-                        return cb();
+                        return next();
                     }),
-                    () => next(),
-                ),
-            ], () => countMaster.stop(null, done));
-        },
-    );
+                next =>
+                    client.readCountItems(logger, (err, res) => {
+                        expect(err).toBeFalsy();
+                        expect(res).toMatchObject(expectedCountItems);
+                        expect(res.bucketList).toEqual(expect.arrayContaining(expectedBucketList));
+                        return next();
+                    }),
+                next =>
+                    async.eachSeries(
+                        Object.keys(expectedDataMetrics),
+                        (entity, cb) =>
+                            client.readStorageConsumptionMetrics(entity, logger, (err, res) => {
+                                expect(err).toBeFalsy();
+                                expect(res.usedCapacity).toMatchObject(expectedDataMetrics[entity].usedCapacity);
+                                expect(res.objectCount).toMatchObject(expectedDataMetrics[entity].objectCount);
+                                expect(res.measuredOn).not.toBeNull();
+                                return cb();
+                            }),
+                        () => next(),
+                    ),
+            ],
+            () => countMaster.stop(null, done),
+        );
+    });
 });
