@@ -42,7 +42,7 @@ function httpRequest(method, url, retryParams) {
                         resolve(r);
                     });
                     r.once('error', err =>
-                        reject(new Error('error reading response from HTTP request ' + `to ${url}: ${err.message}`)),
+                        reject(new Error(`error reading response from HTTP request to ${url}: ${err.message}`)),
                     );
                 },
             );

@@ -169,7 +169,7 @@ function listObjectsByReplicationStatus(options) {
         }
     }
 
-    log.info('Objects with replication status ' + `${replicationStatusToProcess.join(' or ')} will be listed`);
+    log.info(`Objects with replication status ${replicationStatusToProcess.join(' or ')} will be listed`);
 
     const s3 = new S3Client({
         region: 'us-east-1',

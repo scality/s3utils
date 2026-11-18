@@ -279,7 +279,7 @@ describe('listVersions', () => {
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2` + '?versionId=vid2',
+                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2?versionId=vid2`,
                     status: 200,
                     body: {
                         'content-length': 1024,
@@ -313,7 +313,7 @@ describe('listVersions', () => {
                     }),
                 },
                 {
-                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2` + '?versionId=vid2',
+                    url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key2?versionId=vid2`,
                     status: 404,
                 },
             ]);
@@ -441,7 +441,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 200,
                         body: {
                             'content-length': 1024,
@@ -481,7 +481,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -525,7 +525,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -538,7 +538,7 @@ describe('listVersions', () => {
                         },
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=null',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=null`,
                         status: 200,
                         body: {
                             'content-length': 1024,
@@ -578,7 +578,7 @@ describe('listVersions', () => {
                         }),
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=vid1',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=vid1`,
                         status: 404,
                     },
                     {
@@ -586,7 +586,7 @@ describe('listVersions', () => {
                         status: 404,
                     },
                     {
-                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1` + '?versionId=null',
+                        url: `http://${BUCKETD_HOSTPORT}/default/bucket/${BUCKET}/key1?versionId=null`,
                         status: 404,
                     },
                 ]);

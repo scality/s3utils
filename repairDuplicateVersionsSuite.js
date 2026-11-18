@@ -91,7 +91,7 @@ function httpRequest(method, url, reqBody, cb) {
                 return cbOnce(null, res);
             });
             return res.once('error', err =>
-                cbOnce(new Error('error reading response from HTTP request ' + `to ${url}: ${err.message}`)),
+                cbOnce(new Error(`error reading response from HTTP request to ${url}: ${err.message}`)),
             );
         },
     );

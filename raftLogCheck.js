@@ -62,7 +62,7 @@ function compareWithLeaderLog(leaderLog, connected, seq, cb) {
         connected,
         (member, cb) => {
             getUrl(
-                `${protocol}://${member.host}:${member.adminPort}` + `/_/raft/log?begin=${seq}&limit=${pageSize}`,
+                `${protocol}://${member.host}:${member.adminPort}/_/raft/log?begin=${seq}&limit=${pageSize}`,
                 (err, memberLog) => {
                     if (err) {
                         return cb(err);
@@ -171,7 +171,7 @@ async.waterfall(
     [
         next => {
             getUrl(
-                `${protocol}://${bucketdHost}:${bucketdPort}/` + `_/raft_sessions/${raftSession}/info`,
+                `${protocol}://${bucketdHost}:${bucketdPort}/_/raft_sessions/${raftSession}/info`,
                 (err, info) => {
                     if (err) {
                         log.error('fetching info', { error: err.message });
@@ -202,7 +202,7 @@ async.waterfall(
                 cb => {
                     log.info('page', { seq, pageSize });
                     getUrl(
-                        `${protocol}://${leaderHost}:${leaderPort}/` + `_/raft/log?begin=${seq}&limit=${pageSize}`,
+                        `${protocol}://${leaderHost}:${leaderPort}/_/raft/log?begin=${seq}&limit=${pageSize}`,
                         (err, leaderLog) => {
                             if (err) {
                                 log.error('getting leader log', { error: err.message });

@@ -34,7 +34,7 @@ function httpRequest(method, url, cb) {
                 return cbOnce(null, res);
             });
             res.once('error', err =>
-                cbOnce(new Error('error reading response from HTTP request ' + `to ${url}: ${err.message}`)),
+                cbOnce(new Error(`error reading response from HTTP request to ${url}: ${err.message}`)),
             );
             return undefined;
         },

@@ -344,7 +344,7 @@ describe('RepairObjects.getRepairStrategy()', () => {
         const keyDesc = testCase.leaderState.refreshedMasterMd ? 'versioned' : 'non-versioned';
         const sourceDesc = testCase.expectedRepairSource ? ` from ${testCase.expectedRepairSource}` : '';
         const testDesc =
-            `${keyDesc} key ${testCase.desc} should give status ` + `${testCase.expectedRepairStatus}${sourceDesc}`;
+            `${keyDesc} key ${testCase.desc} should give status ${testCase.expectedRepairStatus}${sourceDesc}`;
         test(testDesc, () => {
             const repairStrategy = getRepairStrategy(testCase.followerState, testCase.leaderState);
             expect(repairStrategy.status).toEqual(testCase.expectedRepairStatus);

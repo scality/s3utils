@@ -346,7 +346,7 @@ class ReplicationSiteRemover {
                     const remaining = this.buckets.slice(bucketDone ? i + 1 : i);
                     if (remaining.length > 0) {
                         let message =
-                            `reached ${limit}, resume by re-running ` + `with the bucket list "${remaining.join(',')}"`;
+                            `reached ${limit}, resume by re-running with the bucket list "${remaining.join(',')}"`;
                         if (!bucketDone) {
                             message += ` and KEY_MARKER=${this._keyMarker} VERSION_ID_MARKER=${this._versionIdMarker}`;
                         }

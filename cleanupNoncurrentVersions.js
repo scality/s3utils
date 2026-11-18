@@ -120,7 +120,7 @@ if (DELETED_BEFORE && Number.isNaN(DELETED_BEFORE.getTime())) {
 }
 
 function _encodeMarker(bucket, key, versionId) {
-    return `${encodeURI(bucket)}` + `|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
+    return `${encodeURI(bucket)}|${encodeURI(key || '')}|${encodeURI(versionId || '')}`;
 }
 
 function _parseMarker(marker) {
@@ -536,7 +536,7 @@ function triggerDeletesOnBucket(bucketName, cb) {
         MARKER_KEY = undefined;
         MARKER_VERSION_ID = undefined;
         log.info(
-            `resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} ` + `VersionIdMarker=${NextVersionIdMarker}`,
+            `resuming at: bucket=${bucket} KeyMarker=${NextKeyMarker} VersionIdMarker=${NextVersionIdMarker}`,
         );
     }
     bucketInProgress = bucket;
