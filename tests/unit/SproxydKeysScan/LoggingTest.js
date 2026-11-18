@@ -17,7 +17,7 @@ describe('SproxydKeysScan:Logging', () => {
         });
         test('it is a singleton', () => {
             const { debug } = aggregateLogger.log;
-            expect(AggregateLogger.hasOwnProperty('_instance')).toBe(true);
+            expect(Object.hasOwn(AggregateLogger, '_instance')).toBe(true);
             const anotherAggregateLogger = new AggregateLogger(10);
             expect(debug).toHaveBeenCalled();
             const message = 'AggregateLogger is a singleton and has been instatiated. This instantiation is ignored';
