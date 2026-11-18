@@ -198,7 +198,7 @@ class RaftJournalReader {
 
                     const bucket = record.db;
 
-                    let json = null;
+                    let json;
                     try {
                         json = JSON.parse(entry.value);
                     } catch (err) {
