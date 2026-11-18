@@ -2,7 +2,6 @@
 
 const { http, https } = require('httpagent');
 const async = require('async');
-const crypto = require('crypto');
 const { 
     S3Client, 
     GetBucketVersioningCommand,

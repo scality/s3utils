@@ -87,7 +87,7 @@ describe('listObjectsByReplicationStatus', () => {
                 replicationStatus: 'PENDING', // Choose a valid status
                 logger: captureLogger,
             });
-        } catch (err) {
+        } catch {
             // The function may throw, but regardless we want to inspect the logs
         } finally {
             // Clean up the account
@@ -103,7 +103,6 @@ describe('listObjectsByReplicationStatus', () => {
         // Create an IAM user in accountSource with a restrictive policy
         const restrictedUserName = `list-only-user-${Date.now()}`;
         const s3ResourceArn = `arn:aws:s3:::${accountSource.bucketName}`;
-        const s3ObjectResourceArn = `arn:aws:s3:::${accountSource.bucketName}/*`;
 
         // Create the user
         await accountSource.iamClient.send(new CreateUserCommand({
@@ -179,7 +178,7 @@ describe('listObjectsByReplicationStatus', () => {
                 replicationStatus: 'PENDING',
                 logger: captureLogger,
             });
-        } catch (err) {
+        } catch {
             // Swallow error, we're inspecting logs
         } 
 

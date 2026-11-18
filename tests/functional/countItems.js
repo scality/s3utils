@@ -248,7 +248,7 @@ describe('CountItems', () => {
             next => populateEmptyBucket(client, next),
         ], done);
         setTimeoutSpy = jest.spyOn(global, 'setTimeout');
-        setTimeoutSpy.mockImplementation((callback, delay) => callback());
+        setTimeoutSpy.mockImplementation(callback => callback());
     });
 
     afterAll(done => {

@@ -13,7 +13,6 @@ const {
     OBJECT_REPAIR_BUCKETD_HOSTPORT,
     OBJECT_REPAIR_TLS_KEY_PATH,
     OBJECT_REPAIR_TLS_CERT_PATH,
-    OBJECT_REPAIR_TLS_CA_PATH,
 } = process.env;
 
 const useHttps = (OBJECT_REPAIR_TLS_KEY_PATH !== undefined
@@ -93,7 +92,7 @@ function readVerifyLog(cb) {
                 firstVersionId: parsedLine.firstVersionId,
                 versionedKeyUrl: parsedLine.versionedKeyUrl,
             });
-        } catch (err) {
+        } catch {
             log.info('ignoring malformed JSON line');
         }
         return undefined;

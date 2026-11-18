@@ -185,7 +185,7 @@ class S3UtilsMongoClient extends MongoClientInterface {
             const getUsersBucketCreationDateAsync = promisify(this.getUsersBucketCreationDate).bind(this);
             try {
                 bucketCreationDate = await getUsersBucketCreationDateAsync(bucketInfo.getOwner(), bucketName, log);
-            } catch (err) {
+            } catch {
                 return callback(errors.InternalError);
             }
 

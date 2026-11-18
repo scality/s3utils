@@ -5,7 +5,6 @@ const { NotFound } = require('@aws-sdk/client-s3');
 
 let bucketMatch = false;
 let compareSize = false;
-let compareAllVersions = false;
 let destinationStorage = null;
 let destinationClient = null;
 let listingLimit = null;
@@ -141,7 +140,6 @@ function verifyReplication(params, cb) {
     logger = log;
     statusObj = status;
     compareSize = verification.compareObjectSize;
-    compareAllVersions = verification.compareObjectAllVersions;
     sourceStorage = storage[source.storageType];
     destinationStorage = storage[destination.storageType];
     sourceClient = sourceStorage.getClient({ ...source, log });

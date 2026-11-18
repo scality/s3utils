@@ -2,7 +2,6 @@ const {
     waterfall, doWhilst, eachLimit, retry,
 } = require('async');
 const http = require('http');
-const { http: httpArsn } = require('httpagent');
 const { Producer } = require('node-rdkafka');
 const { scheduleJob } = require('node-schedule');
 
@@ -207,7 +206,7 @@ function _requeueAll() {
                     let result;
                     try {
                         result = JSON.parse(body);
-                    } catch (err) {
+                    } catch {
                         log.error('invalid response: not JSON');
                         return batchDone(errors.InternalError);
                     }

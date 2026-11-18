@@ -1,6 +1,5 @@
 const { errors } = require('@scality/arsenal');
 const promClient = require('prom-client');
-const { http } = require('httpagent');
 const cluster = require('cluster');
 
 const aggregatorRegistry = new promClient.AggregatorRegistry();

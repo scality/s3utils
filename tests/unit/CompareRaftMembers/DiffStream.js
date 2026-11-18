@@ -26,7 +26,7 @@ class MockBucketStream extends stream.Readable {
         MOCK_BUCKET_STREAM_REQUESTS_MADE.push({ bucketName, marker, lastKey });
 
         this.listingToSend = MOCK_BUCKET_STREAM_FULL_LISTING.filter(item => {
-            const { key, value } = item;
+            const { key } = item;
             const slashIndex = key.indexOf('/');
             const [itemBucketName, objectKey] = [key.slice(0, slashIndex), key.slice(slashIndex + 1)];
             if (itemBucketName !== bucketName) {

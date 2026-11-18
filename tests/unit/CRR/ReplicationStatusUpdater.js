@@ -10,7 +10,6 @@ const {
     listVersionWithMarkerRes,
     getMetadataRes,
     getBucketReplicationV2Res,
-    objectMd,
 } = require('../../utils/crr');
 
 const logger = new werelogs.Logger('ReplicationStatusUpdater::tests', 'debug', 'debug');

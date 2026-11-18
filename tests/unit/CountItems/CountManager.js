@@ -5,7 +5,7 @@ const CountManager = require('../../../CountItems/CountManager');
 const DummyLogger = require('../../mocks/DummyLogger');
 const CountWorkerObj = require('../../mocks/CountWorkerObj');
 
-const { testBucketMD, internalTestBucketMD } = require('../../constants');
+const { internalTestBucketMD } = require('../../constants');
 const stringifiedBucketMD = JSON.stringify(internalTestBucketMD);
 
 const createWorkers = numWorkers => {

@@ -89,7 +89,7 @@ class RaftJournalReader {
                 try {
                     const body = JSON.parse(res.body);
                     this._setCseq(body);
-                } catch (err) {
+                } catch {
                     log.error('unable to fetch cseq: invalid JSON in response body');
                     return cb(errors.InternalError);
                 }
@@ -154,7 +154,7 @@ class RaftJournalReader {
             let body;
             try {
                 body = JSON.parse(res.body);
-            } catch (err) {
+            } catch {
                 return cb(new Error(`GET ${requestUrl}: invalid JSON in response body`));
             }
             // FIXME this special case should be taken care of once S3C-3928 is fixed
@@ -201,7 +201,7 @@ class RaftJournalReader {
                     let json;
                     try {
                         json = JSON.parse(entry.value);
-                    } catch (err) {
+                    } catch {
                         log.error('json corrupted', {
                             begin: this.begin,
                             limit: this.limit,

@@ -42,9 +42,7 @@ class MongoClientInterfaceStalled extends MongoClientInterface {
         let stalledCount = 0;
         try {
             const collections = await this.db.listCollections().toArray();
-            let i = 0;
             return async.eachSeries(collections, (value, next) => {
-                i++;
                 if (this._isSpecialCollection(value.name)) {
                     // skip
                     return next();

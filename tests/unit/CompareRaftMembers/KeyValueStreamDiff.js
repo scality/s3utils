@@ -1,4 +1,3 @@
-const async = require('async');
 const stream = require('stream');
 
 const KeyValueStreamDiff = require('../../../CompareRaftMembers/KeyValueStreamDiff');

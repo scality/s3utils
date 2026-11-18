@@ -18,7 +18,7 @@ class StalledRequestHandler {
 
     queueSetup() {
         this._queue = async.queue((task, done) => {
-            const { bucket, batch, getNext } = task;
+            const { batch, getNext } = task;
             
             if (this.queueError !== null) {
                 return done();

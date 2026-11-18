@@ -148,7 +148,7 @@ function readVerifyLog(cb) {
                 objectUrl: parsedLine.objectUrl,
                 objectUrl2: parsedLine.objectUrl2,
             });
-        } catch (err) {
+        } catch {
             log.info('ignoring malformed JSON line');
         }
         return undefined;

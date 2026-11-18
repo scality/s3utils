@@ -1,7 +1,3 @@
-const { versioning } = require('@scality/arsenal');
-
-const VID_SEP = versioning.VersioningConstants.VersionId.Separator;
-
 function getRepairStrategy(followerState, leaderState) {
     if (leaderState.refreshedMd) {
         if (!leaderState.diffMd) {

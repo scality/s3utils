@@ -1,5 +1,4 @@
 const fs = require('fs');
-const werelogs = require('werelogs');
 // Mock the entire werelogs module
 const mockFatal = jest.fn();
 const mockInfo = jest.fn();
