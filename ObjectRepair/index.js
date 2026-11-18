@@ -58,7 +58,7 @@ for (const [key, value] of Object.entries(env)) {
 function runJournalReader() {
     if (env.OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ === null) {
         log.info(
-            'OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ is not defined.' +
+            'OBJECT_REPAIR_RAFT_LOG_BEGIN_SEQ is not defined. ' +
                 'Ingestion will start at latest cseq - OBJECT_REPAIR_LOOKBACK_WINDOW',
         );
     }

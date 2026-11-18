@@ -1044,7 +1044,7 @@ describe('S3UtilsMongoClient::getObjectMDStats', () => {
                 );
 
                 it(
-                    'should get correct results with lifecycle replication enabled' +
+                    'should get correct results with lifecycle replication enabled ' +
                         `and location transient is false ${variation.it}`,
                     done => {
                         const expected = {
