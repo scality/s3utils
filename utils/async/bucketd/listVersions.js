@@ -43,7 +43,7 @@ async function fetchFullObjectMetadata(bucketdHostport, bucket, key, versionId, 
         try {
             return JSON.parse(res.body);
         } catch (e) {
-            throw new Error(`failed to parse metadata from ${url}: ${e.message}`);
+            throw new Error(`failed to parse metadata from ${url}: ${e.message}`, { cause: e });
         }
     }
 
