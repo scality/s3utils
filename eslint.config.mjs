@@ -7,11 +7,15 @@ export default defineConfig(
     {
         languageOptions: {
             ecmaVersion: 2020,
-            sourceType: 'script',
         },
         rules: {
             'max-len': 'off',
-            'no-redeclare': 'off',
+        },
+    },
+    {
+        files: ['**/*.js'],
+        languageOptions: {
+            sourceType: 'commonjs',
         },
     },
     jest(['tests/**/*.js']),
