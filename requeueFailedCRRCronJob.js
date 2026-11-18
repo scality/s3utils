@@ -28,8 +28,7 @@ if (!SECRET_KEY) {
 }
 if (!SITE_NAME) {
     throw new Error(
-        'missing SITE_NAME environment variable, must be set to' +
-            ' the value of "site" property in the CRR configuration',
+        'missing SITE_NAME environment variable, must be set to the value of "site" property in the CRR configuration',
     );
 }
 if (!KAFKA_HOSTS) {

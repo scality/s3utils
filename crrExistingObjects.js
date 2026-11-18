@@ -57,9 +57,8 @@ const replicationStatusToProcess = TARGET_REPLICATION_STATUS.split(',');
 replicationStatusToProcess.forEach(state => {
     if (!['NEW', 'PENDING', 'COMPLETED', 'FAILED', 'REPLICA'].includes(state)) {
         log.fatal(
-            'invalid TARGET_REPLICATION_STATUS environment: must be a ' +
-                'comma-separated list of replication statuses to requeue, ' +
-                'as NEW,PENDING,COMPLETED,FAILED,REPLICA.',
+            'invalid TARGET_REPLICATION_STATUS environment: must be a comma-separated list ' +
+                'of replication statuses to requeue, as NEW,PENDING,COMPLETED,FAILED,REPLICA.',
         );
         process.exit(1);
     }
