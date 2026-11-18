@@ -64,8 +64,7 @@ replicationStatusToProcess.forEach(state => {
     }
 });
 log.info(
-    'Objects with replication status ' +
-        `${replicationStatusToProcess.join(' or ')} ` +
+    `Objects with replication status ${replicationStatusToProcess.join(' or ')} ` +
         'will be reset to PENDING to trigger CRR',
 );
 

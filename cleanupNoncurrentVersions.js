@@ -600,12 +600,9 @@ function triggerDeletesOnBucket(bucketName, cb) {
                     _logProgress('final summary');
                     const marker = _encodeMarker(bucket, KeyMarker, VersionIdMarker);
                     const message =
-                        'reached ' +
-                        `${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} ` +
-                        'count limit, resuming from this point can be ' +
-                        'achieved by re-running the script with the same ' +
-                        'bucket list and the following environment variable ' +
-                        `set: MARKER='${marker}'`;
+                        `reached ${nDeleted >= MAX_DELETES ? 'delete' : 'scanned'} count limit, ` +
+                        'resuming from this point can be achieved by re-running the script with the ' +
+                        `same bucket list and the following environment variable set: MARKER='${marker}'`;
                     log.info(message);
                     process.exit(0);
                 }

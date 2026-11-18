@@ -391,16 +391,14 @@ class ReplicationStatusUpdater {
         if (!this._unknownSite) {
             this._unknownSite = { bucket, key, versionId };
             this.log.error(
-                'unknown replication site, run stopped. SITE_NAME is not a site ' +
-                    'of this object or of the bucket rules. Expected for the S3C default site ' +
-                    '(rules without StorageClass), e.g. DR failback or renamed DR site. ' +
-                    'Objects processed before this point may already have this SITE_NAME: ' +
-                    'if SITE_NAME is wrong, run removeReplicationSite (dry run) with ' +
-                    `SITE_TO_REMOVE=${this.siteName} on these buckets to find and remove it. ` +
-                    'If it reset objects, re-run with the right SITE_NAME from the start of ' +
-                    'this run (same bucket list and markers): the reset objects are before ' +
-                    'the resume point. Otherwise re-run from the resume point with the right ' +
-                    'SITE_NAME, or with ALLOW_NEW_SITE=true',
+                'unknown replication site, run stopped. SITE_NAME is not a site of this object or of ' +
+                    'the bucket rules. Expected for the S3C default site (rules without StorageClass), ' +
+                    'e.g. DR failback or renamed DR site. Objects processed before this point may already ' +
+                    'have this SITE_NAME: if SITE_NAME is wrong, run removeReplicationSite (dry run) with ' +
+                    `SITE_TO_REMOVE=${this.siteName} on these buckets to find and remove it. If it reset ` +
+                    'objects, re-run with the right SITE_NAME from the start of this run (same bucket ' +
+                    'list and markers): the reset objects are before the resume point. Otherwise re-run ' +
+                    'from the resume point with the right SITE_NAME, or with ALLOW_NEW_SITE=true',
                 {
                     bucket,
                     key,
@@ -769,8 +767,7 @@ class ReplicationStatusUpdater {
             this.inputKeyMarker = undefined;
             this.inputVersionIdMarker = undefined;
             this.log.info(
-                `resuming bucket: ${bucket} at: KeyMarker=${this._KeyMarker} ` +
-                    `VersionIdMarker=${this._VersionIdMarker}`,
+                `resuming bucket: ${bucket} at: KeyMarker=${this._KeyMarker} VersionIdMarker=${this._VersionIdMarker}`,
             );
         }
         return doWhilst(
@@ -811,16 +808,13 @@ class ReplicationStatusUpdater {
                         );
                     }
                     let message =
-                        'reached ' +
-                        `${this._nUpdated >= this.maxUpdates ? 'update' : 'scanned'} ` +
-                        'count limit, resuming from this ' +
-                        'point can be achieved by re-running the script with ' +
-                        `the bucket list "${remainingBuckets.join(',')}"`;
+                        `reached ${this._nUpdated >= this.maxUpdates ? 'update' : 'scanned'} ` +
+                        'count limit, resuming from this point can be achieved by re-running ' +
+                        `the script with the bucket list "${remainingBuckets.join(',')}"`;
                     if (this._VersionIdMarker || this._KeyMarker) {
                         message +=
                             ' and the following environment variables set: ' +
-                            `KEY_MARKER=${this._KeyMarker} ` +
-                            `VERSION_ID_MARKER=${this._VersionIdMarker}`;
+                            `KEY_MARKER=${this._KeyMarker} VERSION_ID_MARKER=${this._VersionIdMarker}`;
                     }
                     this.log.info(message);
                     return false;
@@ -840,14 +834,12 @@ class ReplicationStatusUpdater {
                 this._logProgress();
                 if (this._unknownSite) {
                     let message =
-                        'stopped on an unknown replication site, resume by re-running ' +
-                        'the script with the bucket list ' +
-                        `"${this.buckets.slice(this.buckets.indexOf(bucketName)).join(',')}"`;
+                        'stopped on an unknown replication site, resume by re-running the script with the ' +
+                        `bucket list "${this.buckets.slice(this.buckets.indexOf(bucketName)).join(',')}"`;
                     if (this._VersionIdMarker || this._KeyMarker) {
                         message +=
                             ' and the following environment variables set: ' +
-                            `KEY_MARKER=${this._KeyMarker} ` +
-                            `VERSION_ID_MARKER=${this._VersionIdMarker}`;
+                            `KEY_MARKER=${this._KeyMarker} VERSION_ID_MARKER=${this._VersionIdMarker}`;
                     }
                     this.log.error(message);
                     cb(new Error('stopped on an unknown replication site'));

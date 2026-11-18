@@ -173,8 +173,7 @@ function setupFromUrl(fromUrl) {
     const bucketIndex = remainingBuckets.indexOf(bucket);
     if (bucketIndex === -1) {
         console.error(
-            `ERROR: FROM_URL bucket ${bucket} ` +
-                `${BUCKETS ? 'is not in BUCKETS' : 'does not belong to RAFT_SESSIONS'}`,
+            `ERROR: FROM_URL bucket ${bucket} ${BUCKETS ? 'is not in BUCKETS' : 'does not belong to RAFT_SESSIONS'}`,
         );
         console.error(USAGE);
         process.exit(1);
