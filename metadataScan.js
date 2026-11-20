@@ -14,35 +14,8 @@ const FindDuplicateSproxydKeys = require('./MetadataScan/FindDuplicateSproxydKey
 const validateLocations = require('./MetadataScan/validateLocations');
 const BlockDigestsStream = require('./CompareRaftMembers/BlockDigestsStream');
 const BlockDigestsStorage = require('./CompareRaftMembers/BlockDigestsStorage');
-
-const DEFAULT_WORKERS = 100;
-const DEFAULT_LOG_PROGRESS_INTERVAL = 10;
-const DEFAULT_LISTING_LIMIT = 1000;
-const DEFAULT_LISTING_DIGESTS_BLOCK_SIZE = 1000;
-
-const {
-    BUCKETD_HOSTPORT, SPROXYD_HOSTPORT,
-    BUCKETS, RAFT_SESSIONS, KEYS_FROM_STDIN, FROM_URL,
-    LISTING_DIGESTS_OUTPUT_DIR,
-} = process.env;
-
-const WORKERS = (
-    process.env.WORKERS
-        && Number.parseInt(process.env.WORKERS, 10)) || DEFAULT_WORKERS;
-const VERBOSE = process.env.VERBOSE === '1';
-
-const LISTING_LIMIT = (
-    process.env.LISTING_LIMIT
-        && Number.parseInt(process.env.LISTING_LIMIT, 10))
-      || DEFAULT_LISTING_LIMIT;
-
-const LOG_PROGRESS_INTERVAL = (
-    process.env.LOG_PROGRESS_INTERVAL
-        && Number.parseInt(process.env.LOG_PROGRESS_INTERVAL, 10))
-      || DEFAULT_LOG_PROGRESS_INTERVAL;
-
-const MPU_ONLY = process.env.MPU_ONLY === '1';
-const NO_MISSING_KEY_CHECK = process.env.NO_MISSING_KEY_CHECK === '1';
+const { getConfig, OPTIONS_USAGE } = require('./MetadataScan/getConfig');
+const { isHelpRequested } = require('./utils/parseOptions');
 
 // To check duplicate sproxyd keys while coping with out-of-order
 // checks due to concurrency as well as duplicate keys straddling
@@ -51,22 +24,21 @@ const NO_MISSING_KEY_CHECK = process.env.NO_MISSING_KEY_CHECK === '1';
 // catch all cases.
 const DUPLICATE_KEYS_WINDOW_SIZE = 10000;
 
-const LISTING_DIGESTS_BLOCK_SIZE = (
-    process.env.LISTING_DIGESTS_BLOCK_SIZE
-        && Number.parseInt(process.env.LISTING_DIGESTS_BLOCK_SIZE, 10))
-      || DEFAULT_LISTING_DIGESTS_BLOCK_SIZE;
-
 const USAGE = `
 metadataScan.js
 
-This script verifies that :
+This script scans the metadata of objects in S3 buckets, and verifies
+that:
 
-1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
-2. sproxyd keys are unique across versions of the same object
-3. object metadata is not an empty JSON object '{}'
+1. sproxyd keys are unique across versions of the same object
+2. object metadata is not an empty JSON object '{}'
 
-It can help to identify objects affected by the S3C-1959 bug (1), or
-one of S3C-2731, S3C-3778 (2), S3C-5987 (3).
+It can help to identify objects affected by one of S3C-2731, S3C-3778
+(1) or S3C-5987 (2).
+
+With --check-missing-sproxyd-keys, it also verifies that all sproxyd
+keys referenced by objects exist on the RING, which can help to
+identify objects affected by the S3C-1959 bug.
 
 The script can also be used to generate block digests from the listing
 results as seen by the leader, for the purpose of finding
@@ -74,54 +46,39 @@ discrepancies between raft members, that can be caused by bugs like
 S3C-5739.
 
 Usage:
-    node metadataScan.js
+    node metadataScan.js [OPTIONS]
 
-Mandatory environment variables:
-    BUCKETD_HOSTPORT: ip:port of bucketd endpoint
-    SPROXYD_HOSTPORT: ip:port of sproxyd endpoint (optional if NO_MISSING_KEY_CHECK=1)
-    One of:
-        BUCKETS: comma-separated list of buckets to scan
-    or:
-        RAFT_SESSIONS: comma-separated list of raft sessions to scan
-    or:
-        KEYS_FROM_STDIN: reads objects to scan from stdin if this environment variable is
-          set, where the input is a stream of JSON objects, each of the form:
-          {"bucket":"bucketname","key":"objectkey\\0objectversion"}
-          note: if "\\0objectversion" is not present, it checks the master key
+Each option can be set either as a command-line long option, or as an
+equivalent environment variable: the command line takes precedence.
+Boolean options are set on the command line with --option or
+--no-option, and as environment variables with 1, true or yes, or 0,
+false or no.
 
-Optional environment variables:
-    WORKERS: concurrency value for sproxyd requests (default ${DEFAULT_WORKERS})
-    FROM_URL: URL from which to resume scanning ("s3://bucket[/key]")
-    VERBOSE: set to 1 for more verbose output (shows one line for every sproxyd key)
-    LOG_PROGRESS_INTERVAL: interval in seconds between progress update log lines (default ${DEFAULT_LOG_PROGRESS_INTERVAL})
-    LISTING_LIMIT: number of keys to list per listing request (default ${DEFAULT_LISTING_LIMIT})
-    MPU_ONLY: only scan objects uploaded with multipart upload method
-    NO_MISSING_KEY_CHECK: do not check for existence of sproxyd keys,
-    for a performance benefit - other checks like duplicate keys and
-    empty metadata are still done
-    LISTING_DIGESTS_OUTPUT_DIR: output listing digests into the specified directory (in the LevelDB format)
-    LISTING_DIGESTS_BLOCK_SIZE: number of keys in each listing digest block (default ${DEFAULT_LISTING_DIGESTS_BLOCK_SIZE})
+One of --buckets, --raft-sessions or --keys-from-stdin is mandatory.
+
+Options:
+${OPTIONS_USAGE}
+
+Backward compatibility with the legacy script name:
+  When invoked as "verifyBucketSproxydKeys.js", the check for missing
+  sproxyd keys is enabled by default, and can be disabled by setting the
+  NO_MISSING_KEY_CHECK environment variable to 1, true or yes.
 `;
 
-if (!BUCKETS && !RAFT_SESSIONS && !KEYS_FROM_STDIN) {
-    console.error('ERROR: either BUCKETS or RAFT_SESSIONS or KEYS_FROM_STDIN environment '
-                  + 'variable must be defined');
-    console.error(USAGE);
-    process.exit(1);
+// only parse the command line when launched as a CLI: when required
+// by a test, process.argv holds the test runner arguments
+const argv = require.main === module ? process.argv : [];
+
+if (isHelpRequested(argv.slice(2))) {
+    console.log(USAGE);
+    process.exit(0);
 }
-if ((BUCKETS ? 1 : 0) + (RAFT_SESSIONS ? 1 : 0) + (KEYS_FROM_STDIN ? 1 : 0) > 1) {
-    console.error('ERROR: only one of BUCKETS, RAFT_SESSIONS or KEYS_FROM_STDIN environment '
-                  + 'variables can be defined');
-    console.error(USAGE);
-    process.exit(1);
-}
-if (!BUCKETD_HOSTPORT) {
-    console.error('ERROR: BUCKETD_HOSTPORT not defined');
-    console.error(USAGE);
-    process.exit(1);
-}
-if (!SPROXYD_HOSTPORT && !NO_MISSING_KEY_CHECK) {
-    console.error('ERROR: SPROXYD_HOSTPORT not defined');
+
+let config;
+try {
+    config = getConfig({ env: process.env, argv });
+} catch (err) {
+    console.error(`ERROR: ${err.message}`);
     console.error(USAGE);
     process.exit(1);
 }
@@ -146,7 +103,7 @@ const status = {
     bucketsDeleted: 0
 };
 
-let remainingBuckets = (BUCKETS && BUCKETS.split(',')) || [];
+let remainingBuckets = config.buckets || [];
 let sproxydAlias;
 
 // used to skip versions that have already been processed as master key
@@ -159,9 +116,9 @@ let findDuplicateSproxydKeys;
 // digests stream, to create block digests from a stream of key/value pairs
 let digestsStream;
 let levelStream;
-if (LISTING_DIGESTS_OUTPUT_DIR) {
-    digestsStream = new BlockDigestsStream({ blockSize: LISTING_DIGESTS_BLOCK_SIZE });
-    levelStream = new BlockDigestsStorage({ levelPath: LISTING_DIGESTS_OUTPUT_DIR });
+if (config.listingDigestsOutputDir) {
+    digestsStream = new BlockDigestsStream({ blockSize: config.listingDigestsBlockSize });
+    levelStream = new BlockDigestsStorage({ levelPath: config.listingDigestsOutputDir });
     digestsStream.pipe(levelStream);
 }
 
@@ -177,7 +134,7 @@ function setupFromUrl(fromUrl) {
     const bucketIndex = remainingBuckets.indexOf(bucket);
     if (bucketIndex === -1) {
         console.error(`ERROR: FROM_URL bucket ${bucket} `
-                      + `${BUCKETS ? 'is not in BUCKETS'
+                      + `${config.buckets ? 'is not in BUCKETS'
                           : 'does not belong to RAFT_SESSIONS'}`);
         console.error(USAGE);
         process.exit(1);
@@ -191,7 +148,7 @@ function logProgress(message) {
     log.info(message, {
         skipped: status.objectsSkipped,
         scanned: status.objectsScanned,
-        haveMissingKeys: NO_MISSING_KEY_CHECK ? undefined : status.objectsWithMissingKeys,
+        haveMissingKeys: config.checkMissingSproxydKeys ? status.objectsWithMissingKeys : undefined,
         haveDupKeys: status.objectsWithDupKeys,
         haveEmptyMetadata: status.objectsWithEmptyMetadata,
         haveDupVersionIds: status.objectsWithDupVersionIds,
@@ -203,7 +160,7 @@ function logProgress(message) {
 
 setInterval(
     () => logProgress('progress update'),
-    LOG_PROGRESS_INTERVAL * 1000
+    config.logProgressInterval * 1000
 );
 
 
@@ -241,7 +198,7 @@ function httpRequest(method, url, cb) {
 }
 
 function getSproxydAlias(cb) {
-    const url = `http://${SPROXYD_HOSTPORT}/.conf`;
+    const url = `http://${config.sproxydHostport}/.conf`;
     httpRequest('GET', url, (err, res) => {
         if (err) {
             return cb(err);
@@ -258,12 +215,12 @@ function getSproxydAlias(cb) {
 }
 
 function raftSessionsToBuckets(cb) {
-    if (!RAFT_SESSIONS) {
+    if (!config.raftSessions) {
         return cb();
     }
-    const rsList = RAFT_SESSIONS.split(',');
+    const rsList = config.raftSessions;
     return async.each(rsList, (rs, done) => {
-        const url = `http://${BUCKETD_HOSTPORT}/_/raft_sessions/${rs}/bucket`;
+        const url = `http://${config.bucketdHostport}/_/raft_sessions/${rs}/bucket`;
         httpRequest('GET', url, (err, res) => {
             if (err) {
                 return cb(err);
@@ -282,7 +239,7 @@ function raftSessionsToBuckets(cb) {
 }
 
 function fetchObjectLocations(bucket, objectKey, cb) {
-    const url = getBucketdURL(BUCKETD_HOSTPORT, {
+    const url = getBucketdURL(config.bucketdHostport, {
         Bucket: bucket,
         Key: objectKey,
     });
@@ -329,8 +286,8 @@ function checkSproxydKeys(objectUrl, locations, cb) {
         });
         dupKey = true;
     }
-    if (NO_MISSING_KEY_CHECK) {
-        if (VERBOSE) {
+    if (!config.checkMissingSproxydKeys) {
+        if (config.verbose) {
             locations.forEach(loc => log.info('sproxyd key', {
                 objectUrl,
                 sproxydKey: loc.key,
@@ -340,7 +297,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
     }
     return async.eachSeries(locations, (loc, locDone) => {
         // existence check
-        const sproxydUrl = `http://${SPROXYD_HOSTPORT}/${sproxydAlias}/${loc.key}`;
+        const sproxydUrl = `http://${config.sproxydHostport}/${sproxydAlias}/${loc.key}`;
         httpRequest('HEAD', sproxydUrl, (err, res) => {
             if (err) {
                 log.error('sproxyd check error', {
@@ -362,7 +319,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
                     httpCode: res.statusCode,
                 });
                 keyError = true;
-            } else if (VERBOSE) {
+            } else if (config.verbose) {
                 log.info('sproxyd check returned success', {
                     objectUrl,
                     sproxydKey: loc.key,
@@ -390,9 +347,9 @@ function fetchAndCheckObject(bucket, itemKey, cb) {
 }
 
 function listBucketIter(bucket, cb) {
-    const url = getBucketdURL(BUCKETD_HOSTPORT, {
+    const url = getBucketdURL(config.bucketdHostport, {
         Bucket: bucket,
-        MaxKeys: LISTING_LIMIT,
+        MaxKeys: config.listingLimit,
         KeyMarker: status.KeyMarker,
     });
     httpRequest('GET', url, (err, res) => {
@@ -412,7 +369,7 @@ function listBucketIter(bucket, cb) {
         const resp = JSON.parse(res.body);
         const { Contents, IsTruncated } = resp;
 
-        return async.mapLimit(Contents, WORKERS, (item, itemDone) => {
+        return async.mapLimit(Contents, config.workers, (item, itemDone) => {
             if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
                 return itemDone();
             }
@@ -478,7 +435,7 @@ function listBucketIter(bucket, cb) {
 
             const isNotMPU = md['content-md5'] && md['content-md5'].indexOf('-') === -1;
 
-            if (MPU_ONLY && isNotMPU) {
+            if (config.mpuOnly && isNotMPU) {
                 // not an MPU object
                 status.objectsSkipped += 1;
                 findDuplicateSproxydKeys.skipVersion();
@@ -579,11 +536,11 @@ function consumeStdin(cb) {
                 return undefined;
             }
             ++nParallel;
-            if (nParallel === WORKERS) {
+            if (nParallel === config.workers) {
                 itemStream.pause();
             }
             return fetchAndCheckObject(item.bucket, item.key, () => {
-                if (nParallel === WORKERS) {
+                if (nParallel === config.workers) {
                     itemStream.resume();
                 }
                 --nParallel;
@@ -610,17 +567,17 @@ function consumeStdin(cb) {
 function main() {
     async.series([
         done => {
-            if (NO_MISSING_KEY_CHECK) {
+            if (!config.checkMissingSproxydKeys) {
                 return done();
             }
             return getSproxydAlias(done);
         },
         done => raftSessionsToBuckets(done),
         done => {
-            if (FROM_URL) {
-                setupFromUrl(FROM_URL);
+            if (config.fromUrl) {
+                setupFromUrl(config.fromUrl);
             }
-            if (KEYS_FROM_STDIN) {
+            if (config.keysFromStdin) {
                 return consumeStdin(done);
             }
             return async.eachSeries(remainingBuckets, listBucket, done);
