@@ -449,7 +449,7 @@ S3C-5739.
 ## Usage
 
 ```
-node verifyBucketSproxydKeys.js
+node metadataScan.js
 ```
 
 ## Mandatory environment variables:
@@ -472,8 +472,8 @@ node verifyBucketSproxydKeys.js
     -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
     -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
     -e 'RAFT_SESSIONS=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js
+    ghcr.io/scality/s3utils:latest \
+    node metadataScan.js
     ```
 
 * or:
@@ -489,8 +489,8 @@ node verifyBucketSproxydKeys.js
     -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
     -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
     -e 'KEYS_FROM_STDIN=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
+    ghcr.io/scality/s3utils:latest \
+    node metadataScan.js | tee ring_scan_raft_session_1.txt
     ```
 
 ## Optional environment variables:
@@ -799,8 +799,8 @@ docker run \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
 -e 'NO_MISSING_KEY_CHECK=1' \
-ghcr.io/scality/s3utils:1.13.23 \
-node verifyBucketSproxydKeys.js \
+ghcr.io/scality/s3utils:latest \
+node metadataScan.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
 

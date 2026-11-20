@@ -69,7 +69,7 @@ echo '=== STEP 1: START TIME' `date` '===' >&2
 # We can't use "wait" in bash to wait for process substitution >(...),
 # but adding "| cat" has the same effect of waiting until the
 # subcommand inside >(...) completes.
-NO_MISSING_KEY_CHECK=1 node verifyBucketSproxydKeys.js \
+NO_MISSING_KEY_CHECK=1 node metadataScan.js \
     | tee >(node repairDuplicateVersions.js) | cat
 
 echo >&2
