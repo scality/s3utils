@@ -1,0 +1,649 @@
+/* eslint-disable no-console */
+const http = require('http');
+const { http: httpArsn } = require('httpagent');
+const async = require('async');
+const { URL } = require('url');
+const jsonStream = require('JSONStream');
+
+const { jsutil, versioning } = require('arsenal');
+const { Logger } = require('werelogs');
+
+const getObjectURL = require('./MetadataScan/getObjectURL');
+const getBucketdURL = require('./MetadataScan/getBucketdURL');
+const FindDuplicateSproxydKeys = require('./MetadataScan/FindDuplicateSproxydKeys');
+const validateLocations = require('./MetadataScan/validateLocations');
+const BlockDigestsStream = require('./CompareRaftMembers/BlockDigestsStream');
+const BlockDigestsStorage = require('./CompareRaftMembers/BlockDigestsStorage');
+const { getConfig, OPTIONS_USAGE } = require('./MetadataScan/getConfig');
+const { isHelpRequested } = require('./utils/parseOptions');
+
+// To check duplicate sproxyd keys while coping with out-of-order
+// checks due to concurrency as well as duplicate keys straddling
+// across multiple versions, we need to maintain duplicate info for a
+// window of versions that is not too small to be confident we can
+// catch all cases.
+const DUPLICATE_KEYS_WINDOW_SIZE = 10000;
+
+const USAGE = `
+metadataScan.js
+
+This script scans the metadata of objects in S3 buckets, and verifies
+that:
+
+1. sproxyd keys are unique across versions of the same object
+2. object metadata is not an empty JSON object '{}'
+
+It can help to identify objects affected by one of S3C-2731, S3C-3778
+(1) or S3C-5987 (2).
+
+With --check-missing-sproxyd-keys, it also verifies that all sproxyd
+keys referenced by objects exist on the RING, which can help to
+identify objects affected by the S3C-1959 bug.
+
+The script can also be used to generate block digests from the listing
+results as seen by the leader, for the purpose of finding
+discrepancies between raft members, that can be caused by bugs like
+S3C-5739.
+
+Usage:
+    node metadataScan.js [OPTIONS]
+
+Each option can be set either as a command-line long option, or as an
+equivalent environment variable: the command line takes precedence.
+Boolean options are set on the command line with --option or
+--no-option, and as environment variables with 1, true or yes, or 0,
+false or no.
+
+One of --buckets, --raft-sessions or --keys-from-stdin is mandatory.
+
+Options:
+${OPTIONS_USAGE}
+
+Backward compatibility with the legacy script name:
+  When invoked as "verifyBucketSproxydKeys.js", the check for missing
+  sproxyd keys is enabled by default, and can be disabled by setting the
+  NO_MISSING_KEY_CHECK environment variable to 1, true or yes.
+`;
+
+// only parse the command line when launched as a CLI: when required
+// by a test, process.argv holds the test runner arguments
+const argv = require.main === module ? process.argv : [];
+
+if (isHelpRequested(argv.slice(2))) {
+    console.log(USAGE);
+    process.exit(0);
+}
+
+let config;
+try {
+    config = getConfig({ env: process.env, argv });
+} catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    console.error(USAGE);
+    process.exit(1);
+}
+
+const log = new Logger('s3utils:verifyBucketSproxydKeys');
+
+const httpAgent = new httpArsn.Agent({
+    keepAlive: true,
+});
+
+const status = {
+    objectsSkipped: 0,
+    objectsScanned: 0,
+    objectsWithMissingKeys: 0,
+    objectsWithDupKeys: 0,
+    objectsWithEmptyMetadata: 0,
+    objectsWithDupVersionIds: 0,
+    objectsWithBrokenMetadata: 0,
+    objectsErrors: 0,
+    bucketInProgress: null,
+    KeyMarker: '',
+    bucketsDeleted: 0
+};
+
+let remainingBuckets = config.buckets || [];
+let sproxydAlias;
+
+// used to skip versions that have already been processed as master key
+let lastMasterKey;
+let lastMasterVersionId;
+
+// helper to detect duplicate sproxyd keys
+let findDuplicateSproxydKeys;
+
+// digests stream, to create block digests from a stream of key/value pairs
+let digestsStream;
+let levelStream;
+if (config.listingDigestsOutputDir) {
+    digestsStream = new BlockDigestsStream({ blockSize: config.listingDigestsBlockSize });
+    levelStream = new BlockDigestsStorage({ levelPath: config.listingDigestsOutputDir });
+    digestsStream.pipe(levelStream);
+}
+
+function setupFromUrl(fromUrl) {
+    if (!fromUrl.startsWith('s3://')) {
+        console.error('ERROR: FROM_URL must start with "s3://"');
+        console.error(USAGE);
+        process.exit(1);
+    }
+    const trimmed = fromUrl.slice(5);
+    const sep = trimmed.indexOf('/');
+    const bucket = (sep !== -1 ? trimmed.slice(0, sep) : trimmed);
+    const bucketIndex = remainingBuckets.indexOf(bucket);
+    if (bucketIndex === -1) {
+        console.error(`ERROR: FROM_URL bucket ${bucket} `
+                      + `${config.buckets ? 'is not in BUCKETS'
+                          : 'does not belong to RAFT_SESSIONS'}`);
+        console.error(USAGE);
+        process.exit(1);
+    }
+    remainingBuckets = remainingBuckets.slice(bucketIndex);
+    const encodedKey = trimmed.slice(bucket.length + 1);
+    status.KeyMarker = decodeURI(encodedKey);
+}
+
+function logProgress(message) {
+    log.info(message, {
+        skipped: status.objectsSkipped,
+        scanned: status.objectsScanned,
+        haveMissingKeys: config.checkMissingSproxydKeys ? status.objectsWithMissingKeys : undefined,
+        haveDupKeys: status.objectsWithDupKeys,
+        haveEmptyMetadata: status.objectsWithEmptyMetadata,
+        haveDupVersionIds: status.objectsWithDupVersionIds,
+        haveBrokenMetadata: status.objectsWithBrokenMetadata,
+        errors: status.objectsErrors,
+        url: getObjectURL(status.bucketInProgress, status.KeyMarker),
+    });
+}
+
+setInterval(
+    () => logProgress('progress update'),
+    config.logProgressInterval * 1000
+);
+
+
+function httpRequest(method, url, cb) {
+    const cbOnce = jsutil.once(cb);
+    const urlObj = new URL(url);
+    const req = http.request({
+        hostname: urlObj.hostname,
+        port: urlObj.port,
+        path: `${urlObj.pathname}${urlObj.search}`,
+        method,
+        agent: httpAgent,
+    }, res => {
+        if (method === 'HEAD') {
+            return cbOnce(null, res);
+        }
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.once('end', () => {
+            const body = chunks.join('');
+            // eslint-disable-next-line no-param-reassign
+            res.body = body;
+            return cbOnce(null, res);
+        });
+        res.once('error', err => cbOnce(new Error(
+            'error reading response from HTTP request '
+                + `to ${url}: ${err.message}`
+        )));
+        return undefined;
+    });
+    req.once('error', err => cbOnce(new Error(
+        `error sending HTTP request to ${url}: ${err.message}`
+    )));
+    req.end();
+}
+
+function getSproxydAlias(cb) {
+    const url = `http://${config.sproxydHostport}/.conf`;
+    httpRequest('GET', url, (err, res) => {
+        if (err) {
+            return cb(err);
+        }
+        if (res.statusCode !== 200) {
+            return cb(new Error(
+                `GET ${url} returned status ${res.statusCode}`
+            ));
+        }
+        const resp = JSON.parse(res.body);
+        sproxydAlias = resp['ring_driver:0'].alias;
+        return cb();
+    });
+}
+
+function raftSessionsToBuckets(cb) {
+    if (!config.raftSessions) {
+        return cb();
+    }
+    const rsList = config.raftSessions;
+    return async.each(rsList, (rs, done) => {
+        const url = `http://${config.bucketdHostport}/_/raft_sessions/${rs}/bucket`;
+        httpRequest('GET', url, (err, res) => {
+            if (err) {
+                return cb(err);
+            }
+            if (res.statusCode !== 200) {
+                return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+            }
+            const resp = JSON.parse(res.body);
+            remainingBuckets = remainingBuckets.concat(resp.filter(
+                bucket => !bucket.startsWith('mpuShadowBucket')
+                    && bucket !== 'users..bucket'
+            ));
+            return done();
+        });
+    }, cb);
+}
+
+function fetchObjectLocations(bucket, objectKey, cb) {
+    const url = getBucketdURL(config.bucketdHostport, {
+        Bucket: bucket,
+        Key: objectKey,
+    });
+    httpRequest('GET', url, (err, res) => {
+        if (err) {
+            return cb(err);
+        }
+        if (res.statusCode !== 200) {
+            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+        }
+        const md = JSON.parse(res.body);
+        return cb(null, md.location);
+    });
+}
+
+function checkSproxydKeys(objectUrl, locations, cb) {
+    if (!validateLocations(objectUrl, locations, status, findDuplicateSproxydKeys)) {
+        return process.nextTick(cb);
+    }
+
+    let keyError = false;
+    let keyMissing = false;
+    let dupKey = false;
+
+    const onComplete = () => {
+        status.objectsScanned += 1;
+        if (keyError) {
+            status.objectsErrors += 1;
+        } else if (keyMissing) {
+            status.objectsWithMissingKeys += 1;
+        }
+        if (dupKey) {
+            status.objectsWithDupKeys += 1;
+        }
+        return cb();
+    };
+
+    const dupInfo = findDuplicateSproxydKeys.insertVersion(objectUrl, locations.map(loc => loc.key));
+    if (dupInfo) {
+        log.error('duplicate sproxyd key found', {
+            objectUrl,
+            objectUrl2: dupInfo.objectId,
+            sproxydKey: dupInfo.key,
+        });
+        dupKey = true;
+    }
+    if (!config.checkMissingSproxydKeys) {
+        if (config.verbose) {
+            locations.forEach(loc => log.info('sproxyd key', {
+                objectUrl,
+                sproxydKey: loc.key,
+            }));
+        }
+        return process.nextTick(onComplete);
+    }
+    return async.eachSeries(locations, (loc, locDone) => {
+        // existence check
+        const sproxydUrl = `http://${config.sproxydHostport}/${sproxydAlias}/${loc.key}`;
+        httpRequest('HEAD', sproxydUrl, (err, res) => {
+            if (err) {
+                log.error('sproxyd check error', {
+                    objectUrl,
+                    sproxydKey: loc.key,
+                    error: { message: err.message },
+                });
+                keyError = true;
+            } else if (res.statusCode === 404) {
+                log.error('sproxyd check reported missing key', {
+                    objectUrl,
+                    sproxydKey: loc.key,
+                });
+                keyMissing = true;
+            } else if (res.statusCode !== 200) {
+                log.error('sproxyd check returned HTTP error', {
+                    objectUrl,
+                    sproxydKey: loc.key,
+                    httpCode: res.statusCode,
+                });
+                keyError = true;
+            } else if (config.verbose) {
+                log.info('sproxyd check returned success', {
+                    objectUrl,
+                    sproxydKey: loc.key,
+                });
+            }
+            locDone();
+        });
+    }, onComplete);
+}
+
+function fetchAndCheckObject(bucket, itemKey, cb) {
+    const objectUrl = getObjectURL(bucket, itemKey);
+    return fetchObjectLocations(bucket, itemKey, (err, locations) => {
+        if (err) {
+            log.error('error fetching object locations array', {
+                objectUrl,
+                error: { message: err.message },
+            });
+            status.objectsScanned += 1;
+            status.objectsErrors += 1;
+            return cb();
+        }
+        return checkSproxydKeys(objectUrl, locations, () => cb(locations));
+    });
+}
+
+function listBucketIter(bucket, cb) {
+    const url = getBucketdURL(config.bucketdHostport, {
+        Bucket: bucket,
+        MaxKeys: config.listingLimit,
+        KeyMarker: status.KeyMarker,
+    });
+    httpRequest('GET', url, (err, res) => {
+        if (err) {
+            return cb(err);
+        }
+
+        if (res.statusCode === 404) {
+            // the bucket was deleted during scan, so we continue to next bucket
+            status.bucketsDeleted += 1;
+            return cb(null, false);
+        }
+
+        if (res.statusCode !== 200) {
+            return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+        }
+        const resp = JSON.parse(res.body);
+        const { Contents, IsTruncated } = resp;
+
+        return async.mapLimit(Contents, config.workers, (item, itemDone) => {
+            if (item.key.startsWith(versioning.VersioningConstants.DbPrefixes.Replay)) {
+                return itemDone();
+            }
+            const vidSepPos = item.key.lastIndexOf('\0');
+            const objectUrl = getObjectURL(bucket, item.key);
+            let digestKey = item.key;
+
+            const md = JSON.parse(item.value);
+            if (vidSepPos === -1) {
+                const reVersionIds = /"versionId":"([^"]*)"/g;
+                const versionIds = [];
+                while (true) {
+                    const reVersionIdMatch = reVersionIds.exec(item.value);
+                    if (!reVersionIdMatch) {
+                        break;
+                    }
+                    versionIds.push(reVersionIdMatch[1]);
+                }
+                if (versionIds.length > 1) {
+                    const versionedKey = `${item.key}\0${versionIds[0]}`;
+                    const versionedKeyUrl = getObjectURL(bucket, versionedKey);
+                    log.error('object master metadata with duplicate "versionId" field found', {
+                        objectUrl,
+                        firstVersionId: versionIds[0],
+                        versionedKeyUrl,
+                    });
+                    status.objectsWithDupVersionIds += 1;
+                    // replace with the (assumed legit) first version
+                    // ID to allow correct skipping of version keys         
+                    md.versionId = versionIds[0];
+                }
+                lastMasterKey = item.key;
+                lastMasterVersionId = md.versionId;
+                if (md.versionId) {
+                    digestKey = `${item.key}\0${md.versionId}`;
+                }
+            } else {
+                const masterKey = item.key.slice(0, vidSepPos);
+                if (masterKey === lastMasterKey
+                    && md.versionId === lastMasterVersionId) {
+                    // we have already processed this versioned key as
+                    // the master key, so skip it
+                    findDuplicateSproxydKeys.skipVersion();
+                    return itemDone();
+                }
+            }
+
+            if (item.value === '{}') {
+                log.error('object with empty metadata found', {
+                    objectUrl,
+                });
+                status.objectsScanned += 1;
+                status.objectsWithEmptyMetadata += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+
+            if (md.isPHD) {
+                // object is a Place Holder Delete (PHD)
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+
+            const isNotMPU = md['content-md5'] && md['content-md5'].indexOf('-') === -1;
+
+            if (config.mpuOnly && isNotMPU) {
+                // not an MPU object
+                status.objectsSkipped += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                return itemDone();
+            }
+
+            if (md['content-length'] === 0) {
+                // empty object
+                status.objectsScanned += 1;
+                findDuplicateSproxydKeys.skipVersion();
+                // empty objects should be included in the digest,
+                // hence returning their metadata to the map results
+                return itemDone(null, { key: digestKey, value: item.value });
+            }
+
+            // big MPUs may not have their location in the listing
+            // result, we need to fetch the locations array from
+            // bucketd explicitly in this case
+            if (md.location) {
+                return checkSproxydKeys(objectUrl, md.location, () => {
+                    itemDone(null, { key: digestKey, value: item.value });
+                });
+            }
+            return fetchAndCheckObject(bucket, item.key, location => {
+                if (location && digestsStream) {
+                    // thanks to preservation of JS object attribute
+                    // order, we can attach the locations array and
+                    // reconstruct the metadata blob to match what is
+                    // stored in the DB on disk. This is needed for
+                    // the block digests to have a chance to match.
+                    const fullMdBlob = JSON.stringify(Object.assign(md, { location }));
+                    itemDone(null, { key: digestKey, value: fullMdBlob });
+                } else {
+                    // if there was an error fetching locations, just ignore the entry
+                    itemDone();
+                }
+            });
+        }, (_, items) => {
+            if (IsTruncated) {
+                status.KeyMarker = Contents[Contents.length - 1].key;
+            }
+            if (digestsStream) {
+                items.forEach(item => {
+                    if (item) {
+                        const { key, value } = item;
+                        digestsStream.write({ key: `${bucket}/${key}`, value });
+                    }
+                });
+            }
+            if (digestsStream && digestsStream.writableNeedDrain) {
+                digestsStream.once('drain', () => cb(null, IsTruncated));
+            } else {
+                cb(null, IsTruncated);
+            }
+        });
+    });
+}
+
+function listBucket(bucket, cb) {
+    status.bucketInProgress = bucket;
+
+    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+
+    logProgress('start scanning bucket');
+    async.doWhilst(
+        done => async.retry(
+            { times: 100, interval: 5000 },
+            _done => listBucketIter(bucket, _done),
+            done
+        ),
+        async IsTruncated => IsTruncated,
+        err => {
+            status.bucketInProgress = null;
+            status.KeyMarker = '';
+            if (digestsStream) {
+                // flush the digests stream to output the last bucket block
+                digestsStream.flush();
+            }
+            cb(err);
+        }
+    );
+}
+
+function consumeStdin(cb) {
+    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+
+    const itemStream = process.stdin.pipe(jsonStream.parse());
+    let nParallel = 0;
+    let streamDone = false;
+    itemStream
+        .on('data', item => {
+            if (!item.bucket) {
+                log.error('missing "bucket" attribute in JSON stream item');
+                return undefined;
+            }
+            if (!item.key) {
+                log.error('missing "key" attribute in JSON stream item');
+                return undefined;
+            }
+            ++nParallel;
+            if (nParallel === config.workers) {
+                itemStream.pause();
+            }
+            return fetchAndCheckObject(item.bucket, item.key, () => {
+                if (nParallel === config.workers) {
+                    itemStream.resume();
+                }
+                --nParallel;
+                if (nParallel === 0 && streamDone) {
+                    cb();
+                }
+            });
+        })
+        .on('end', () => {
+            streamDone = true;
+            if (nParallel === 0) {
+                cb();
+            }
+        })
+        .on('error', err => {
+            log.error('error parsing JSON input', {
+                error: err.message,
+            });
+            return cb(err);
+        });
+}
+
+
+function main() {
+    async.series([
+        done => {
+            if (!config.checkMissingSproxydKeys) {
+                return done();
+            }
+            return getSproxydAlias(done);
+        },
+        done => raftSessionsToBuckets(done),
+        done => {
+            if (config.fromUrl) {
+                setupFromUrl(config.fromUrl);
+            }
+            if (config.keysFromStdin) {
+                return consumeStdin(done);
+            }
+            return async.eachSeries(remainingBuckets, listBucket, done);
+        },
+        done => {
+            if (digestsStream) {
+                digestsStream.end();
+                levelStream.on('finish', done);
+            } else {
+                done();
+            }
+        },
+    ], err => {
+        if (err) {
+            log.error('an error occurred during scan', {
+                error: { message: err.message },
+            });
+            logProgress('last status');
+            process.exit(1);
+        } else {
+            logProgress('completed scan');
+            if (status.objectsWithMissingKeys) {
+                process.exit(101);
+            }
+            if (status.objectsWithDupKeys) {
+                process.exit(102);
+            }
+            if (status.objectsWithEmptyMetadata) {
+                process.exit(104);
+            }
+            if (status.objectsWithBrokenMetadata) {
+                process.exit(105);
+            }
+            if (status.objectsErrors) {
+                process.exit(103);
+            }
+            process.exit(0);
+        }
+    });
+}
+
+// Run the scan and wire up signal handlers only when this file is launched
+// as a CLI. Skip both when a test requires the file as a module — otherwise
+// the SIGINT / SIGTERM handlers would register against the Jest worker
+// process and `stop()` could silently exit it on signal (which would mask
+// CI timeouts as passing runs).
+if (require.main === module) {
+    main();
+    process.on('SIGINT', stop);
+    process.on('SIGHUP', stop);
+    process.on('SIGQUIT', stop);
+    process.on('SIGTERM', stop);
+}
+
+function stop() {
+    if (digestsStream) {
+        digestsStream.destroy();
+    }
+    log.info('stopping execution');
+    logProgress('last status');
+    process.exit(0);
+}
+
+module.exports = {
+    httpRequest,
+    status,
+    log,
+    logProgress,
+};

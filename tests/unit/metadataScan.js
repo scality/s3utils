@@ -1,9 +1,9 @@
-const getObjectURL = require('../../VerifyBucketSproxydKeys/getObjectURL');
-const getBucketdURL = require('../../VerifyBucketSproxydKeys/getBucketdURL');
-const FindDuplicateSproxydKeys = require('../../VerifyBucketSproxydKeys/FindDuplicateSproxydKeys');
-const validateLocations = require('../../VerifyBucketSproxydKeys/validateLocations');
+const getObjectURL = require('../../MetadataScan/getObjectURL');
+const getBucketdURL = require('../../MetadataScan/getBucketdURL');
+const FindDuplicateSproxydKeys = require('../../MetadataScan/FindDuplicateSproxydKeys');
+const validateLocations = require('../../MetadataScan/validateLocations');
 
-describe('verifyBucketSproxydKeys', () => {
+describe('metadataScan', () => {
     test('getObjectURL', () => {
         expect(getObjectURL()).toEqual('s3://');
         expect(getObjectURL('foobucket')).toEqual('s3://foobucket');
@@ -191,10 +191,10 @@ process.env.BUCKETS = process.env.BUCKETS || 'test-bucket';
 // timers continue to work.
 const origSetInterval = global.setInterval;
 global.setInterval = () => undefined;
-const vbsk = require('../../verifyBucketSproxydKeys');
+const vbsk = require('../../metadataScan');
 global.setInterval = origSetInterval;
 
-describe('verifyBucketSproxydKeys — summary line emits errors count (S3UTILS-236)', () => {
+describe('metadataScan — summary line emits errors count (S3UTILS-236)', () => {
     let logSpy;
 
     beforeEach(() => {

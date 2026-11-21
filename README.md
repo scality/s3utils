@@ -430,92 +430,134 @@ List objects that have a replication status of PENDING.
 
 List objects that either have a replication status of PENDING or FAILED.
 
-# Verify existence of sproxyd keys
+# Metadata scan
 
-This script verifies that :
+This script scans the metadata of objects in S3 buckets, and verifies
+that:
 
-1. all sproxyd keys referenced by objects in S3 buckets exist on the RING
-2. sproxyd keys are unique across versions of the same object
-3. object metadata is not an empty JSON object '{}'
+1. sproxyd keys are unique across versions of the same object
+2. object metadata is not an empty JSON object '{}'
 
-It can help to identify objects affected by the S3C-1959 bug (1), or
-one of S3C-2731, S3C-3778 (2), S3C-5987 (3).
+It can help to identify objects affected by one of S3C-2731, S3C-3778
+(1) or S3C-5987 (2).
+
+With `--check-missing-sproxyd-keys` (or `CHECK_MISSING_SPROXYD_KEYS=1`),
+it also verifies that all sproxyd keys referenced by objects exist on
+the RING, which can help to identify objects affected by the S3C-1959
+bug.
 
 The script can also be used to generate block digests from the listing
 results as seen by the leader, for the purpose of finding
 discrepancies between raft members, that can be caused by bugs like
 S3C-5739.
 
+**Note**: this script was previously named
+`verifyBucketSproxydKeys.js`, which is kept as a symbolic link to
+`metadataScan.js` for backward compatibility. The check for existence
+of sproxyd keys on the RING is disabled by default when the script is
+invoked as `metadataScan.js` (see **CHECK_MISSING_SPROXYD_KEYS** to
+enable it), and enabled by default when invoked as
+`verifyBucketSproxydKeys.js` (see **NO_MISSING_KEY_CHECK** to disable
+it).
+
 ## Usage
 
+Output of `node metadataScan.js --help`:
+
 ```
-node verifyBucketSproxydKeys.js
+Usage:
+    node metadataScan.js [OPTIONS]
+
+Each option can be set either as a command-line long option, or as an
+equivalent environment variable: the command line takes precedence.
+Boolean options are set on the command line with --option or
+--no-option, and as environment variables with 1, true or yes, or 0,
+false or no.
+
+One of --buckets, --raft-sessions or --keys-from-stdin is mandatory.
+
+Options:
+  -h, --help
+      show this help and exit
+  --bucketd-hostport <value>, BUCKETD_HOSTPORT=<value>
+      ip:port of bucketd endpoint (default: 127.0.0.1:9000)
+  --sproxyd-hostport <value>, SPROXYD_HOSTPORT=<value>
+      ip:port of sproxyd endpoint, only used when checking for missing sproxyd
+      keys (default: 127.0.0.1:8181)
+  --buckets <list>, BUCKETS=<list>
+      comma-separated list of buckets to scan
+  --raft-sessions <list>, RAFT_SESSIONS=<list>
+      comma-separated list of raft sessions to scan
+  --[no-]keys-from-stdin, KEYS_FROM_STDIN=<bool>
+      read objects to scan from stdin, where the input is a stream of JSON
+      objects, each of the form
+      {"bucket":"bucketname","key":"objectkey\0objectversion"} - if
+      "\0objectversion" is not present, it checks the master key
+  --from-url <value>, FROM_URL=<value>
+      URL from which to resume scanning ("s3://bucket[/key]")
+  --workers <number>, WORKERS=<number>
+      concurrency value for sproxyd requests (default: 100)
+  --[no-]verbose, VERBOSE=<bool>
+      more verbose output (shows one line for every sproxyd key)
+  --log-progress-interval <number>, LOG_PROGRESS_INTERVAL=<number>
+      interval in seconds between progress update log lines (default: 10)
+  --listing-limit <number>, LISTING_LIMIT=<number>
+      number of keys to list per listing request (default: 1000)
+  --[no-]mpu-only, MPU_ONLY=<bool>
+      only scan objects uploaded with multipart upload method
+  --[no-]check-missing-sproxyd-keys, CHECK_MISSING_SPROXYD_KEYS=<bool>
+      also check that all sproxyd keys referenced by objects exist on the RING:
+      this sends a request to sproxyd for every key, which makes the scan
+      significantly slower than a metadata-only scan
+  --listing-digests-output-dir <value>, LISTING_DIGESTS_OUTPUT_DIR=<value>
+      output listing digests into the specified directory (in the LevelDB
+      format)
+  --listing-digests-block-size <number>, LISTING_DIGESTS_BLOCK_SIZE=<number>
+      number of keys in each listing digest block (default: 1000)
+
+Backward compatibility with the legacy script name:
+  When invoked as "verifyBucketSproxydKeys.js", the check for missing
+  sproxyd keys is enabled by default, and can be disabled by setting the
+  NO_MISSING_KEY_CHECK environment variable to 1, true or yes.
 ```
 
-## Mandatory environment variables:
+## Examples
 
-* **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
+Scan raft session 1 and check that all sproxyd keys exist on the RING:
 
-* **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
+```
+docker run --net=host \
+-e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+-e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
+-e 'RAFT_SESSIONS=1' \
+-e 'CHECK_MISSING_SPROXYD_KEYS=1' \
+ghcr.io/scality/s3utils:latest \
+node metadataScan.js
+```
 
-* One of:
+Same scan, using command-line options instead of environment variables:
 
-  * **BUCKETS**: comma-separated list of buckets to scan
-  * Example : `BUCKETS=bucket1,bucket2,bucket3`
+```
+docker run --net=host \
+ghcr.io/scality/s3utils:latest \
+node metadataScan.js \
+--bucketd-hostport 127.0.0.1:9000 \
+--sproxyd-hostport 127.0.0.1:8181 \
+--raft-sessions 1 \
+--check-missing-sproxyd-keys
+```
 
-* or:
+Check objects read from stdin:
 
-  * **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
-  * Example :
-    ```
-    docker run --net=host \
-    -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
-    -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
-    -e 'RAFT_SESSIONS=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js
-    ```
-
-* or:
-
-  * **KEYS_FROM_STDIN**: reads objects to scan from stdin if this
-    environment variable is set, where the input is a stream of JSON
-    objects, each of the form:
-    `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
-    **note**: if `\u0000objectversion` is not present, it checks the master key
-  * Example :
-    ```
-    cat raft_session_1_output.txt | docker run -i --net=host --rm \
-    -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
-    -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
-    -e 'KEYS_FROM_STDIN=1' \
-    ghcr.io/scality/s3utils:1.12.5 \
-    node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
-    ```
-
-## Optional environment variables:
-
-* **WORKERS**: concurrency value for sproxyd requests (default 100)
-
-* **FROM_URL**: URL from which to resume scanning ("s3://bucket[/key]")
-
-* **VERBOSE**: set to 1 for more verbose output (shows one line for every sproxyd key)
-
-* **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
-
-* **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
-
-* **MPU_ONLY**: only scan objects uploaded with multipart upload method
-
-* **NO_MISSING_KEY_CHECK**: do not check for existence of sproxyd
-    keys, for a performance benefit - other checks like duplicate keys
-    and missing metadata are still done
-
-* **LISTING_DIGESTS_OUTPUT_DIR**: output listing digests into the
-    specified directory (in the LevelDB format)
-
-* **LISTING_DIGESTS_BLOCK_SIZE**: number of keys in each listing
-    digest block (default 1000)
+```
+cat raft_session_1_output.txt | docker run -i --net=host --rm \
+-e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
+-e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
+-e 'KEYS_FROM_STDIN=1' \
+-e 'CHECK_MISSING_SPROXYD_KEYS=1' \
+ghcr.io/scality/s3utils:latest \
+node metadataScan.js | tee ring_scan_raft_session_1.txt
+```
 
 ## Output
 
@@ -671,7 +713,7 @@ a pre-computed digests database via the LISTING_DIGESTS_INPUT_DIR
 environment variable, so that ranges of keys that match the digests
 database do not have to be checked by querying the leader. The
 pre-computed digests database can be generated via a run of
-"verifyBucketSproxydKeys" script, providing it the
+"metadataScan" script, providing it the
 LISTING_DIGESTS_OUTPUT_DIR environment variable.
 
 ## Usage
@@ -728,7 +770,7 @@ node followerDiff.js
 In order to scan a set of raft sessions to detect discrepancies
 between raft members, you may use the following procedure involving
 the two scan tools
-[verifyBucketSproxydKeys](#verify-existence-of-sproxyd-keys) and
+[metadataScan](#metadata-scan) and
 [followerDiff](#compare-followers-databases-against-leader-view).
 
 Make sure that no leader change occurs from the beginning to the end
@@ -775,13 +817,12 @@ of `wsb[x]-cluster[y]` members.
 
 ### Step Prep-1: Generate the digests database on one metadata server
 
-Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
+Start by scanning all raft sessions using `metadataScan`,
 to generate a digests database in order to have a more efficient scan
 of followers later on, that does not require an entire listing of the
 leader again.
 
-Provide the environment variables **LISTING_DIGESTS_OUTPUT_DIR** and
-enable **NO_MISSING_KEY_CHECK** to speed up the listing.
+Provide the environment variable **LISTING_DIGESTS_OUTPUT_DIR**.
 
 If the command is restarted, e.g. after an error or manual abortion,
 make sure to delete the `${DIGESTS_PATH}` directory before running the
@@ -798,9 +839,8 @@ docker run \
 -e 'RAFT_SESSIONS=1,2,3,4,5,6,7,8' \
 -e 'LISTING_DIGESTS_OUTPUT_DIR=/digests' \
 -v "${DIGESTS_PATH}:/digests" \
--e 'NO_MISSING_KEY_CHECK=1' \
-ghcr.io/scality/s3utils:1.13.23 \
-node verifyBucketSproxydKeys.js \
+ghcr.io/scality/s3utils:latest \
+node metadataScan.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
 
