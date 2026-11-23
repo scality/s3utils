@@ -1043,6 +1043,8 @@ in order to have access to all databases.
 
 Example command:
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
@@ -1064,6 +1066,8 @@ docker run --net=host --rm \
 | tee -a followerDiff.log
 
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 **Note**: the tool will refuse to override an existing diff output
 file. If you need to re-run the command, first delete the output
@@ -1466,6 +1470,8 @@ in order to have access to all local databases, as well as mount
 
 Example command:
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 MY_DATABASE_VOLUME_MOUNTS=$(docker inspect scality-metadata-bucket-repd \
 | jq -r '.[0].Mounts | map(select(.Source | contains("scality-metadata-databases-bucket")) | "-v \(.Source):\(.Destination)") | .[]')
@@ -1487,6 +1493,8 @@ docker run --net=host --rm \
 | tee -a compareFollowerDbs.log
 
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 **Note**: the tool will refuse to override an existing diff output
 file. If you need to re-run the command, first delete the output
@@ -1584,9 +1592,13 @@ ambiguity on what's the best way to repair.
 The script outputs logs in JSON. Each object repair analysis or
 attempt outputs a single log line, for example:
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 {"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563031,"bucket":"s3c-5862-nv-0072","key":"test-2022-07-05T21-06-16-960Z/190","repairStatus":"AutoRepair","repairSource":"Leader","repairMaster":false,"level":"info","message":"repaired object metadata successfully","hostname":"jonathan-storage-1","pid":1}
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 In the above log, the repair status is `AutoRepair`, which means the
 script attempted to repair automatically the object metadata, and it
@@ -1620,9 +1632,13 @@ Additionally, logs may contain such lines, when a check failed on a
 particular sproxyd key that belongs to one instance of the metadata
 (whether on leader or follower):
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 {"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563000,"bucketdUrl":"http://localhost:9000/default/bucket/s3c-5862-nv-0072/test-2022-07-05T21-06-16-960Z%2F190","sproxydKey":"A553B230F05B0B55C2D090233B280559E730D320","level":"error","message":"sproxyd check reported missing key","hostname":"jonathan-storage-1","pid":1}
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 Those are expected when metadata divergence exists, they can give some
 complementary information for diagnosis.
@@ -1633,9 +1649,13 @@ here, we know that there were 2 automatic repairs performed, and one
 requiring a manual check and repair (which entry can be found from the
 logs, looking for "ManualRepair" status):
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 {"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563064,"countByStatus":{"AutoRepair":2,"AutoRepairError":0,"ManualRepair":1,"NotRepairable":0,"UpdatedByClient":0},"level":"info","message":"completed repair","hostname":"jonathan-storage-1","pid":1}
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ### Repair Procedure
 
@@ -1715,15 +1735,23 @@ The output of the script consists of JSON log lines.
 
 One log line is output for each delete marker deleted, e.g.:
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 {"name":"s3utils::removeDeleteMarkers","time":1586304708269,"bucket":"some-bucket","objectKey":"some-key","versionId":"3938343133363935343035383633393939393936524730303120203533342e3432363436322e393035353030","level":"info","message":"delete marker deleted","hostname":"c3f84aa473a2","pid":88}
 ```
 
+<!-- markdownlint-enable MD013 -->
+
 The script also logs a progress update, every 10 seconds by default:
+
+<!-- markdownlint-disable MD013 -->
 
 ```
 {"name":"s3utils::removeDeleteMarkers","time":1586304694304,"objectsListed":257000,"deleteMarkersDeleted":0,"deleteMarkersErrors":0,"bucketInProgress":"some-bucket","keyMarker":"some-key-marker","versionIdMarker":"3938343133373030373134393734393939393938524730303120203533342e3430323230362e373139333039","level":"info","message":"progress update","hostname":"c3f84aa473a2","pid":88}
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ## Repair duplicate sproxyd keys
 
@@ -1760,9 +1788,13 @@ and ignores other entries.
 
 ### Example
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 OBJECT_REPAIR_SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ### Effect on object metadata
 
@@ -1830,9 +1862,13 @@ duplicate "versionId" field found' and ignores other entries.
 
 ### Example
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 cat /tmp/verifyBucketSproxydKeys.log | docker run -i ghcr.io/scality/s3utils:1.13.24 bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 node repairDuplicateVersionIds.js' > /tmp/repairDuplicateVersionIds.log
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ## Cleanup Noncurrent Versions
 
@@ -1899,9 +1935,13 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 
 ### Example
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 docker run --net=host -ti zenko/s3utils:latest bash -c 'S3_ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ## Count number and total size of current and noncurrent versions in a bucket
 
@@ -2216,9 +2256,13 @@ Generates a service level usage report from UtapiV2 in HTML or JSON format.
 
 Commands must be executed on a stateful server that hosts the target UtapiV2 deployment.
 
+<!-- markdownlint-disable MD013 -->
+
 ```
 docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/conf:/conf:ro -v $PWD:/output zenko/s3utils utapi/service-report.py --output /output
 ```
+
+<!-- markdownlint-enable MD013 -->
 
 ### Flags
 
