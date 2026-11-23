@@ -7,6 +7,7 @@
     "description": "Awesome scripts to use when working with S3 at scale",
     "scripts": {
         "lint": "eslint $(git ls-files '*.js' '*.mjs')",
+        "lint_md": "mdlint $(git ls-files '*.md' ':!AGENTS.md')",
         "prettier:check": "prettier --check .",
         "jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
         "test:unit": "LOCATION_CONFIG_FILE='tests/conf/locationConfig.json' yarn jest --verbose --logHeapUsage --projects jest.config.js --coverage --coverageDirectory=coverage/unit --testPathPatterns='tests/unit/[\\w/-]+\\.[tj]s'",
