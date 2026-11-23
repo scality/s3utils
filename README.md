@@ -18,11 +18,11 @@ ghcr.io/scality/s3utils:<tag> node scriptName bucket1[,bucket2...]
 node crrExistingObjects.js testbucket1,testbucket2
 ```
 
-### Mandatory environment variables,
+### Mandatory environment variables
 
 - **REPLICATION_GROUP_ID**
 
-### Optional environment variables,
+### Optional environment variables
 
 - **DEBUG**: set to 1 to output debug level information.
 
@@ -529,7 +529,7 @@ S3C-5739.
 node verifyBucketSproxydKeys.js
 ```
 
-### Mandatory environment variables:
+### Mandatory environment variables
 
 - **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
@@ -570,7 +570,7 @@ node verifyBucketSproxydKeys.js
         node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
         ```
 
-### Optional environment variables:
+### Optional environment variables
 
 - **WORKERS**: concurrency value for sproxyd requests (default 100)
 
@@ -1691,7 +1691,7 @@ more versioning-suspended bucket(s).
 
 - **SECRET_KEY**: S3 account secret key
 
-### Optional environment variables:
+### Optional environment variables
 
 - **TARGET_PREFIX**: only process a specific prefix in the bucket(s)
 
@@ -1923,7 +1923,7 @@ noncurrent versions.
 
 - **BUCKET**: S3 bucket name
 
-### Optional environment variables:
+### Optional environment variables
 
 - **TARGET_PREFIX**: only process a specific prefix in the bucket
 
@@ -2051,7 +2051,7 @@ node VerifyReplication/index.js
 
 - **DST_SECRET_KEY**: replication destination s3 account secret key
 
-### Optional environment variables:
+### Optional environment variables
 
 - **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
 
