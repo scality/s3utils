@@ -2,7 +2,8 @@
 
 S3 Connector and Zenko Utilities
 
-Run the Docker container as (replace `<tag>` with the tag of s3utils image to be used)
+Run the Docker container as (replace `<tag>` with the tag of s3utils image to be
+used)
 
 ```
 docker run --net=host -e 'ACCESS_KEY=accessKey' -e 'SECRET_KEY=secretKey' -e 'ENDPOINT=http://127.0.0.1:8000' -e 'REPLICATION_GROUP_ID=RG001'
@@ -231,8 +232,8 @@ resume point with the right `SITE_NAME`, or with `ALLOW_NEW_SITE=true`.
 The check can't run on objects with nothing to compare against, so objects
 processed before the stop may already have the wrong `SITE_NAME`. Before
 re-running with the right `SITE_NAME`, run
-[removeReplicationSite](#remove-a-replication-site-from-object-metadata) in dry run with
-`SITE_TO_REMOVE=<wrong SITE_NAME>` on the same buckets: it lists the
+[removeReplicationSite](#remove-a-replication-site-from-object-metadata) in dry
+run with `SITE_TO_REMOVE=<wrong SITE_NAME>` on the same buckets: it lists the
 objects that got the wrong site. If there are any, run it again with
 `DRY_RUN=false`. Skip the cleanup if `SITE_NAME` was in fact right (see
 below).
@@ -578,9 +579,11 @@ node verifyBucketSproxydKeys.js
 
 - **FROM_URL**: URL from which to resume scanning ("s3://bucket[/key]")
 
-- **VERBOSE**: set to 1 for more verbose output (shows one line for every sproxyd key)
+- **VERBOSE**: set to 1 for more verbose output (shows one line for every
+  sproxyd key)
 
-- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log
+  lines (default 10)
 
 - **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
@@ -1719,7 +1722,8 @@ more versioning-suspended bucket(s).
 
 - **WORKERS**: concurrency value for listing / batch delete requests (default 10)
 
-- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log
+  lines (default 10)
 
 - **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
@@ -1971,7 +1975,8 @@ noncurrent versions.
 
 - **LISTING_LIMIT**: number of keys to list per listing request (default 1000)
 
-- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log
+  lines (default 10)
 
 - **KEY_MARKER**: start counting from a specific key
 
@@ -2069,7 +2074,11 @@ script outputs this status on a single line.
 
 ## Verify Replication
 
-The verify replication script checks/compares the replication source with the replication destination. The script produces logs about missing objects on destination and destination objects whose size doesnt match the source size. The script verifies only current version of objects. It relies on standard s3 api's for the source and the destination.
+The verify replication script checks/compares the replication source with the
+replication destination. The script produces logs about missing objects on
+destination and destination objects whose size doesnt match the source size. The
+script verifies only current version of objects. It relies on standard s3 api's
+for the source and the destination.
 
 ### Usage
 
@@ -2095,7 +2104,8 @@ node VerifyReplication/index.js
 
 ### Optional environment variables
 
-- **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
+- **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be
+  limited to these prefixes
 
 - **SRC_DELIMITER**: delimiter used with prefixes in source (default '/')
 
@@ -2103,9 +2113,11 @@ node VerifyReplication/index.js
 
 - **LISTING_WORKERS**: number of concurrent workers to handle listing (default 10)
 
-- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log lines (default 10)
+- **LOG_PROGRESS_INTERVAL**: interval in seconds between progress update log
+  lines (default 10)
 
-- **BUCKET_MATCH**: set to 1 if bucket match is enabled with replication, when not enabled objects will be replicated with keyname pattern `sourceBucket/key`
+- **BUCKET_MATCH**: set to 1 if bucket match is enabled with replication, when
+  not enabled objects will be replicated with keyname pattern `sourceBucket/key`
 
 - **COMPARE_OBJECT_SIZE**: set to 1 to compare source and destination object sizes
 
@@ -2113,20 +2125,30 @@ node VerifyReplication/index.js
 
 - **DST_STORAGE_TYPE**: destination storage type, currently supports only `aws_s3`
 
-- **DST_REGION**: destination s3 region (only for storage type `aws_s3`, default `us-east-1`)
+- **DST_REGION**: destination s3 region (only for storage type `aws_s3`, default
+  `us-east-1`)
 
-- **DST_MD_REQUEST_WORKERS**: number of concurrent workers to handle destination metadata requests (default 50)
+- **DST_MD_REQUEST_WORKERS**: number of concurrent workers to handle destination
+  metadata requests (default 50)
 
-- **HTTPS_CA_PATH**: path to a CA certificate bundle used to authentify the source S3 endpoint
+- **HTTPS_CA_PATH**: path to a CA certificate bundle used to authentify the
+  source S3 endpoint
 
 - **HTTPS_NO_VERIFY**: set to 1 to disable source S3 endpoint certificate check
 
-- **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if available (enable only for debugging as it may produce a lot of log entries), this may be disregarded if the client (depending on storage type) does not support it
+- **SHOW_CLIENT_LOGS_IF_AVAILABLE**: set to 1 to show storage client logs if
+  available (enable only for debugging as it may produce a lot of log entries),
+  this may be disregarded if the client (depending on storage type) does not
+  support it
 
-- **SKIP_OLDER_THAN**: skip replication verification of objects whose last modified date is older than this, set this as an ISO date or a number of days e.g.,
+- **SKIP_OLDER_THAN**: skip replication verification of objects whose last
+  modified date is older than this, set this as an ISO date or a number of
+  days e.g.,
 
-    - setting to "2022-11-30T00:00:00Z" skips the verification of objects created or modified before Nov 30th 2022
-    - setting to "30 days" skips the verification of objects created or modified more than 30 days ago
+    - setting to "2022-11-30T00:00:00Z" skips the verification of objects
+      created or modified before Nov 30th 2022
+    - setting to "30 days" skips the verification of objects created or modified
+      more than 30 days ago
 
 ### Output
 
@@ -2218,11 +2240,14 @@ The script also logs a progress update (a summary), every 10 seconds by default,
 Description of the properties in the summary/progress update log,
 
 - **srcListedCount** - total number of objects listed from source
-- **dstProcessedCount** - total number of objects checked in destination (includes missing, mismatched & failed)
-- **skippedByDate** - total number of objects skipped verification because of a date filter `SKIP_OLDER_THAN`
+- **dstProcessedCount** - total number of objects checked in destination
+  (includes missing, mismatched & failed)
+- **skippedByDate** - total number of objects skipped verification because of a
+  date filter `SKIP_OLDER_THAN`
 - **missingInDstCount** - total number of objects missing in destination
 - **sizeMismatchCount** - total number of objects with mismtached size in destination
-- **dstFailedMdRetrievalsCount** - total number of failed object metadata retrievals (after retries) from destination
+- **dstFailedMdRetrievalsCount** - total number of failed object metadata
+  retrievals (after retries) from destination
 - **replicatedCount** - total number of successful replications
 - **srcBucket** - source bucket
 - **dstBucket** - destination bucket
@@ -2387,7 +2412,8 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-API requests to `/api/report` require this API token to be present in the `Authorization` header.
+API requests to `/api/report` require this API token to be present in the
+`Authorization` header.
 
 ```shell
 curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report
@@ -2395,9 +2421,11 @@ curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/re
 
 #### Scale Factor
 
-Scale factor is provided as a floating point number that represents the percentage to scale reported byte values.
+Scale factor is provided as a floating point number that represents the
+percentage to scale reported byte values.
 It is used to account for the overhead of erasure coding on the storage backend.
-For example, a value of `1.4` will output byte numbers 140% of the calculated value ie 100 bytes will be reported as 140 bytes.
+For example, a value of `1.4` will output byte numbers 140% of the calculated
+value ie 100 bytes will be reported as 140 bytes.
 If this produces a non-integer result it is rounded up to the next whole number.
 
 It can be set using the `SIDECAR_SCALE_FACTOR` environment variable.
@@ -2411,9 +2439,11 @@ docker run -d \
 
 #### TLS
 
-TLS can be enabled for the api server as well as internal connections to vault and bucketd.
-To enable TLS for the API server specify the path to the TLS certificate and key using
-the `SIDECAR_TLS_KEY_PATH` and `SIDECAR_TLS_CERT_PATH` environment variables.
+TLS can be enabled for the api server as well as internal connections to vault
+and bucketd.
+To enable TLS for the API server specify the path to the TLS certificate and key
+using the `SIDECAR_TLS_KEY_PATH` and `SIDECAR_TLS_CERT_PATH` environment
+variables.
 A CA can optionally be set using `SIDECAR_TLS_CA_PATH`.
 Certificates should be mounted into the container using a docker volume.
 
@@ -2427,7 +2457,9 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-To enable TLS for internal connections to vault or bucketd set `SIDECAR_VAULT_ENABLE_TLS=true` or `SIDECAR_BUCKETD_ENABLE_TLS=true` respectively.
+To enable TLS for internal connections to vault or bucketd set
+`SIDECAR_VAULT_ENABLE_TLS=true` or `SIDECAR_BUCKETD_ENABLE_TLS=true`
+respectively.
 
 ```shell
 docker run -d \
@@ -2464,7 +2496,8 @@ docker run -d \
 ##### Warp 10
 
 The Warp 10 address is configured using `SIDECAR_WARP10_NODE`.
-The Warp 10 `nodeId` must be included (normally matches ansible inventory name plus port ie `md1-cluster1:4802`).
+The Warp 10 `nodeId` must be included (normally matches ansible inventory name
+plus port ie `md1-cluster1:4802`).
 The format is `<nodeId>@<host>:<port>`.
 
 ```shell
@@ -2492,7 +2525,9 @@ docker run -d \
 #### Other Settings
 
 - Log level can be set using `SIDECAR_LOG_LEVEL` (defaults to `info`)
-- The concurrency used to query backend APIs can be set using `SIDECAR_CONCURRENCY_LIMIT` (defaults to 10)
-- The maximum retries allowed when querying backend APIs can be set using `SIDECAR_RETRY_LIMIT` (defaults to 5)
+- The concurrency used to query backend APIs can be set using
+  `SIDECAR_CONCURRENCY_LIMIT` (defaults to 10)
+- The maximum retries allowed when querying backend APIs can be set using
+  `SIDECAR_RETRY_LIMIT` (defaults to 5)
 - The IP address to bind can be set using `SIDECAR_HOST` (default `0.0.0.0`)
 - The port to bind can be set using `SIDECAR_PORT` (default `24742`)

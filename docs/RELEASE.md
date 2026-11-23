@@ -32,7 +32,9 @@ To release a production image:
 
 - Create a PR and merge the `package.json` change.
 
-- Run the workflow [action release](https://github.com/scality/s3utils/actions/workflows/release.yml) using
+- Run the workflow
+  [action release](https://github.com/scality/s3utils/actions/workflows/release.yml)
+  using
     - A given branch that ideally matches the tag.
     - Fill the field `tag` with the actual tag
     - Fill the field `prerelease` with true if it's one

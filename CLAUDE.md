@@ -1,10 +1,15 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
 ## Project Overview
 
-s3utils is a collection of utilities and scripts for managing S3-compatible storage at scale, specifically designed for Scality S3 Connector (S3C) and Zenko deployments. The project provides operational tools for Cross-Region Replication (CRR), metadata verification, Raft consensus debugging, and data integrity checks.
+s3utils is a collection of utilities and scripts for managing S3-compatible
+storage at scale, specifically designed for Scality S3 Connector (S3C) and Zenko
+deployments. The project provides operational tools for Cross-Region Replication
+(CRR), metadata verification, Raft consensus debugging, and data integrity
+checks.
 
 ## Common Commands
 
@@ -34,7 +39,8 @@ yarn lint -- --max-warnings 0
 
 ### Running Scripts
 
-Most scripts are executed directly with Node.js and require environment variables for configuration:
+Most scripts are executed directly with Node.js and require environment
+variables for configuration:
 
 ```bash
 # Example: CRR existing objects
@@ -47,7 +53,8 @@ node verifyBucketSproxydKeys.js
 node cleanupNoncurrentVersions.js bucket1,bucket2
 ```
 
-Many scripts are also designed to run inside Docker containers with proper network and volume mounts (see README.md for specific examples).
+Many scripts are also designed to run inside Docker containers with proper
+network and volume mounts (see README.md for specific examples).
 
 ## Architecture Overview
 
@@ -55,22 +62,35 @@ Many scripts are also designed to run inside Docker containers with proper netwo
 
 **Script Categories:**
 
-- **CRR Management** (`CRR/`, `crrExistingObjects.js`, `autoRetryFailedCRR.js`, `requeueFailedCRRCronJob.js`): Cross-Region Replication utilities for triggering and managing replication of existing objects
-- **Metadata Verification** (`verifyBucketSproxydKeys.js`, `VerifyBucketSproxydKeys/`): Validates sproxyd keys referenced in S3 metadata exist on storage backend
-- **Raft Consensus Tools** (`CompareRaftMembers/`): Compares metadata databases between Raft leader and followers to detect and repair divergences
-- **Data Cleanup** (`cleanupBuckets.js`, `cleanupNoncurrentVersions.js`, `removeDeleteMarkers.js`): Utilities for managing object versions and lifecycle
-- **Replication Verification** (`VerifyReplication/`): Compares source and destination buckets to verify replication completeness
-- **Object Repair** (`ObjectRepair/`, `repairDuplicateVersions*.js`): Repairs metadata inconsistencies and duplicate keys
-- **Monitoring & Reporting** (`service-level-sidecar/`, `DataReport/`, `bucketVersionsStats.js`): UtapiV2 service-level metrics and bucket statistics
+- **CRR Management** (`CRR/`, `crrExistingObjects.js`, `autoRetryFailedCRR.js`,
+  `requeueFailedCRRCronJob.js`): Cross-Region Replication utilities for
+  triggering and managing replication of existing objects
+- **Metadata Verification** (`verifyBucketSproxydKeys.js`,
+  `VerifyBucketSproxydKeys/`): Validates sproxyd keys referenced in S3 metadata
+  exist on storage backend
+- **Raft Consensus Tools** (`CompareRaftMembers/`): Compares metadata databases
+  between Raft leader and followers to detect and repair divergences
+- **Data Cleanup** (`cleanupBuckets.js`, `cleanupNoncurrentVersions.js`,
+  `removeDeleteMarkers.js`): Utilities for managing object versions and
+  lifecycle
+- **Replication Verification** (`VerifyReplication/`): Compares source and
+  destination buckets to verify replication completeness
+- **Object Repair** (`ObjectRepair/`, `repairDuplicateVersions*.js`): Repairs
+  metadata inconsistencies and duplicate keys
+- **Monitoring & Reporting** (`service-level-sidecar/`, `DataReport/`,
+  `bucketVersionsStats.js`): UtapiV2 service-level metrics and bucket statistics
 - **Utilities** (`Clients/`, `utils/`): Shared S3 and CloudServer client wrappers
 
 ### Key Architectural Patterns
 
 **Client Architecture:**
 
-- `Clients/s3Client.js`: AWS SDK v3 S3 client with custom retry strategy (100 retries with exponential backoff)
-- `Clients/CloudserverClient.js`: Internal CloudServer API client for direct metadata operations
-- Both clients use configurable retry logic and keep-alive connections for high-throughput operations
+- `Clients/s3Client.js`: AWS SDK v3 S3 client with custom retry strategy (100
+  retries with exponential backoff)
+- `Clients/CloudserverClient.js`: Internal CloudServer API client for direct
+  metadata operations
+- Both clients use configurable retry logic and keep-alive connections for
+  high-throughput operations
 
 **Replication Status Management:**
 
@@ -82,11 +102,13 @@ Many scripts are also designed to run inside Docker containers with proper netwo
 **Metadata Database Tools:**
 
 - Uses LevelDB for local metadata storage comparisons
-- `CompareRaftMembers/followerDiff.js`: Compares follower databases against leader view
+- `CompareRaftMembers/followerDiff.js`: Compares follower databases against
+  leader view
 - `CompareRaftMembers/compareFollowerDbs.js`: Compares two follower database sets
 - `CompareRaftMembers/repairObjects.js`: Automatically repairs detected inconsistencies
 - Implements block digests for efficient comparison of large datasets
-- Supports filtering by Raft oplog cseq to eliminate false positives from concurrent updates
+- Supports filtering by Raft oplog cseq to eliminate false positives from
+  concurrent updates
 
 **Stream Processing:**
 
@@ -121,8 +143,10 @@ Scripts follow consistent patterns for configuration:
 ### Testing Architecture
 
 - **Unit Tests:** `tests/unit/` - Mock-based testing of individual components
-- **Functional Tests:** `tests/functional/` - Integration tests requiring MongoDB and workbench
-- **Workbench:** `workbench/env/default/` - Local development environment with CloudServer and dependencies
+- **Functional Tests:** `tests/functional/` - Integration tests requiring
+  MongoDB and workbench
+- **Workbench:** `workbench/env/default/` - Local development environment with
+  CloudServer and dependencies
 - **CI/CD:** GitHub Actions with Docker-based MongoDB and service orchestration
 - Test configuration in `jest.config.js` with separate coverage directories
 
