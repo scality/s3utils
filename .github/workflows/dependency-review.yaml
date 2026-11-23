@@ -14,3 +14,9 @@ jobs:
 
       - name: 'Dependency Review'
         uses: actions/dependency-review-action@v5.0.0
+        with:
+          # katex comes from the mdlint dependencies of @scality/eslint-config-scality
+          # (markdownlint -> micromark-extension-math, which requires katex ^0.16); the
+          # fix is in 0.18.2. Dev-only, and mdlint never renders math: remove once
+          # micromark-extension-math allows a patched katex.
+          allow-ghsas: GHSA-238p-pmpm-9mq7
