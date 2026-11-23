@@ -544,6 +544,7 @@ node verifyBucketSproxydKeys.js
 
     - **RAFT_SESSIONS**: comma-separated list of raft sessions to scan
     - Example :
+
         ```
         docker run --net=host \
         -e 'BUCKETD_HOSTPORT=127.0.0.1:9000' \
@@ -561,6 +562,7 @@ node verifyBucketSproxydKeys.js
       `{"bucket":"bucketname","key":"objectkey\u0000objectversion"}` -
       **note**: if `\u0000objectversion` is not present, it checks the master key
     - Example :
+
         ```
         cat raft_session_1_output.txt | docker run -i --net=host --rm \
         -e 'SPROXYD_HOSTPORT=127.0.0.1:8181' \
