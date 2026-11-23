@@ -457,7 +457,7 @@ node removeReplicationSite.js bucket1[,bucket2...]
 This script deletes all versions of objects in the bucket, including delete markers,
 and aborts any ongoing multipart uploads to prepare the bucket for deletion.
 
-**Note: This deletes the data associated with objects and is not recoverable**
+**Note:** This deletes the data associated with objects and is not recoverable
 
 ```
 node cleanupBuckets.js testbucket1,testbucket2
@@ -2240,7 +2240,7 @@ REST API to provide service level reports for UtapiV2
 
 ### Usage
 
-**Using Warp 10 backend**
+#### Using Warp 10 backend
 
 ```shell
 docker run -d \
@@ -2251,7 +2251,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-**Using Scuba backend**
+#### Using Scuba backend
 
 ```shell
 docker run -d \
@@ -2263,7 +2263,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-**Example output**
+#### Example output
 
 ```shell
 curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report | jq
