@@ -379,7 +379,7 @@ export TARGET_REPLICATION_STATUS=REPLICA
 export MAX_UPDATES=10000
 ```
 
-# Remove a replication site from object metadata
+## Remove a replication site from object metadata
 
 Clean up objects left PENDING forever by a `crrExistingObjects.js` run
 with a wrong `SITE_NAME`. The script removes the site from the object
@@ -404,12 +404,12 @@ is lost. Run it when no such change happens on the target buckets.
 node removeReplicationSite.js bucket1[,bucket2...]
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **ENDPOINT**, **ACCESS_KEY**, **SECRET_KEY**
 - **SITE_TO_REMOVE**: the wrong site name to remove
 
-## Optional environment variables
+### Optional environment variables
 
 - **DRY_RUN**: `true` by default, only logs what would change. Set
   `DRY_RUN=false` to write the changes.
@@ -429,7 +429,7 @@ node removeReplicationSite.js bucket1[,bucket2...]
   a real destination, and stops. Set it to `true` to remove it anyway.
 - **DEBUG**: set to 1 for debug logs
 
-## Procedure
+### Procedure
 
 1. Dry run on the source buckets, check the logs, then run with
    `DRY_RUN=false`.
@@ -438,7 +438,7 @@ node removeReplicationSite.js bucket1[,bucket2...]
 4. Objects reset to "never replicated": run `crrExistingObjects.js` with
    the right `SITE_NAME` to replicate them.
 
-## Notes
+### Notes
 
 - S3C 9.5.2 / 9.5.4: Backbeat routes on the replication `storageClass`.
   After a run with a wrong `SITE_NAME`, the real site re-sends the objects
@@ -452,7 +452,7 @@ node removeReplicationSite.js bucket1[,bucket2...]
   microVersionId format written by s3utils 1.18 (S3C-11591). Check those
   objects after the run.
 
-# Empty a versioned bucket
+## Empty a versioned bucket
 
 This script deletes all versions of objects in the bucket, including delete markers,
 and aborts any ongoing multipart uploads to prepare the bucket for deletion.
@@ -463,11 +463,11 @@ and aborts any ongoing multipart uploads to prepare the bucket for deletion.
 node cleanupBuckets.js testbucket1,testbucket2
 ```
 
-# List objects by replication status
+## List objects by replication status
 
 Two scripts are available for listing objects by replication status:
 
-## List objects with FAILED replication status
+### List objects with FAILED replication status
 
 To list only objects that have failed replication:
 
@@ -475,7 +475,7 @@ To list only objects that have failed replication:
 node listFailedObjects.js testbucket1,testbucket2
 ```
 
-## List objects by configurable replication status
+### List objects by configurable replication status
 
 To list objects with a specific or multiple replication statuses:
 
@@ -483,11 +483,11 @@ To list objects with a specific or multiple replication statuses:
 node listObjectsByReplicationStatus.js testbucket1,testbucket2
 ```
 
-## Required environment variables
+### Required environment variables
 
 The following environment variable is **required** for `listObjectsByReplicationStatus.js`:
 
-### REPLICATION_STATUS
+#### REPLICATION_STATUS
 
 Comma-separated list of replication statuses to list. The recognized statuses are:
 
@@ -507,7 +507,7 @@ List objects that have a replication status of PENDING.
 
 List objects that either have a replication status of PENDING or FAILED.
 
-# Verify existence of sproxyd keys
+## Verify existence of sproxyd keys
 
 This script verifies that :
 
@@ -523,13 +523,13 @@ results as seen by the leader, for the purpose of finding
 discrepancies between raft members, that can be caused by bugs like
 S3C-5739.
 
-## Usage
+### Usage
 
 ```
 node verifyBucketSproxydKeys.js
 ```
 
-## Mandatory environment variables:
+### Mandatory environment variables:
 
 - **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
@@ -570,7 +570,7 @@ node verifyBucketSproxydKeys.js
         node verifyBucketSproxydKeys.js | tee ring_scan_raft_session_1.txt
         ```
 
-## Optional environment variables:
+### Optional environment variables:
 
 - **WORKERS**: concurrency value for sproxyd requests (default 100)
 
@@ -594,12 +594,12 @@ node verifyBucketSproxydKeys.js
 - **LISTING_DIGESTS_BLOCK_SIZE**: number of keys in each listing
   digest block (default 1000)
 
-## Output
+### Output
 
 The output of the script consists of JSON log lines. The most
 important ones are described below.
 
-### Info
+#### Info
 
 ```
 progress update
@@ -636,7 +636,7 @@ Example:
 "message":"progress update","hostname":"e923ec732b42","pid":67}
 ```
 
-### Issue reports
+#### Issue reports
 
 ```
 sproxyd check reported missing key
@@ -721,7 +721,7 @@ jq -r "${JQ_SCRIPT}" verifyBucketSproxydKeys.log | while read url; do
 done
 ```
 
-# Compare follower's databases against leader view
+## Compare follower's databases against leader view
 
 The **CompareRaftMembers/followerDiff** tool compares Metadata leveldb
 databases on the repd follower on which it is run against the leader's
@@ -750,13 +750,13 @@ pre-computed digests database can be generated via a run of
 "verifyBucketSproxydKeys" script, providing it the
 LISTING_DIGESTS_OUTPUT_DIR environment variable.
 
-## Usage
+### Usage
 
 ```
 node followerDiff.js
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
@@ -764,7 +764,7 @@ node followerDiff.js
 
 - **DIFF_OUTPUT_FILE**: file path where diff output will be stored
 
-## Optional environment variables
+### Optional environment variables
 
 - **LISTING_DIGESTS_INPUT_DIR**: read listing digests from the
   specified LevelDB database
@@ -794,7 +794,7 @@ node followerDiff.js
 
         - or any other raft session's oplog at any cseq
 
-## Scan Procedure with Stable Leader
+### Scan Procedure with Stable Leader
 
 **Note**: you may use this procedure when leaders are stable,
 i.e. leader changes are rare in normal circumstances. When leaders
@@ -834,7 +834,7 @@ hasn't changed without sending requests to the leader.
 Note: If running on RH8 or Rocky Linux 8, you may adapt the given
 docker commands with `crictl` instead.
 
-### Pre-check: followers must be up-to-date
+#### Pre-check: followers must be up-to-date
 
 On each raft session, check that all followers are up-to-date with the leader.
 
@@ -849,7 +849,7 @@ make sure that all `committed` values across active `md[x]-cluster[y]`
 members are within less than 100 entries to each other. Ignore values
 of `wsb[x]-cluster[y]` members.
 
-### Step Prep-1: Generate the digests database on one metadata server
+#### Step Prep-1: Generate the digests database on one metadata server
 
 Start by scanning all raft sessions using `verifyBucketSproxydKeys`,
 to generate a digests database in order to have a more efficient scan
@@ -880,7 +880,7 @@ node verifyBucketSproxydKeys.js \
 | tee -a verifyBucketSproxydKeys.log
 ```
 
-### Step Prep-2: Copy the digests database to each active metadata stateful server
+#### Step Prep-2: Copy the digests database to each active metadata stateful server
 
 Example:
 
@@ -891,7 +891,7 @@ for HOST in storage-1 storage-2 storage-3 storage-4 storage-5; do
 done
 ```
 
-### Step Prep-3: Save the list of raft sessions to scan on each stateful server
+#### Step Prep-3: Save the list of raft sessions to scan on each stateful server
 
 The following script computes the list of raft sessions to scan for
 each stateful server, and outputs the result as a series of ssh
@@ -964,7 +964,7 @@ ssh -n 'root'@'storage-5' 'echo 1 2 4 6 7 8 > /tmp/rs-to-scan'
 
 **The following steps are to be run for each active metadata stateful node.**
 
-### Step Scan-1: SSH to next stateful host to scan
+#### Step Scan-1: SSH to next stateful host to scan
 
 Example:
 
@@ -972,7 +972,7 @@ Example:
 ssh root@storage-1
 ```
 
-### Step Scan-2: Gather current cseq of each raft session to scan
+#### Step Scan-2: Gather current cseq of each raft session to scan
 
 This step gathers the current cseq value of the follower repds for all
 raft sessions to be scanned. The result will be passed on to the
@@ -1008,7 +1008,7 @@ session numbers to latest cseq values, and storing it in
 }
 ```
 
-### Step Scan-3: Stop all follower repd processes
+#### Step Scan-3: Stop all follower repd processes
 
 In order to be able to scan the databases, follower repd processes
 must be stopped with the following command:
@@ -1029,7 +1029,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Scan-4: Scan local databases
+#### Step Scan-4: Scan local databases
 
 Run the "CompareRaftMembers/followerDiff" tool to generate a
 line-separated JSON output file showing all differences found between
@@ -1067,7 +1067,7 @@ docker run --net=host --rm \
 file. If you need to re-run the command, first delete the output
 file or give another path as DIFF_OUTPUT_FILE.
 
-### Step Scan-5: Restart all stopped repd processes
+#### Step Scan-5: Restart all stopped repd processes
 
 ```
 for RS in $(cat /tmp/rs-to-scan); do
@@ -1089,7 +1089,7 @@ In case errors occur, restart the command.
 [Step Scan-1](#step-scan-1-ssh-to-next-stateful-host-to-scan) on the next
 active stateful host.**
 
-### Step Results-1: Gather results
+#### Step Results-1: Gather results
 
 Finally, once all scans have been done on all active stateful hosts,
 gather all diff results for later analysis or [repair](#repair-procedure).
@@ -1111,7 +1111,7 @@ repair the divergences. More details on the output format can be found
 in the [tool's description
 summary](#compare-followers-databases-against-leader-view).
 
-### Caveats
+#### Caveats
 
 - The more up-to-date the digests database is, the more efficient the
   subsequent stateful host scans are. This means that it's better not
@@ -1135,7 +1135,7 @@ summary](#compare-followers-databases-against-leader-view).
 - The current version of the script does not support internal TLS
   feature
 
-# Compare two followers database sets
+## Compare two followers database sets
 
 The **CompareRaftMembers/compareFollowerDbs** tool compares two sets
 of Metadata leveldb databases, belonging to two different Metadata
@@ -1156,13 +1156,13 @@ entries, where each entry can be one of:
   is the value seen on follower #1 and "value2" the value seen on
   follower #2.
 
-## Usage
+### Usage
 
 ```
 node compareFollowerDbs.js
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **DATABASES1**: space-separated list of databases of follower #1 to
   compare against follower #2
@@ -1172,7 +1172,7 @@ node compareFollowerDbs.js
 
 - **DIFF_OUTPUT_FILE**: file path where diff output will be stored
 
-## Optional environment variables
+### Optional environment variables
 
 - **PARALLEL_SCANS**: number of databases to scan in parallel (default 4)
 
@@ -1202,7 +1202,7 @@ node compareFollowerDbs.js
 - **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint, needed when
   EXCLUDE_FROM_CSEQS is set (in order to read the Raft oplog)
 
-## Scan Procedure with Unstable Leader
+### Scan Procedure with Unstable Leader
 
 **Note**: you may use this procedure when leaders are unstable,
 i.e. leader changes are frequent or susceptible to happen during the
@@ -1222,7 +1222,7 @@ stopped at some point to copy or read its databases set, then
 restarted. Stopping the leader can have a small temporary impact on
 the traffic.
 
-### Define global configuration values
+#### Define global configuration values
 
 - Choose one node on the system that will be the source from which we
   will copy the set of leveldb databases to a filesystem location that
@@ -1279,7 +1279,7 @@ The following steps will be run as follows:
 - **Step Results-1** is to be run once at the end of the scan, to
   gather results
 
-### Pre-check: followers must be up-to-date
+#### Pre-check: followers must be up-to-date
 
 On each raft session, check that all followers are up-to-date with the leader.
 
@@ -1294,7 +1294,7 @@ make sure that all `committed` values across active `md[x]-cluster[y]`
 members are within less than 100 entries to each other. Ignore values
 of `wsb[x]-cluster[y]` members.
 
-### Step Prep-1: Gather current cseq of each raft session to scan
+#### Step Prep-1: Gather current cseq of each raft session to scan
 
 This step gathers the current cseq value of the **SourceNode** repd
 for all raft sessions to be scanned. The result will be passed on to
@@ -1330,7 +1330,7 @@ session numbers to latest cseq values, and storing it in
 }
 ```
 
-### Step Prep-2: Copy cseqs file to other nodes
+#### Step Prep-2: Copy cseqs file to other nodes
 
 Copy the file just created on **SourceNode** to each other node that
 will be scanned.
@@ -1344,7 +1344,7 @@ for NODE in storage-2 storage-3 storage-4 storage-5; do
 done
 ```
 
-### Step Prep-3: Stop repd processes
+#### Step Prep-3: Stop repd processes
 
 In order to be able to copy the databases, repd processes for the
 corresponding raft sessions to scan must be stopped.
@@ -1367,7 +1367,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Prep-4: Copy databases to the remote location
+#### Step Prep-4: Copy databases to the remote location
 
 Copy the set of LevelDB databases hosting Metadata for the raft
 sessions in `RAFT_SESSIONS_TO_SCAN`, to the remote filesystem location
@@ -1385,7 +1385,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Prep-5: Restart repd processes
+#### Step Prep-5: Restart repd processes
 
 It can be done with the following script:
 
@@ -1408,7 +1408,7 @@ In case errors occur, restart the command.
 **Important**: Run the following Scan steps on each stateful node
 except **SourceNode**.
 
-### Step Scan-1: SSH to next stateful host to scan
+#### Step Scan-1: SSH to next stateful host to scan
 
 SSH to the next stateful host (excluding **SourceNode**) where the
 next scan will run to compare against **SourceNode**.
@@ -1419,7 +1419,7 @@ Example:
 ssh root@storage-2
 ```
 
-### Step Scan-2: Copy remote databases locally
+#### Step Scan-2: Copy remote databases locally
 
 Copy the set of LevelDB databases previously saved from **SourceNode**
 to the remote location locally.
@@ -1430,7 +1430,7 @@ It can be done with the following script:
 rsync -a ${REMOTE_DATABASES_HOST_PATH}/ ${LOCAL_DATABASES_PATH}/
 ```
 
-### Step Scan-3: Stop repd processes
+#### Step Scan-3: Stop repd processes
 
 In order to be able to scan the databases, repd processes must be
 stopped with the following command:
@@ -1451,7 +1451,7 @@ done
 
 In case errors occur, restart the command.
 
-### Step Scan-4: Scan local databases
+#### Step Scan-4: Scan local databases
 
 Run the "CompareRaftMembers/compareFollowerDbs" tool to generate a
 line-separated JSON output file showing all differences found between
@@ -1490,7 +1490,7 @@ docker run --net=host --rm \
 file. If you need to re-run the command, first delete the output
 file or give another path as DIFF_OUTPUT_FILE.
 
-### Step Scan-5: Restart stopped repd processes
+#### Step Scan-5: Restart stopped repd processes
 
 ```
 for RS in ${RAFT_SESSIONS_TO_SCAN}; do
@@ -1512,7 +1512,7 @@ In case errors occur, restart the command.
 [Step Scan-1](#step-scan-1-ssh-to-next-stateful-host-to-scan-1) on the next
 active stateful host.**
 
-### Step Results-1: Gather results
+#### Step Results-1: Gather results
 
 Finally, once all scans have been done on all active stateful hosts
 except **SourceNode**, gather all diff results for later analysis
@@ -1535,7 +1535,7 @@ repair the divergences. More details on the output format can be found
 in the [tool's description
 summary](#compare-followers-databases-against-leader-view).
 
-### Caveats
+#### Caveats
 
 - The current version of the script does not work with Metadata bucket
   format v1, only with v0. If the need arises, it could be made to
@@ -1544,7 +1544,7 @@ summary](#compare-followers-databases-against-leader-view).
 - The current version of the script does not support internal TLS
   feature
 
-# Repair objects affected by raft divergence
+## Repair objects affected by raft divergence
 
 The repair script provided here attempts to automatically repair the
 object metadata affected by divergences between leaders and followers,
@@ -1558,26 +1558,26 @@ the output of followerDiff.js, and repairs the object on metadata if
 deemed safe to do so with a readable version, and if there's no
 ambiguity on what's the best way to repair.
 
-## Usage
+### Usage
 
 ```
     node CompareRaftMembers/repairObjects.js
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
 - **SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
-## Optional environment variables
+### Optional environment variables
 
 - **VERBOSE**: set to 1 for more verbose output (shows one line for
   every sproxyd key checked)
 
 - **DRY_RUN**: set to 1 to log statuses without attempting to repair anything
 
-## Logs
+### Logs
 
 The script outputs logs in JSON. Each object repair analysis or
 attempt outputs a single log line, for example:
@@ -1635,7 +1635,7 @@ logs, looking for "ManualRepair" status):
 {"name":"s3utils:CompareRaftMembers:repairObjects","time":1658796563064,"countByStatus":{"AutoRepair":2,"AutoRepairError":0,"ManualRepair":1,"NotRepairable":0,"UpdatedByClient":0},"level":"info","message":"completed repair","hostname":"jonathan-storage-1","pid":1}
 ```
 
-## Repair Procedure
+### Repair Procedure
 
 To repair a set of objects with inconsistencies, first make sure that
 you ran one of the scan procedures (with [stable
@@ -1643,7 +1643,7 @@ leader](#scan-procedure-with-stable-leader) or [unstable
 leader](#scan-procedure-with-unstable-leader)) and got results ready
 from `scan-results.[host]` directories.
 
-### Example Repair Command
+#### Example Repair Command
 
 Assuming the hosts are named storage-1 through storage-5, this command
 can be used to launch the repair in dry-run mode first (it's a good
@@ -1672,18 +1672,18 @@ docker run -i --net=host --rm \
   node CompareRaftMembers/repairObjects | tee -a repairObjects.log
 ```
 
-# Remove delete markers
+## Remove delete markers
 
 The removeDeleteMarkers.js script removes delete markers from one or
 more versioning-suspended bucket(s).
 
-## Usage
+### Usage
 
 ```
     node removeDeleteMarkers.js bucket1[,bucket2...]
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **ENDPOINT**: S3 endpoint
 
@@ -1691,7 +1691,7 @@ more versioning-suspended bucket(s).
 
 - **SECRET_KEY**: S3 account secret key
 
-## Optional environment variables:
+### Optional environment variables:
 
 - **TARGET_PREFIX**: only process a specific prefix in the bucket(s)
 
@@ -1705,11 +1705,11 @@ more versioning-suspended bucket(s).
 
 - **VERSION_ID_MARKER**: resume processing from a specific version ID
 
-## Output
+### Output
 
 The output of the script consists of JSON log lines.
 
-### Info
+#### Info
 
 One log line is output for each delete marker deleted, e.g.:
 
@@ -1723,7 +1723,7 @@ The script also logs a progress update, every 10 seconds by default:
 {"name":"s3utils::removeDeleteMarkers","time":1586304694304,"objectsListed":257000,"deleteMarkersDeleted":0,"deleteMarkersErrors":0,"bucketInProgress":"some-bucket","keyMarker":"some-key-marker","versionIdMarker":"3938343133373030373134393734393939393938524730303120203533342e3430323230362e373139333039","level":"info","message":"progress update","hostname":"c3f84aa473a2","pid":88}
 ```
 
-# Repair duplicate sproxyd keys
+## Repair duplicate sproxyd keys
 
 This script repairs object versions that share sproxyd keys with
 another version, particularly due to bug S3C-2731.
@@ -1737,32 +1737,32 @@ The script does not remove any version even if the duplicate was due
 to an internal retry in the metadata layer, because either version
 might be referenced by S3 clients in some cases.
 
-## Usage
+### Usage
 
 ```
 node repairDuplicateVersions.js
 ```
 
-## Standard Input
+### Standard Input
 
 The standard input must be fed with the JSON logs output by the
 verifyBucketSproxydKeys.js s3utils script. This script only processes
 the log entries containing the message "duplicate sproxyd key found"
 and ignores other entries.
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
 - **OBJECT_REPAIR_SPROXYD_HOSTPORT**: ip:port of sproxyd endpoint
 
-## Example
+### Example
 
 ```
 cat /tmp/verifyBucketSproxydKeys.log | docker run -i zenko/s3utils:latest bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 OBJECT_REPAIR_SPROXYD_HOSTPORT=127.0.0.1:8181 node repairDuplicateVersions.js' > /tmp/repairDuplicateVersions.log
 ```
 
-## Effect on object metadata
+### Effect on object metadata
 
 In addition to updating the `location` field, the repair tool adds a
 `repairedInfo` field to the metadata of every repaired object version:
@@ -1780,7 +1780,7 @@ the type of inconsistency that triggered the repair. If an object is
 repaired more than once, the field is overwritten with the information
 from the most recent repair.
 
-## Caveat
+### Caveat
 
 While the script is running, there is a possibility, although slim,
 that it updates metadata for an object that is being updated at the
@@ -1796,7 +1796,7 @@ we suggest to disable those operations on the clients during the time
 the script is running (or alternatively, disable all writes), to avoid
 any such risk.
 
-# Repair object metadata with duplicate 'versionId' field
+## Repair object metadata with duplicate 'versionId' field
 
 This script repairs object versions that have a duplicate versionId
 field in the master key and a missing version key, in particular due
@@ -1809,42 +1809,42 @@ present in the binary blob (assumed to be the original one, hence
 correct), then copying it to both the master key and a new version
 key.
 
-## Usage
+### Usage
 
 ```
 node repairDuplicateVersionIds.js
 ```
 
-## Standard Input
+### Standard Input
 
 The standard input must be fed with the JSON logs output by the
 verifyBucketSproxydKeys.js s3utils script. This script only processes
 the log entries containing the message 'object master metadata with
 duplicate "versionId" field found' and ignores other entries.
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **OBJECT_REPAIR_BUCKETD_HOSTPORT**: ip:port of bucketd endpoint
 
-## Example
+### Example
 
 ```
 cat /tmp/verifyBucketSproxydKeys.log | docker run -i ghcr.io/scality/s3utils:1.13.24 bash -c 'OBJECT_REPAIR_BUCKETD_HOSTPORT=127.0.0.1:9000 node repairDuplicateVersionIds.js' > /tmp/repairDuplicateVersionIds.log
 ```
 
-# Cleanup Noncurrent Versions
+## Cleanup Noncurrent Versions
 
 This script removes noncurrent versions and current/noncurrent delete
 markers, either all such objects or older than a specified
 last-modified date.
 
-## Usage
+### Usage
 
 ```
 node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **S3_ENDPOINT**: S3 endpoint URL
 
@@ -1852,7 +1852,7 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 
 - **SECRET_KEY**: S3 account/user secret key
 
-## Optional environment variables
+### Optional environment variables
 
 - **TARGET_PREFIX**: cleanup only inside this key prefix in each bucket
 
@@ -1895,25 +1895,25 @@ node cleanupNoncurrentVersions.js bucket1[,bucket2...]
 - **EXCLUDE_REPLICATING_VERSIONS**: if is set to '1,' 'true,' or 'yes,'
   prevent the deletion of replicating versions
 
-## Example
+### Example
 
 ```
 docker run --net=host -ti zenko/s3utils:latest bash -c 'S3_ENDPOINT=https://s3.customer.com ACCESS_KEY=123456 SECRET_KEY=789ABC OLDER_THAN="Jan 14 2021" node cleanupNoncurrentVersions.js target-bucket-1,target-bucket-2' > /tmp/cleanupNoncurrentVersions.log
 ```
 
-# Count number and total size of current and noncurrent versions in a bucket
+## Count number and total size of current and noncurrent versions in a bucket
 
 The bucketVersionsStats.js script counts the total number of objects
 and their cumulative size, and shows them separately for current and
 noncurrent versions.
 
-## Usage
+### Usage
 
 ```
     node bucketVersionsStats.js
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **ENDPOINT**: S3 endpoint
 
@@ -1923,7 +1923,7 @@ noncurrent versions.
 
 - **BUCKET**: S3 bucket name
 
-## Optional environment variables:
+### Optional environment variables:
 
 - **TARGET_PREFIX**: only process a specific prefix in the bucket
 
@@ -1935,7 +1935,7 @@ noncurrent versions.
 
 - **VERSION_ID_MARKER**: start counting from a specific version ID
 
-## Output
+### Output
 
 The output of the script consists of JSON log lines.
 
@@ -1961,7 +1961,7 @@ The total counts may be possibly limited by the **TARGET_PREFIX**,
     - **size** is the cumulative size in bytes of the objects pertaining
       to the section
 
-### Example Progress Update
+#### Example Progress Update
 
 Note: the JSON output is prettified here for readability, but the
 script outputs this status on a single line.
@@ -1994,7 +1994,7 @@ script outputs this status on a single line.
 }
 ```
 
-### Example Final Summary
+#### Example Final Summary
 
 Note: the JSON output is prettified here for readability, but the
 script outputs this status on a single line.
@@ -2025,17 +2025,17 @@ script outputs this status on a single line.
 }
 ```
 
-# Verify Replication
+## Verify Replication
 
 The verify replication script checks/compares the replication source with the replication destination. The script produces logs about missing objects on destination and destination objects whose size doesnt match the source size. The script verifies only current version of objects. It relies on standard s3 api's for the source and the destination.
 
-## Usage
+### Usage
 
 ```shell
 node VerifyReplication/index.js
 ```
 
-## Mandatory environment variables
+### Mandatory environment variables
 
 - **SRC_ENDPOINT**: replication source s3 endpoint
 
@@ -2051,7 +2051,7 @@ node VerifyReplication/index.js
 
 - **DST_SECRET_KEY**: replication destination s3 account secret key
 
-## Optional environment variables:
+### Optional environment variables:
 
 - **SRC_BUCKET_PREFIXES**: comma separated list of prefixes, listing will be limited to these prefixes
 
@@ -2086,11 +2086,11 @@ node VerifyReplication/index.js
     - setting to "2022-11-30T00:00:00Z" skips the verification of objects created or modified before Nov 30th 2022
     - setting to "30 days" skips the verification of objects created or modified more than 30 days ago
 
-## Output
+### Output
 
 The output of the script consists of JSON log lines.
 
-### Info
+#### Info
 
 One log line is output for each missing object,
 
@@ -2185,7 +2185,7 @@ Description of the properties in the summary/progress update log,
 - **srcBucket** - source bucket
 - **dstBucket** - destination bucket
 
-## Example
+### Example
 
 ```shell
 docker run \
@@ -2206,11 +2206,11 @@ docker run \
   node VerifyReplication/index.js
 ```
 
-# UtapiV2 Service Report
+## UtapiV2 Service Report
 
 Generates a service level usage report from UtapiV2 in HTML or JSON format.
 
-## Usage
+### Usage
 
 Commands must be executed on a stateful server that hosts the target UtapiV2 deployment.
 
@@ -2218,7 +2218,7 @@ Commands must be executed on a stateful server that hosts the target UtapiV2 dep
 docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/conf:/conf:ro -v $PWD:/output zenko/s3utils utapi/service-report.py --output /output
 ```
 
-## Flags
+### Flags
 
 ```
   -c CONFIG, --config CONFIG
@@ -2234,11 +2234,11 @@ docker run --net=host --entrypoint python3 -v /scality/ssd01/s3/scality-utapi/co
   --dry-run             Don't do any computation. Only validate and print the configuration. (default: False)
 ```
 
-# UtapiV2 Service level metrics sidecar
+## UtapiV2 Service level metrics sidecar
 
 REST API to provide service level reports for UtapiV2
 
-## Usage
+### Usage
 
 **Using Warp 10 backend**
 
@@ -2316,7 +2316,7 @@ curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/re
 }
 ```
 
-### Authentication
+#### Authentication
 
 By default a random API key is generated and logged to stdout at startup.
 
@@ -2347,7 +2347,7 @@ API requests to `/api/report` require this API token to be present in the `Autho
 curl -X POST -H "Authorization: Bearer dev_key_change_me" localhost:24742/api/report
 ```
 
-### Scale Factor
+#### Scale Factor
 
 Scale factor is provided as a floating point number that represents the percentage to scale reported byte values.
 It is used to account for the overhead of erasure coding on the storage backend.
@@ -2363,7 +2363,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-### TLS
+#### TLS
 
 TLS can be enabled for the api server as well as internal connections to vault and bucketd.
 To enable TLS for the API server specify the path to the TLS certificate and key using
@@ -2391,9 +2391,9 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-### Backend addresses
+#### Backend addresses
 
-#### Vault
+##### Vault
 
 Vault is configured using `SIDECAR_VAULT_ENDPOINT`
 
@@ -2404,7 +2404,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-#### Bucketd
+##### Bucketd
 
 Bucketd is configured using `SIDECAR_BUCKETD_BOOTSTRAP`
 
@@ -2415,7 +2415,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-#### Warp 10
+##### Warp 10
 
 The Warp 10 address is configured using `SIDECAR_WARP10_NODE`.
 The Warp 10 `nodeId` must be included (normally matches ansible inventory name plus port ie `md1-cluster1:4802`).
@@ -2428,7 +2428,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-#### Scuba
+##### Scuba
 
 The scuba backend can be enabled by setting `SIDECAR_ENABLE_SCUBA`.
 A bucketd address can be provided using `SIDECAR_SCUBA_BUCKETD_BOOTSTRAP`.
@@ -2443,7 +2443,7 @@ docker run -d \
   scality/s3utils service-level-sidecar/index.js
 ```
 
-### Other Settings
+#### Other Settings
 
 - Log level can be set using `SIDECAR_LOG_LEVEL` (defaults to `info`)
 - The concurrency used to query backend APIs can be set using `SIDECAR_CONCURRENCY_LIMIT` (defaults to 10)
