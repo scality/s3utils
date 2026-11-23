@@ -184,7 +184,7 @@ the script stops.
 #### KEY_MARKER
 
 Set to resume from where an earlier invocation stopped (see
-[MAX_UPDATES, MAX_SCANNED](#MAX_UPDATES)).
+[MAX_UPDATES, MAX_SCANNED](#max_updates-max_scanned)).
 
 Example:
 
@@ -193,7 +193,7 @@ Example:
 #### VERSION_ID_MARKER
 
 Set to resume from where an earlier invocation stopped (see
-[MAX_UPDATES](#MAX_UPDATES)).
+[MAX_UPDATES](#max_updates-max_scanned)).
 
 Example:
 
