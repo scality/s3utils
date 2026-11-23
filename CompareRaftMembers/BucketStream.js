@@ -26,18 +26,15 @@ class BucketStream extends stream.Readable {
         this.bucketName = bucketName;
         this.marker = marker;
         this.lastKey = lastKey;
-        // S3UTILS-264: the interval below reads this.retryDelayMs and this.maxRetryDelayMs, which are never set
-        // eslint-disable-next-line no-unused-vars
         const retryDelayMs = userRetryDelayMs || 1000;
-        // eslint-disable-next-line no-unused-vars
         const maxRetryDelayMs = userMaxRetryDelayMs || 10000;
         this.retryParams = {
             times: 20,
             interval: retryCount =>
                 Math.min(
                     // the first retry comes as "retryCount=2", hence substract 2
-                    this.retryDelayMs * 2 ** (retryCount - 2),
-                    this.maxRetryDelayMs,
+                    retryDelayMs * 2 ** (retryCount - 2),
+                    maxRetryDelayMs,
                 ),
         };
         // for filtering seen master keys from listing

@@ -299,4 +299,26 @@ describe('BucketStream', () => {
             })
             .on('error', done);
     });
+
+    test('retries should be spaced by the given delays, doubling up to the maximum', () => {
+        const bucketStream = new BucketStream({
+            bucketdHost: 'localhost',
+            bucketdPort: httpServer.address().port,
+            bucketName: 'test-bucket',
+            retryDelayMs: 10,
+            maxRetryDelayMs: 100,
+        });
+        const { interval } = bucketStream.retryParams;
+        expect([2, 3, 4, 5, 6, 7].map(interval)).toEqual([10, 20, 40, 80, 100, 100]);
+    });
+
+    test('retries should be spaced from 1 to 10 seconds by default', () => {
+        const bucketStream = new BucketStream({
+            bucketdHost: 'localhost',
+            bucketdPort: httpServer.address().port,
+            bucketName: 'test-bucket',
+        });
+        const { interval } = bucketStream.retryParams;
+        expect([2, 3, 5, 6].map(interval)).toEqual([1000, 2000, 8000, 10000]);
+    });
 });
