@@ -8,7 +8,7 @@ const { http: httpArsn } = require('httpagent');
 const { Logger } = require('werelogs');
 const { jsutil, errors, versioning } = require('@scality/arsenal');
 
-const getBucketdURL = require('../VerifyBucketSproxydKeys/getBucketdURL');
+const getBucketdURL = require('../MetadataScan/getBucketdURL');
 const getRepairStrategy = require('./RepairObjects/getRepairStrategy');
 
 const VID_SEP = versioning.VersioningConstants.VersionId.Separator;

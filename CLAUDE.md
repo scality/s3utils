@@ -47,7 +47,7 @@ variables for configuration:
 node crrExistingObjects.js bucket1,bucket2
 
 # Example: Verify bucket sproxyd keys
-node verifyBucketSproxydKeys.js
+node metadataScan.js
 
 # Example: Cleanup noncurrent versions
 node cleanupNoncurrentVersions.js bucket1,bucket2
@@ -65,9 +65,9 @@ network and volume mounts (see README.md for specific examples).
 - **CRR Management** (`CRR/`, `crrExistingObjects.js`, `autoRetryFailedCRR.js`,
   `requeueFailedCRRCronJob.js`): Cross-Region Replication utilities for
   triggering and managing replication of existing objects
-- **Metadata Verification** (`verifyBucketSproxydKeys.js`,
-  `VerifyBucketSproxydKeys/`): Validates sproxyd keys referenced in S3 metadata
-  exist on storage backend
+- **Metadata Verification** (`metadataScan.js` (formerly
+  `verifyBucketSproxydKeys.js`, kept as a symlink), `MetadataScan/`): Validates
+  sproxyd keys referenced in S3 metadata exist on storage backend
 - **Raft Consensus Tools** (`CompareRaftMembers/`): Compares metadata databases
   between Raft leader and followers to detect and repair divergences
 - **Data Cleanup** (`cleanupBuckets.js`, `cleanupNoncurrentVersions.js`,

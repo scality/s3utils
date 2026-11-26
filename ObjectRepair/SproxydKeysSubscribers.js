@@ -3,7 +3,7 @@ const { Logger } = require('werelogs');
 const { MultiMap, BoundedMap } = require('./DuplicateKeysWindow');
 const { repairObject } = require('../repairDuplicateVersionsSuite');
 const { ProxyLoggerCreator } = require('./Logging');
-const getObjectURL = require('../VerifyBucketSproxydKeys/getObjectURL');
+const getObjectURL = require('../MetadataScan/getObjectURL');
 const { env } = require('./env');
 
 const log = new ProxyLoggerCreator(new Logger('ObjectRepair:SproxydKeysSubscribers'));
