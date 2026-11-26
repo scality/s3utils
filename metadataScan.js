@@ -241,10 +241,10 @@ function raftSessionsToBuckets(ctx, cb) {
         const url = `http://${ctx.config.bucketdHostport}/_/raft_sessions/${rs}/bucket`;
         httpRequest(ctx.httpAgent, 'GET', url, (err, res) => {
             if (err) {
-                return cb(err);
+                return done(err);
             }
             if (res.statusCode !== 200) {
-                return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
+                return done(new Error(`GET ${url} returned status ${res.statusCode}`));
             }
             const resp = JSON.parse(res.body);
             ctx.remainingBuckets = ctx.remainingBuckets.concat(resp.filter(
