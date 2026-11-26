@@ -621,7 +621,7 @@ function getExitCode(scanStatus) {
  */
 function main(ctx, cb) {
     const { config } = ctx;
-    const progressTimer = setInterval(
+    ctx.progressTimer = setInterval(
         () => logProgress(ctx, 'progress update'),
         config.logProgressInterval * 1000
     );
@@ -659,9 +659,7 @@ function main(ctx, cb) {
             }
         },
     ], err => {
-        // release resources that would keep the process alive
-        clearInterval(progressTimer);
-        ctx.httpAgent.destroy();
+        releaseResources(ctx);
 
         if (err instanceof UsageError) {
             return cb(err);
@@ -678,50 +676,127 @@ function main(ctx, cb) {
     });
 }
 
+/**
+ * Release the resources that would keep the process alive
+ *
+ * @param {object} ctx - scan context
+ * @return {undefined}
+ */
+function releaseResources(ctx) {
+    clearInterval(ctx.progressTimer);
+    ctx.httpAgent.destroy();
+}
+
+/**
+ * Stop a running scan, logging its last status
+ *
+ * In-flight requests are aborted, the scan is not meant to be
+ * resumed afterwards.
+ *
+ * @param {object} ctx - scan context
+ * @return {undefined}
+ */
 function stop(ctx) {
     if (ctx.digestsStream) {
         ctx.digestsStream.destroy();
     }
     ctx.log.info('stopping execution');
     logProgress(ctx, 'last status');
-    process.exit(0);
+    releaseResources(ctx);
+}
+
+/**
+ * Scan the metadata of objects, see USAGE for details
+ *
+ * @param {object} params - parameters
+ * @param {string[]} [params.argv] - command-line arguments,
+ * including the node executable and script path (e.g. process.argv)
+ * @param {object} [params.env] - environment variables
+ * (e.g. process.env)
+ * @param {AbortSignal} [params.signal] - signal to stop the scan:
+ * when aborted, the scan logs its last status and the returned
+ * promise is rejected with the abort reason
+ * @return {Promise<object>} - resolves with { status, exitCode }
+ * when the scan completes, where "status" holds the scan counters
+ * and "exitCode" is the process exit code reflecting the scan
+ * results (see getExitCode()); rejects with a UsageError on invalid
+ * options, or with another error if the scan could not complete
+ */
+function metadataScan({ argv = [], env = {}, signal } = {}) {
+    return new Promise((resolve, reject) => {
+        if (signal && signal.aborted) {
+            return reject(signal.reason);
+        }
+        let config;
+        try {
+            config = getConfig({ env, argv });
+        } catch (err) {
+            return reject(new UsageError(err.message));
+        }
+        const log = new Logger('s3utils:metadataScan');
+        let ctx;
+        try {
+            ctx = createScanContext(config, log);
+        } catch (err) {
+            log.error('error initializing scan', {
+                error: { message: err.message },
+            });
+            return reject(err);
+        }
+        const onAbort = () => {
+            stop(ctx);
+            reject(signal.reason);
+        };
+        if (signal) {
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+        return main(ctx, (err, exitCode) => {
+            if (signal) {
+                signal.removeEventListener('abort', onAbort);
+            }
+            if (err) {
+                return reject(err);
+            }
+            return resolve({ status: ctx.status, exitCode });
+        });
+    });
 }
 
 // Run the scan and wire up signal handlers only when this file is launched
 // as a CLI. Skip both when a test requires the file as a module — otherwise
 // the SIGINT / SIGTERM handlers would register against the Jest worker
-// process and `stop()` could silently exit it on signal (which would mask
-// CI timeouts as passing runs).
+// process and silently exit it on signal (which would mask CI timeouts as
+// passing runs).
 if (require.main === module) {
-    const argv = process.argv;
-    if (isHelpRequested(argv.slice(2))) {
+    if (isHelpRequested(process.argv.slice(2))) {
         console.log(USAGE);
         process.exit(0);
     }
-
-    let config;
-    try {
-        config = getConfig({ env: process.env, argv });
-    } catch (err) {
-        console.error(`ERROR: ${err.message}`);
-        console.error(USAGE);
-        process.exit(1);
+    const abortController = new AbortController();
+    for (const signal of ['SIGINT', 'SIGHUP', 'SIGQUIT', 'SIGTERM']) {
+        process.on(signal, () => {
+            // abort listeners run synchronously, so the last status
+            // is logged before exiting
+            abortController.abort();
+            process.exit(0);
+        });
     }
-
-    const ctx = createScanContext(config, new Logger('s3utils:metadataScan'));
-    main(ctx, (err, exitCode) => {
+    metadataScan({
+        argv: process.argv,
+        env: process.env,
+        signal: abortController.signal,
+    }).then(({ exitCode }) => process.exit(exitCode), err => {
         if (err instanceof UsageError) {
             console.error(`ERROR: ${err.message}`);
             console.error(USAGE);
         }
-        process.exit(err ? 1 : exitCode);
+        process.exit(1);
     });
-    for (const signal of ['SIGINT', 'SIGHUP', 'SIGQUIT', 'SIGTERM']) {
-        process.on(signal, () => stop(ctx));
-    }
 }
 
 module.exports = {
+    metadataScan,
+    UsageError,
     httpRequest,
     createScanStatus,
     logProgress,
