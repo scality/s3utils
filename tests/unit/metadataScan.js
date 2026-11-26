@@ -184,15 +184,7 @@ process.env.SPROXYD_HOSTPORT = process.env.SPROXYD_HOSTPORT || 'fake-sproxyd:999
 process.env.BUCKETD_HOSTPORT = process.env.BUCKETD_HOSTPORT || 'fake-bucketd:9998';
 process.env.BUCKETS = process.env.BUCKETS || 'test-bucket';
 
-// The script registers a periodic-progress timer at startup. If we leave it
-// alone the timer keeps the Jest worker alive after the tests finish and
-// Jest crashes with "child process exceptions". Swap setInterval for a
-// no-op while we require the file, then put it back so Jest's own internal
-// timers continue to work.
-const origSetInterval = global.setInterval;
-global.setInterval = () => undefined;
 const vbsk = require('../../metadataScan');
-global.setInterval = origSetInterval;
 
 describe('metadataScan — summary line emits errors count (S3UTILS-236)', () => {
     let logSpy;

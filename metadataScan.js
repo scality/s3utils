@@ -169,11 +169,6 @@ function logProgress(message) {
     });
 }
 
-setInterval(
-    () => logProgress('progress update'),
-    config.logProgressInterval * 1000
-);
-
 
 function httpRequest(method, url, cb) {
     const cbOnce = jsutil.once(cb);
@@ -613,6 +608,10 @@ function getExitCode(scanStatus) {
  * @return {undefined}
  */
 function main(cb) {
+    const progressTimer = setInterval(
+        () => logProgress('progress update'),
+        config.logProgressInterval * 1000
+    );
     async.series([
         done => {
             if (!config.checkMissingSproxydKeys) {
@@ -643,6 +642,10 @@ function main(cb) {
             }
         },
     ], err => {
+        // release resources that would keep the process alive
+        clearInterval(progressTimer);
+        httpAgent.destroy();
+
         if (err instanceof UsageError) {
             return cb(err);
         }
