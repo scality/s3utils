@@ -99,12 +99,15 @@ function createScanStatus() {
  *
  * @param {object} config - scan configuration, see getConfig()
  * @param {werelogs.Logger} log - logger
+ * @param {stream.Readable} stdin - input stream of objects to scan,
+ * used with the "keysFromStdin" option
  * @return {object} - scan context, passed to all scan functions
  */
-function createScanContext(config, log) {
+function createScanContext(config, log, stdin) {
     const ctx = {
         config,
         log,
+        stdin,
         httpAgent: new httpArsn.Agent({
             keepAlive: true,
         }),
@@ -540,7 +543,7 @@ function consumeStdin(ctx, cb) {
     const { config, log } = ctx;
     ctx.findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
 
-    const itemStream = process.stdin.pipe(jsonStream.parse());
+    const itemStream = ctx.stdin.pipe(jsonStream.parse());
     let nParallel = 0;
     let streamDone = false;
     itemStream
@@ -716,13 +719,23 @@ function stop(ctx) {
  * @param {AbortSignal} [params.signal] - signal to stop the scan:
  * when aborted, the scan logs its last status and the returned
  * promise is rejected with the abort reason
+ * @param {stream.Readable} [params.stdin] - input stream of objects
+ * to scan with the "keysFromStdin" option, defaults to process.stdin
+ * @param {werelogs.Logger} [params.logger] - logger, defaults to a
+ * "s3utils:metadataScan" logger
  * @return {Promise<object>} - resolves with { status, exitCode }
  * when the scan completes, where "status" holds the scan counters
  * and "exitCode" is the process exit code reflecting the scan
  * results (see getExitCode()); rejects with a UsageError on invalid
  * options, or with another error if the scan could not complete
  */
-function metadataScan({ argv = [], env = {}, signal } = {}) {
+function metadataScan({
+    argv = [],
+    env = {},
+    signal,
+    stdin = process.stdin,
+    logger = new Logger('s3utils:metadataScan'),
+} = {}) {
     return new Promise((resolve, reject) => {
         if (signal && signal.aborted) {
             return reject(signal.reason);
@@ -733,12 +746,11 @@ function metadataScan({ argv = [], env = {}, signal } = {}) {
         } catch (err) {
             return reject(new UsageError(err.message));
         }
-        const log = new Logger('s3utils:metadataScan');
         let ctx;
         try {
-            ctx = createScanContext(config, log);
+            ctx = createScanContext(config, logger, stdin);
         } catch (err) {
-            log.error('error initializing scan', {
+            logger.error('error initializing scan', {
                 error: { message: err.message },
             });
             return reject(err);
