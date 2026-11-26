@@ -1,4 +1,6 @@
 /* eslint-disable no-console */
+// the scan context "ctx" is designed to be updated by scan functions
+/* eslint no-param-reassign: ["warn", { "props": true, "ignorePropertyModificationsFor": ["ctx"] }] */
 const http = require('http');
 const { http: httpArsn } = require('httpagent');
 const async = require('async');
@@ -71,91 +73,99 @@ Backward compatibility with the legacy script name:
  */
 class UsageError extends Error {}
 
-// only parse the command line when launched as a CLI: when required
-// by a test, process.argv holds the test runner arguments
-const argv = require.main === module ? process.argv : [];
-
-if (isHelpRequested(argv.slice(2))) {
-    console.log(USAGE);
-    process.exit(0);
+/**
+ * Create the status of a scan, with all counters set to zero
+ *
+ * @return {object} - scan status
+ */
+function createScanStatus() {
+    return {
+        objectsSkipped: 0,
+        objectsScanned: 0,
+        objectsWithMissingKeys: 0,
+        objectsWithDupKeys: 0,
+        objectsWithEmptyMetadata: 0,
+        objectsWithDupVersionIds: 0,
+        objectsWithBrokenMetadata: 0,
+        objectsErrors: 0,
+        bucketInProgress: null,
+        KeyMarker: '',
+        bucketsDeleted: 0,
+    };
 }
 
-let config;
-try {
-    config = getConfig({ env: process.env, argv });
-} catch (err) {
-    console.error(`ERROR: ${err.message}`);
-    console.error(USAGE);
-    process.exit(1);
-}
-
-const log = new Logger('s3utils:metadataScan');
-
-const httpAgent = new httpArsn.Agent({
-    keepAlive: true,
-});
-
-const status = {
-    objectsSkipped: 0,
-    objectsScanned: 0,
-    objectsWithMissingKeys: 0,
-    objectsWithDupKeys: 0,
-    objectsWithEmptyMetadata: 0,
-    objectsWithDupVersionIds: 0,
-    objectsWithBrokenMetadata: 0,
-    objectsErrors: 0,
-    bucketInProgress: null,
-    KeyMarker: '',
-    bucketsDeleted: 0
-};
-
-let remainingBuckets = config.buckets || [];
-let sproxydAlias;
-
-// used to skip versions that have already been processed as master key
-let lastMasterKey;
-let lastMasterVersionId;
-
-// helper to detect duplicate sproxyd keys
-let findDuplicateSproxydKeys;
-
-// digests stream, to create block digests from a stream of key/value pairs
-let digestsStream;
-let levelStream;
-if (config.listingDigestsOutputDir) {
-    digestsStream = new BlockDigestsStream({ blockSize: config.listingDigestsBlockSize });
-    levelStream = new BlockDigestsStorage({ levelPath: config.listingDigestsOutputDir });
-    digestsStream.pipe(levelStream);
+/**
+ * Create the context holding the configuration and state of a scan
+ *
+ * @param {object} config - scan configuration, see getConfig()
+ * @param {werelogs.Logger} log - logger
+ * @return {object} - scan context, passed to all scan functions
+ */
+function createScanContext(config, log) {
+    const ctx = {
+        config,
+        log,
+        httpAgent: new httpArsn.Agent({
+            keepAlive: true,
+        }),
+        status: createScanStatus(),
+        remainingBuckets: config.buckets || [],
+        sproxydAlias: undefined,
+        // used to skip versions that have already been processed as master key
+        lastMasterKey: undefined,
+        lastMasterVersionId: undefined,
+        // helper to detect duplicate sproxyd keys
+        findDuplicateSproxydKeys: undefined,
+        // digests stream, to create block digests from a stream of key/value pairs
+        digestsStream: undefined,
+        levelStream: undefined,
+    };
+    if (config.listingDigestsOutputDir) {
+        ctx.digestsStream = new BlockDigestsStream({ blockSize: config.listingDigestsBlockSize });
+        ctx.levelStream = new BlockDigestsStorage({ levelPath: config.listingDigestsOutputDir });
+        ctx.digestsStream.pipe(ctx.levelStream);
+    }
+    return ctx;
 }
 
 /**
  * Restrict the buckets to scan and set the initial listing marker
  * from the FROM_URL option
  *
+ * @param {object} ctx - scan context
  * @param {string} fromUrl - URL to resume from ("s3://bucket[/key]")
  * @return {undefined}
  * @throws {UsageError} - if the URL is invalid or its bucket is not
  * part of the buckets to scan
  */
-function setupFromUrl(fromUrl) {
+function setupFromUrl(ctx, fromUrl) {
     if (!fromUrl.startsWith('s3://')) {
         throw new UsageError('FROM_URL must start with "s3://"');
     }
     const trimmed = fromUrl.slice(5);
     const sep = trimmed.indexOf('/');
     const bucket = (sep !== -1 ? trimmed.slice(0, sep) : trimmed);
-    const bucketIndex = remainingBuckets.indexOf(bucket);
+    const bucketIndex = ctx.remainingBuckets.indexOf(bucket);
     if (bucketIndex === -1) {
         throw new UsageError(`FROM_URL bucket ${bucket} `
-                             + `${config.buckets ? 'is not in BUCKETS'
+                             + `${ctx.config.buckets ? 'is not in BUCKETS'
                                  : 'does not belong to RAFT_SESSIONS'}`);
     }
-    remainingBuckets = remainingBuckets.slice(bucketIndex);
+    ctx.remainingBuckets = ctx.remainingBuckets.slice(bucketIndex);
     const encodedKey = trimmed.slice(bucket.length + 1);
-    status.KeyMarker = decodeURI(encodedKey);
+    ctx.status.KeyMarker = decodeURI(encodedKey);
 }
 
-function logProgress(message) {
+/**
+ * Log the scan status counters and current position
+ *
+ * @param {object} ctx - scan context, only "log", "config" and
+ * "status" attributes are used
+ * @param {string} message - log message
+ * @return {undefined}
+ */
+function logProgress(ctx, message) {
+    const { log, config, status } = ctx;
     log.info(message, {
         skipped: status.objectsSkipped,
         scanned: status.objectsScanned,
@@ -169,8 +179,7 @@ function logProgress(message) {
     });
 }
 
-
-function httpRequest(method, url, cb) {
+function httpRequest(agent, method, url, cb) {
     const cbOnce = jsutil.once(cb);
     const urlObj = new URL(url);
     const req = http.request({
@@ -178,7 +187,7 @@ function httpRequest(method, url, cb) {
         port: urlObj.port,
         path: `${urlObj.pathname}${urlObj.search}`,
         method,
-        agent: httpAgent,
+        agent,
     }, res => {
         if (method === 'HEAD') {
             return cbOnce(null, res);
@@ -203,9 +212,9 @@ function httpRequest(method, url, cb) {
     req.end();
 }
 
-function getSproxydAlias(cb) {
-    const url = `http://${config.sproxydHostport}/.conf`;
-    httpRequest('GET', url, (err, res) => {
+function getSproxydAlias(ctx, cb) {
+    const url = `http://${ctx.config.sproxydHostport}/.conf`;
+    httpRequest(ctx.httpAgent, 'GET', url, (err, res) => {
         if (err) {
             return cb(err);
         }
@@ -215,19 +224,19 @@ function getSproxydAlias(cb) {
             ));
         }
         const resp = JSON.parse(res.body);
-        sproxydAlias = resp['ring_driver:0'].alias;
+        ctx.sproxydAlias = resp['ring_driver:0'].alias;
         return cb();
     });
 }
 
-function raftSessionsToBuckets(cb) {
-    if (!config.raftSessions) {
+function raftSessionsToBuckets(ctx, cb) {
+    if (!ctx.config.raftSessions) {
         return cb();
     }
-    const rsList = config.raftSessions;
+    const rsList = ctx.config.raftSessions;
     return async.each(rsList, (rs, done) => {
-        const url = `http://${config.bucketdHostport}/_/raft_sessions/${rs}/bucket`;
-        httpRequest('GET', url, (err, res) => {
+        const url = `http://${ctx.config.bucketdHostport}/_/raft_sessions/${rs}/bucket`;
+        httpRequest(ctx.httpAgent, 'GET', url, (err, res) => {
             if (err) {
                 return cb(err);
             }
@@ -235,7 +244,7 @@ function raftSessionsToBuckets(cb) {
                 return cb(new Error(`GET ${url} returned status ${res.statusCode}`));
             }
             const resp = JSON.parse(res.body);
-            remainingBuckets = remainingBuckets.concat(resp.filter(
+            ctx.remainingBuckets = ctx.remainingBuckets.concat(resp.filter(
                 bucket => !bucket.startsWith('mpuShadowBucket')
                     && bucket !== 'users..bucket'
             ));
@@ -244,12 +253,12 @@ function raftSessionsToBuckets(cb) {
     }, cb);
 }
 
-function fetchObjectLocations(bucket, objectKey, cb) {
-    const url = getBucketdURL(config.bucketdHostport, {
+function fetchObjectLocations(ctx, bucket, objectKey, cb) {
+    const url = getBucketdURL(ctx.config.bucketdHostport, {
         Bucket: bucket,
         Key: objectKey,
     });
-    httpRequest('GET', url, (err, res) => {
+    httpRequest(ctx.httpAgent, 'GET', url, (err, res) => {
         if (err) {
             return cb(err);
         }
@@ -261,8 +270,9 @@ function fetchObjectLocations(bucket, objectKey, cb) {
     });
 }
 
-function checkSproxydKeys(objectUrl, locations, cb) {
-    if (!validateLocations(objectUrl, locations, status, findDuplicateSproxydKeys)) {
+function checkSproxydKeys(ctx, objectUrl, locations, cb) {
+    const { config, log, status } = ctx;
+    if (!validateLocations(objectUrl, locations, status, ctx.findDuplicateSproxydKeys)) {
         return process.nextTick(cb);
     }
 
@@ -283,7 +293,7 @@ function checkSproxydKeys(objectUrl, locations, cb) {
         return cb();
     };
 
-    const dupInfo = findDuplicateSproxydKeys.insertVersion(objectUrl, locations.map(loc => loc.key));
+    const dupInfo = ctx.findDuplicateSproxydKeys.insertVersion(objectUrl, locations.map(loc => loc.key));
     if (dupInfo) {
         log.error('duplicate sproxyd key found', {
             objectUrl,
@@ -303,8 +313,8 @@ function checkSproxydKeys(objectUrl, locations, cb) {
     }
     return async.eachSeries(locations, (loc, locDone) => {
         // existence check
-        const sproxydUrl = `http://${config.sproxydHostport}/${sproxydAlias}/${loc.key}`;
-        httpRequest('HEAD', sproxydUrl, (err, res) => {
+        const sproxydUrl = `http://${config.sproxydHostport}/${ctx.sproxydAlias}/${loc.key}`;
+        httpRequest(ctx.httpAgent, 'HEAD', sproxydUrl, (err, res) => {
             if (err) {
                 log.error('sproxyd check error', {
                     objectUrl,
@@ -336,29 +346,30 @@ function checkSproxydKeys(objectUrl, locations, cb) {
     }, onComplete);
 }
 
-function fetchAndCheckObject(bucket, itemKey, cb) {
+function fetchAndCheckObject(ctx, bucket, itemKey, cb) {
     const objectUrl = getObjectURL(bucket, itemKey);
-    return fetchObjectLocations(bucket, itemKey, (err, locations) => {
+    return fetchObjectLocations(ctx, bucket, itemKey, (err, locations) => {
         if (err) {
-            log.error('error fetching object locations array', {
+            ctx.log.error('error fetching object locations array', {
                 objectUrl,
                 error: { message: err.message },
             });
-            status.objectsScanned += 1;
-            status.objectsErrors += 1;
+            ctx.status.objectsScanned += 1;
+            ctx.status.objectsErrors += 1;
             return cb();
         }
-        return checkSproxydKeys(objectUrl, locations, () => cb(locations));
+        return checkSproxydKeys(ctx, objectUrl, locations, () => cb(locations));
     });
 }
 
-function listBucketIter(bucket, cb) {
+function listBucketIter(ctx, bucket, cb) {
+    const { config, log, status, digestsStream } = ctx;
     const url = getBucketdURL(config.bucketdHostport, {
         Bucket: bucket,
         MaxKeys: config.listingLimit,
         KeyMarker: status.KeyMarker,
     });
-    httpRequest('GET', url, (err, res) => {
+    httpRequest(ctx.httpAgent, 'GET', url, (err, res) => {
         if (err) {
             return cb(err);
         }
@@ -404,21 +415,21 @@ function listBucketIter(bucket, cb) {
                     });
                     status.objectsWithDupVersionIds += 1;
                     // replace with the (assumed legit) first version
-                    // ID to allow correct skipping of version keys         
+                    // ID to allow correct skipping of version keys
                     md.versionId = versionIds[0];
                 }
-                lastMasterKey = item.key;
-                lastMasterVersionId = md.versionId;
+                ctx.lastMasterKey = item.key;
+                ctx.lastMasterVersionId = md.versionId;
                 if (md.versionId) {
                     digestKey = `${item.key}\0${md.versionId}`;
                 }
             } else {
                 const masterKey = item.key.slice(0, vidSepPos);
-                if (masterKey === lastMasterKey
-                    && md.versionId === lastMasterVersionId) {
+                if (masterKey === ctx.lastMasterKey
+                    && md.versionId === ctx.lastMasterVersionId) {
                     // we have already processed this versioned key as
                     // the master key, so skip it
-                    findDuplicateSproxydKeys.skipVersion();
+                    ctx.findDuplicateSproxydKeys.skipVersion();
                     return itemDone();
                 }
             }
@@ -429,13 +440,13 @@ function listBucketIter(bucket, cb) {
                 });
                 status.objectsScanned += 1;
                 status.objectsWithEmptyMetadata += 1;
-                findDuplicateSproxydKeys.skipVersion();
+                ctx.findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
 
             if (md.isPHD) {
                 // object is a Place Holder Delete (PHD)
-                findDuplicateSproxydKeys.skipVersion();
+                ctx.findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
 
@@ -444,14 +455,14 @@ function listBucketIter(bucket, cb) {
             if (config.mpuOnly && isNotMPU) {
                 // not an MPU object
                 status.objectsSkipped += 1;
-                findDuplicateSproxydKeys.skipVersion();
+                ctx.findDuplicateSproxydKeys.skipVersion();
                 return itemDone();
             }
 
             if (md['content-length'] === 0) {
                 // empty object
                 status.objectsScanned += 1;
-                findDuplicateSproxydKeys.skipVersion();
+                ctx.findDuplicateSproxydKeys.skipVersion();
                 // empty objects should be included in the digest,
                 // hence returning their metadata to the map results
                 return itemDone(null, { key: digestKey, value: item.value });
@@ -461,11 +472,11 @@ function listBucketIter(bucket, cb) {
             // result, we need to fetch the locations array from
             // bucketd explicitly in this case
             if (md.location) {
-                return checkSproxydKeys(objectUrl, md.location, () => {
+                return checkSproxydKeys(ctx, objectUrl, md.location, () => {
                     itemDone(null, { key: digestKey, value: item.value });
                 });
             }
-            return fetchAndCheckObject(bucket, item.key, location => {
+            return fetchAndCheckObject(ctx, bucket, item.key, location => {
                 if (location && digestsStream) {
                     // thanks to preservation of JS object attribute
                     // order, we can attach the locations array and
@@ -500,33 +511,34 @@ function listBucketIter(bucket, cb) {
     });
 }
 
-function listBucket(bucket, cb) {
-    status.bucketInProgress = bucket;
+function listBucket(ctx, bucket, cb) {
+    ctx.status.bucketInProgress = bucket;
 
-    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+    ctx.findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
 
-    logProgress('start scanning bucket');
+    logProgress(ctx, 'start scanning bucket');
     async.doWhilst(
         done => async.retry(
             { times: 100, interval: 5000 },
-            _done => listBucketIter(bucket, _done),
+            _done => listBucketIter(ctx, bucket, _done),
             done
         ),
         async IsTruncated => IsTruncated,
         err => {
-            status.bucketInProgress = null;
-            status.KeyMarker = '';
-            if (digestsStream) {
+            ctx.status.bucketInProgress = null;
+            ctx.status.KeyMarker = '';
+            if (ctx.digestsStream) {
                 // flush the digests stream to output the last bucket block
-                digestsStream.flush();
+                ctx.digestsStream.flush();
             }
             cb(err);
         }
     );
 }
 
-function consumeStdin(cb) {
-    findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
+function consumeStdin(ctx, cb) {
+    const { config, log } = ctx;
+    ctx.findDuplicateSproxydKeys = new FindDuplicateSproxydKeys(DUPLICATE_KEYS_WINDOW_SIZE);
 
     const itemStream = process.stdin.pipe(jsonStream.parse());
     let nParallel = 0;
@@ -545,7 +557,7 @@ function consumeStdin(cb) {
             if (nParallel === config.workers) {
                 itemStream.pause();
             }
-            return fetchAndCheckObject(item.bucket, item.key, () => {
+            return fetchAndCheckObject(ctx, item.bucket, item.key, () => {
                 if (nParallel === config.workers) {
                     itemStream.resume();
                 }
@@ -568,7 +580,6 @@ function consumeStdin(cb) {
             return cb(err);
         });
 }
-
 
 /**
  * Get the process exit code reflecting the scan results
@@ -601,15 +612,17 @@ function getExitCode(scanStatus) {
 /**
  * Run the scan
  *
+ * @param {object} ctx - scan context, see createScanContext()
  * @param {function} cb - callback(err, exitCode): err is a
  * UsageError for invalid options, or another error if the scan could
  * not complete; exitCode is the process exit code reflecting the
  * scan results, see getExitCode()
  * @return {undefined}
  */
-function main(cb) {
+function main(ctx, cb) {
+    const { config } = ctx;
     const progressTimer = setInterval(
-        () => logProgress('progress update'),
+        () => logProgress(ctx, 'progress update'),
         config.logProgressInterval * 1000
     );
     async.series([
@@ -617,26 +630,30 @@ function main(cb) {
             if (!config.checkMissingSproxydKeys) {
                 return done();
             }
-            return getSproxydAlias(done);
+            return getSproxydAlias(ctx, done);
         },
-        done => raftSessionsToBuckets(done),
+        done => raftSessionsToBuckets(ctx, done),
         done => {
             if (config.fromUrl) {
                 try {
-                    setupFromUrl(config.fromUrl);
+                    setupFromUrl(ctx, config.fromUrl);
                 } catch (err) {
                     return done(err);
                 }
             }
             if (config.keysFromStdin) {
-                return consumeStdin(done);
+                return consumeStdin(ctx, done);
             }
-            return async.eachSeries(remainingBuckets, listBucket, done);
+            return async.eachSeries(
+                ctx.remainingBuckets,
+                (bucket, bucketDone) => listBucket(ctx, bucket, bucketDone),
+                done
+            );
         },
         done => {
-            if (digestsStream) {
-                digestsStream.end();
-                levelStream.on('finish', done);
+            if (ctx.digestsStream) {
+                ctx.digestsStream.end();
+                ctx.levelStream.on('finish', done);
             } else {
                 done();
             }
@@ -644,21 +661,30 @@ function main(cb) {
     ], err => {
         // release resources that would keep the process alive
         clearInterval(progressTimer);
-        httpAgent.destroy();
+        ctx.httpAgent.destroy();
 
         if (err instanceof UsageError) {
             return cb(err);
         }
         if (err) {
-            log.error('an error occurred during scan', {
+            ctx.log.error('an error occurred during scan', {
                 error: { message: err.message },
             });
-            logProgress('last status');
+            logProgress(ctx, 'last status');
             return cb(err);
         }
-        logProgress('completed scan');
-        return cb(null, getExitCode(status));
+        logProgress(ctx, 'completed scan');
+        return cb(null, getExitCode(ctx.status));
     });
+}
+
+function stop(ctx) {
+    if (ctx.digestsStream) {
+        ctx.digestsStream.destroy();
+    }
+    ctx.log.info('stopping execution');
+    logProgress(ctx, 'last status');
+    process.exit(0);
 }
 
 // Run the scan and wire up signal handlers only when this file is launched
@@ -667,31 +693,37 @@ function main(cb) {
 // process and `stop()` could silently exit it on signal (which would mask
 // CI timeouts as passing runs).
 if (require.main === module) {
-    main((err, exitCode) => {
+    const argv = process.argv;
+    if (isHelpRequested(argv.slice(2))) {
+        console.log(USAGE);
+        process.exit(0);
+    }
+
+    let config;
+    try {
+        config = getConfig({ env: process.env, argv });
+    } catch (err) {
+        console.error(`ERROR: ${err.message}`);
+        console.error(USAGE);
+        process.exit(1);
+    }
+
+    const ctx = createScanContext(config, new Logger('s3utils:metadataScan'));
+    main(ctx, (err, exitCode) => {
         if (err instanceof UsageError) {
             console.error(`ERROR: ${err.message}`);
             console.error(USAGE);
         }
         process.exit(err ? 1 : exitCode);
     });
-    process.on('SIGINT', stop);
-    process.on('SIGHUP', stop);
-    process.on('SIGQUIT', stop);
-    process.on('SIGTERM', stop);
-}
-
-function stop() {
-    if (digestsStream) {
-        digestsStream.destroy();
+    for (const signal of ['SIGINT', 'SIGHUP', 'SIGQUIT', 'SIGTERM']) {
+        process.on(signal, () => stop(ctx));
     }
-    log.info('stopping execution');
-    logProgress('last status');
-    process.exit(0);
 }
 
 module.exports = {
     httpRequest,
-    status,
-    log,
+    createScanStatus,
     logProgress,
+    getExitCode,
 };

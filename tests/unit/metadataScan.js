@@ -177,42 +177,30 @@ describe('metadataScan', () => {
 // result. The test below sets the counter, calls logProgress, and checks
 // the emitted summary contains the expected `errors` value.
 
-// The script reads these env vars at startup and exits if any are missing,
-// so we set them before the require. The hosts are fake — no real requests
-// are made because main() doesn't run when the file is required from a test.
-process.env.SPROXYD_HOSTPORT = process.env.SPROXYD_HOSTPORT || 'fake-sproxyd:9999';
-process.env.BUCKETD_HOSTPORT = process.env.BUCKETD_HOSTPORT || 'fake-bucketd:9998';
-process.env.BUCKETS = process.env.BUCKETS || 'test-bucket';
-
-const vbsk = require('../../metadataScan');
+const { createScanStatus, logProgress } = require('../../metadataScan');
 
 describe('metadataScan — summary line emits errors count (S3UTILS-236)', () => {
-    let logSpy;
+    let ctx;
 
     beforeEach(() => {
-        // Reset the counters so each test starts from zero.
-        Object.keys(vbsk.status).forEach(k => {
-            if (typeof vbsk.status[k] === 'number') {
-                vbsk.status[k] = 0;
-            }
-        });
-        // Spy on the logger so we can inspect what logProgress emits.
-        logSpy = jest.spyOn(vbsk.log, 'info').mockImplementation();
-    });
-
-    afterEach(() => {
-        logSpy.mockRestore();
+        // Each test gets its own scan context with counters starting
+        // from zero, and a mock logger to inspect what logProgress emits.
+        ctx = {
+            log: { info: jest.fn() },
+            config: {},
+            status: createScanStatus(),
+        };
     });
 
     test('should emit errors count from status.objectsErrors when non-404 sproxyd errors have been counted', () => {
         // Use the customer's actual numbers from the bug report: 59,011
         // objects scanned, 27,152 sproxyd errors.
-        vbsk.status.objectsScanned = 59011;
-        vbsk.status.objectsErrors = 27152;
+        ctx.status.objectsScanned = 59011;
+        ctx.status.objectsErrors = 27152;
 
-        vbsk.logProgress('completed scan');
+        logProgress(ctx, 'completed scan');
 
-        expect(logSpy).toHaveBeenCalledWith('completed scan', expect.objectContaining({
+        expect(ctx.log.info).toHaveBeenCalledWith('completed scan', expect.objectContaining({
             scanned: 59011,
             errors: 27152,
         }));
@@ -223,12 +211,12 @@ describe('metadataScan — summary line emits errors count (S3UTILS-236)', () =>
         // read were misspelled, the value would be undefined and the key
         // would vanish from the output entirely — so we first assert the
         // key is present, then assert the value is 0.
-        vbsk.status.objectsScanned = 100;
-        vbsk.status.objectsErrors = 0;
+        ctx.status.objectsScanned = 100;
+        ctx.status.objectsErrors = 0;
 
-        vbsk.logProgress('completed scan');
+        logProgress(ctx, 'completed scan');
 
-        const emitted = logSpy.mock.calls[0][1];
+        const emitted = ctx.log.info.mock.calls[0][1];
         expect('errors' in emitted).toBe(true);
         expect(emitted.errors).toBe(0);
     });
