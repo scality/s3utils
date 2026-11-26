@@ -65,6 +65,12 @@ Backward compatibility with the legacy script name:
   NO_MISSING_KEY_CHECK environment variable to 1, true or yes.
 `;
 
+/**
+ * Error caused by an invalid usage of the script, reported along
+ * with the usage text
+ */
+class UsageError extends Error {}
+
 // only parse the command line when launched as a CLI: when required
 // by a test, process.argv holds the test runner arguments
 const argv = require.main === module ? process.argv : [];
@@ -122,22 +128,27 @@ if (config.listingDigestsOutputDir) {
     digestsStream.pipe(levelStream);
 }
 
+/**
+ * Restrict the buckets to scan and set the initial listing marker
+ * from the FROM_URL option
+ *
+ * @param {string} fromUrl - URL to resume from ("s3://bucket[/key]")
+ * @return {undefined}
+ * @throws {UsageError} - if the URL is invalid or its bucket is not
+ * part of the buckets to scan
+ */
 function setupFromUrl(fromUrl) {
     if (!fromUrl.startsWith('s3://')) {
-        console.error('ERROR: FROM_URL must start with "s3://"');
-        console.error(USAGE);
-        process.exit(1);
+        throw new UsageError('FROM_URL must start with "s3://"');
     }
     const trimmed = fromUrl.slice(5);
     const sep = trimmed.indexOf('/');
     const bucket = (sep !== -1 ? trimmed.slice(0, sep) : trimmed);
     const bucketIndex = remainingBuckets.indexOf(bucket);
     if (bucketIndex === -1) {
-        console.error(`ERROR: FROM_URL bucket ${bucket} `
-                      + `${config.buckets ? 'is not in BUCKETS'
-                          : 'does not belong to RAFT_SESSIONS'}`);
-        console.error(USAGE);
-        process.exit(1);
+        throw new UsageError(`FROM_URL bucket ${bucket} `
+                             + `${config.buckets ? 'is not in BUCKETS'
+                                 : 'does not belong to RAFT_SESSIONS'}`);
     }
     remainingBuckets = remainingBuckets.slice(bucketIndex);
     const encodedKey = trimmed.slice(bucket.length + 1);
@@ -564,7 +575,44 @@ function consumeStdin(cb) {
 }
 
 
-function main() {
+/**
+ * Get the process exit code reflecting the scan results
+ *
+ * @param {object} scanStatus - scan status counters
+ * @return {number} - 0 if no issue was found, otherwise an exit code
+ * specific to the first kind of issue found, in order of precedence:
+ * 101 (missing sproxyd keys), 102 (duplicate sproxyd keys), 104
+ * (empty metadata), 105 (broken metadata), 103 (other errors)
+ */
+function getExitCode(scanStatus) {
+    if (scanStatus.objectsWithMissingKeys) {
+        return 101;
+    }
+    if (scanStatus.objectsWithDupKeys) {
+        return 102;
+    }
+    if (scanStatus.objectsWithEmptyMetadata) {
+        return 104;
+    }
+    if (scanStatus.objectsWithBrokenMetadata) {
+        return 105;
+    }
+    if (scanStatus.objectsErrors) {
+        return 103;
+    }
+    return 0;
+}
+
+/**
+ * Run the scan
+ *
+ * @param {function} cb - callback(err, exitCode): err is a
+ * UsageError for invalid options, or another error if the scan could
+ * not complete; exitCode is the process exit code reflecting the
+ * scan results, see getExitCode()
+ * @return {undefined}
+ */
+function main(cb) {
     async.series([
         done => {
             if (!config.checkMissingSproxydKeys) {
@@ -575,7 +623,11 @@ function main() {
         done => raftSessionsToBuckets(done),
         done => {
             if (config.fromUrl) {
-                setupFromUrl(config.fromUrl);
+                try {
+                    setupFromUrl(config.fromUrl);
+                } catch (err) {
+                    return done(err);
+                }
             }
             if (config.keysFromStdin) {
                 return consumeStdin(done);
@@ -591,31 +643,18 @@ function main() {
             }
         },
     ], err => {
+        if (err instanceof UsageError) {
+            return cb(err);
+        }
         if (err) {
             log.error('an error occurred during scan', {
                 error: { message: err.message },
             });
             logProgress('last status');
-            process.exit(1);
-        } else {
-            logProgress('completed scan');
-            if (status.objectsWithMissingKeys) {
-                process.exit(101);
-            }
-            if (status.objectsWithDupKeys) {
-                process.exit(102);
-            }
-            if (status.objectsWithEmptyMetadata) {
-                process.exit(104);
-            }
-            if (status.objectsWithBrokenMetadata) {
-                process.exit(105);
-            }
-            if (status.objectsErrors) {
-                process.exit(103);
-            }
-            process.exit(0);
+            return cb(err);
         }
+        logProgress('completed scan');
+        return cb(null, getExitCode(status));
     });
 }
 
@@ -625,7 +664,13 @@ function main() {
 // process and `stop()` could silently exit it on signal (which would mask
 // CI timeouts as passing runs).
 if (require.main === module) {
-    main();
+    main((err, exitCode) => {
+        if (err instanceof UsageError) {
+            console.error(`ERROR: ${err.message}`);
+            console.error(USAGE);
+        }
+        process.exit(err ? 1 : exitCode);
+    });
     process.on('SIGINT', stop);
     process.on('SIGHUP', stop);
     process.on('SIGQUIT', stop);
