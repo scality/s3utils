@@ -41,7 +41,7 @@ Most scripts are executed directly with Node.js and require environment variable
 node crrExistingObjects.js bucket1,bucket2
 
 # Example: Verify bucket sproxyd keys
-node verifyBucketSproxydKeys.js
+node metadataScan.js
 
 # Example: Cleanup noncurrent versions
 node cleanupNoncurrentVersions.js bucket1,bucket2
@@ -55,7 +55,7 @@ Many scripts are also designed to run inside Docker containers with proper netwo
 
 **Script Categories:**
 - **CRR Management** (`CRR/`, `crrExistingObjects.js`, `autoRetryFailedCRR.js`, `requeueFailedCRRCronJob.js`): Cross-Region Replication utilities for triggering and managing replication of existing objects
-- **Metadata Verification** (`verifyBucketSproxydKeys.js`, `VerifyBucketSproxydKeys/`): Validates sproxyd keys referenced in S3 metadata exist on storage backend
+- **Metadata Verification** (`metadataScan.js` (formerly `verifyBucketSproxydKeys.js`, kept as a symlink), `MetadataScan/`): Validates sproxyd keys referenced in S3 metadata exist on storage backend
 - **Raft Consensus Tools** (`CompareRaftMembers/`): Compares metadata databases between Raft leader and followers to detect and repair divergences
 - **Data Cleanup** (`cleanupBuckets.js`, `cleanupNoncurrentVersions.js`, `removeDeleteMarkers.js`): Utilities for managing object versions and lifecycle
 - **Replication Verification** (`VerifyReplication/`): Compares source and destination buckets to verify replication completeness
